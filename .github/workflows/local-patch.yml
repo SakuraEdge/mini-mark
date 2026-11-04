@@ -6,6 +6,16 @@ on:
         description: Verified Windows build run
         required: true
         type: string
+      target_version:
+        description: Target release version
+        required: true
+        default: '1.0.4'
+        type: string
+      base_version:
+        description: Installed base release version
+        required: true
+        default: '1.0.3'
+        type: string
 permissions:
   actions: read
   contents: read
@@ -15,6 +25,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       RUN_ID: ${{ inputs.build_run_id }}
+      TARGET_VERSION: ${{ inputs.target_version }}
+      BASE_VERSION: ${{ inputs.base_version }}
     steps:
       - uses: actions/checkout@v4
       - name: Verify build and obtain immutable binaries
@@ -26,10 +38,10 @@ jobs:
           if($LASTEXITCODE -ne 0 -or $run.conclusion -ne 'success' -or $run.head_branch -ne 'main' -or $run.path -ne '.github/workflows/build.yml') { throw 'Unverified build' }
           gh run download $env:RUN_ID --repo $env:GITHUB_REPOSITORY --name Moye-windows-x64 --dir release-assets
           if($LASTEXITCODE -ne 0) { throw 'Artifact download failed' }
-          Expand-Archive -LiteralPath release-assets/Moye-1.0.3-windows-x64.zip -DestinationPath release/new
-          gh release download v1.0.2 --repo $env:GITHUB_REPOSITORY --pattern Moye-1.0.2-windows-x64.zip --pattern Moye-Setup-1.0.2-windows-x64.exe --dir release/base
+          Expand-Archive -LiteralPath "release-assets/Moye-$env:TARGET_VERSION-windows-x64.zip" -DestinationPath release/new
+          gh release download "v$env:BASE_VERSION" --repo $env:GITHUB_REPOSITORY --pattern "Moye-$env:BASE_VERSION-windows-x64.zip" --pattern "Moye-Setup-$env:BASE_VERSION-windows-x64.exe" --dir release/base
           if($LASTEXITCODE -ne 0) { throw 'Base release download failed' }
-          Expand-Archive -LiteralPath release/base/Moye-1.0.2-windows-x64.zip -DestinationPath release/base-expanded
+          Expand-Archive -LiteralPath "release/base/Moye-$env:BASE_VERSION-windows-x64.zip" -DestinationPath release/base-expanded
       - name: Build and validate incremental installer
         shell: pwsh
         run: |
@@ -56,12 +68,12 @@ jobs:
           $list=Join-Path $PWD 'release/patch-files.txt'
           [IO.File]::WriteAllLines($list,$changed,[Text.UTF8Encoding]::new($false))
           $iscc=Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'
-          & $iscc /DAppVersion=1.0.3 "/DPublishDir=$stage" "/DPatchList=$list" installer/Moye.iss
+          & $iscc "/DAppVersion=$env:TARGET_VERSION" "/DPublishDir=$stage" "/DPatchList=$list" installer/Moye.iss
           if($LASTEXITCODE -ne 0) { throw 'Patch compilation failed' }
-          Move-Item -LiteralPath release/Moye-Setup-1.0.3-windows-x64.exe -Destination release/Moye-Patch-1.0.3-windows-x64.exe
+          Move-Item -LiteralPath "release/Moye-Setup-$env:TARGET_VERSION-windows-x64.exe" -Destination "release/Moye-Patch-$env:TARGET_VERSION-windows-x64.exe"
           $target=Join-Path $env:RUNNER_TEMP 'Moye-patch-test'
-          $baseInstaller=(Resolve-Path release/base/Moye-Setup-1.0.2-windows-x64.exe).Path
-          $patchInstaller=(Resolve-Path release/Moye-Patch-1.0.3-windows-x64.exe).Path
+          $baseInstaller=(Resolve-Path "release/base/Moye-Setup-$env:BASE_VERSION-windows-x64.exe").Path
+          $patchInstaller=(Resolve-Path "release/Moye-Patch-$env:TARGET_VERSION-windows-x64.exe").Path
           $arguments=@('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="'+$target+'"'))
           $process=Start-Process $baseInstaller -ArgumentList $arguments -WindowStyle Hidden -PassThru -Wait
           if($process.ExitCode -ne 0) { throw 'Base installation failed' }
@@ -80,4 +92,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Moye-maintenance-patch
-          path: release/Moye-Patch-1.0.3-windows-x64.exe
+          path: release/Moye-Patch-${{ inputs.target_version }}-windows-x64.exe

@@ -67,6 +67,37 @@ test('does not offer commands inside code or URLs', async ({ page }) => {
   await expect(page.getByRole('listbox')).toBeHidden();
 });
 
+test('vertical navigation visits every styled source line in order', async ({ page }) => {
+  const editor = await replace(page, ['# 一级标题', '正文', '## 二级标题', '更多正文', '### 三级标题', '结尾'].join('\n'));
+  await page.getByRole('button', { name: '即时', exact: true }).click();
+  await editor.click();
+  await page.keyboard.press('Control+Home');
+  for (const line of [1, 2, 3, 4, 5, 6]) {
+    await expect(page.locator('#cursor-position')).toHaveText(new RegExp(`^第 ${line} 行`));
+    if (line < 6) await page.keyboard.press('ArrowDown');
+  }
+  for (const line of [5, 4, 3, 2, 1]) {
+    await page.keyboard.press('ArrowUp');
+    await expect(page.locator('#cursor-position')).toHaveText(new RegExp(`^第 ${line} 行`));
+  }
+});
+
+test('source and reading split updates the preview without leaving source editing', async ({ page }) => {
+  const editor = await replace(page, '# 分屏标题\n\n初始内容');
+  await page.getByRole('button', { name: '分屏', exact: true }).click();
+  await expect(page.locator('#surface')).toHaveAttribute('data-mode', 'split');
+  await expect(editor).toBeVisible();
+  await expect(page.locator('#reading-view')).toBeVisible();
+  await expect(page.locator('#reading-view h1')).toHaveText('分屏标题');
+  await editor.click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.insertText('\n\n实时更新');
+  await expect(page.locator('#reading-view')).toContainText('实时更新');
+  await page.getByRole('button', { name: '源码', exact: true }).click();
+  await expect(page.locator('#reading-view')).toBeHidden();
+  await expect(editor).toContainText('实时更新');
+});
+
 test('new document has isolated undo history; draft survives reload', async ({ page }) => {
   page.on('dialog', (dialog) => dialog.accept());
   await replace(page, '# 草稿\n测试中文内容');

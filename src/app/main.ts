@@ -23,7 +23,7 @@ let activeId = '';
 let revision = 0;
 let tabs: TabData[] = [];
 let transitionPending = false;
-interface CachedDocument { document: DocumentData; state: EditorState; mode: EditorMode; scroll: number }
+interface CachedDocument { document: DocumentData; state: EditorState; mode: EditorMode; editorScroll: number; readingScroll: number }
 const documents = new Map<string, CachedDocument>();
 let renderedTabsKey = '';
 const tabElements = new Map<string, HTMLElement>();
@@ -39,6 +39,7 @@ new ResizeObserver(() => positionTabIndicator()).observe(tabsContainer);
 void document.fonts.ready.then(() => positionTabIndicator());
 let outlineTimer: ReturnType<typeof setTimeout>;
 let persistTimer: ReturnType<typeof setTimeout>;
+let previewTimer: ReturnType<typeof setTimeout>;
 let toastTimer: ReturnType<typeof setTimeout>;
 let fontSize = Number(localStorage.getItem('moye.font')) || 16;
 let theme = localStorage.getItem('moye.theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -53,6 +54,10 @@ const view = createEditor(document.querySelector('#editor')!, (update) => {
     document.querySelector('#line-count')!.textContent = `${update.state.doc.lines.toLocaleString()} 行`;
     clearTimeout(outlineTimer);
     outlineTimer = setTimeout(updateOutline, 160);
+    if (mode === 'split') {
+      clearTimeout(previewTimer);
+      previewTimer = setTimeout(refreshPreview, 90);
+    }
     updateSaved(text);
     if (!loading) {
       clearTimeout(persistTimer);
@@ -83,7 +88,10 @@ function cacheCurrent() {
   const previous = documents.get(activeId);
   documents.set(activeId, {
     document: { id: activeId, name, text: view.state.doc.toString(), baseline, revision, path: previous?.document.path },
-    state: view.state, mode, scroll: mode === 'read' ? document.querySelector('#reading-view')!.scrollTop : view.scrollDOM.scrollTop,
+    state: view.state,
+    mode,
+    editorScroll: view.scrollDOM.scrollTop,
+    readingScroll: document.querySelector<HTMLElement>('#reading-view')!.scrollTop,
   });
 }
 function renderTabs() {
@@ -182,10 +190,14 @@ function setMode(next: EditorMode) {
   mode = next;
   document.querySelector('#editor')!.toggleAttribute('hidden', next === 'read');
   const reading = document.querySelector<HTMLElement>('#reading-view')!;
-  reading.hidden = next !== 'read';
-  if (next === 'read') reading.innerHTML = renderMarkdown(view.state.doc.toString());
+  reading.hidden = next !== 'read' && next !== 'split';
+  if (next === 'read' || next === 'split') reading.innerHTML = renderMarkdown(view.state.doc.toString());
   else {
     view.dispatch({ effects: modeCompartment.reconfigure(modeExtensions(next)) });
+    view.focus();
+  }
+  if (next === 'split') {
+    view.dispatch({ effects: modeCompartment.reconfigure(modeExtensions('source')) });
     view.focus();
   }
   document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) => {
@@ -194,7 +206,17 @@ function setMode(next: EditorMode) {
   });
   document.querySelectorAll<HTMLButtonElement>('#format-tools button').forEach((button) => { button.disabled = next === 'read'; });
   document.querySelector('#surface')!.setAttribute('data-mode', next);
+  cacheCurrent();
   if (changed) animateDocumentSwitch();
+}
+
+function refreshPreview() {
+  if (mode === 'read' || mode === 'split') {
+    const reading = document.querySelector<HTMLElement>('#reading-view')!;
+    const scroll = reading.scrollTop;
+    reading.innerHTML = renderMarkdown(view.state.doc.toString());
+    reading.scrollTop = scroll;
+  }
 }
 
 function nativeAction(type: string, payload: Record<string, unknown> = {}) {
@@ -322,7 +344,13 @@ connect((message) => {
     mode = cached?.mode ?? mode;
     if (cached && cached.document.text === current.text) view.setState(cached.state);
     else replaceDocument(view, current.text, mode);
-    documents.set(doc.id, { document: { ...current, baseline }, state: view.state, mode, scroll: cached?.scroll ?? 0 });
+    documents.set(doc.id, {
+      document: { ...current, baseline },
+      state: view.state,
+      mode,
+      editorScroll: cached?.editorScroll ?? 0,
+      readingScroll: cached?.readingScroll ?? 0,
+    });
     applyFont();
     loading = false;
     document.querySelector('#document-name')!.textContent = name;
@@ -332,8 +360,15 @@ connect((message) => {
     document.querySelector('#word-count')!.textContent = `${wordCount(current.text).toLocaleString()} 字`;
     document.querySelector('#line-count')!.textContent = `${view.state.doc.lines.toLocaleString()} 行`;
     setMode(mode);
-    const scroll = cached?.scroll ?? 0;
-    view.requestMeasure({ read: () => scroll, write: top => { if (mode === 'read') document.querySelector('#reading-view')!.scrollTop = top; else view.scrollDOM.scrollTop = top; } });
+    const editorScroll = cached?.editorScroll ?? 0;
+    const readingScroll = cached?.readingScroll ?? 0;
+    view.requestMeasure({
+      read: () => ({ editor: editorScroll, reading: readingScroll }),
+      write: scroll => {
+        if (mode !== 'read') view.scrollDOM.scrollTop = scroll.editor;
+        if (mode === 'read' || mode === 'split') document.querySelector<HTMLElement>('#reading-view')!.scrollTop = scroll.reading;
+      },
+    });
     if (message.recovered) showToast('已恢复上次打开的文档和未保存草稿');
     setTransitionPending(false);
     if (switchingDocument) animateDocumentSwitch();

@@ -51,6 +51,9 @@ internal static class Program {
                 await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-mode=read]').click()");
                 await Wait("!document.getElementById('reading-view').hidden", "Read view did not respond");
                 await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-mode=source]').click()");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-mode=split]').click()");
+                await Wait("document.getElementById('surface').getAttribute('data-mode') === 'split' && !document.getElementById('reading-view').hidden && !document.getElementById('editor').hidden", "Split view did not respond");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-mode=source]').click()");
                 var before = received;
                 await Task.Delay(500);
                 if (received - before > 5) throw new Exception("Workspace messages did not settle");

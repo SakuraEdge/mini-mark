@@ -9,7 +9,7 @@ import { tags } from '@lezer/highlight';
 import { commands, imeBlocksCommand, matchingCommands, slashQuery, type SlashCommand } from './commands';
 import { renderMarkdown, renderMath } from '../markdown/render';
 
-export type EditorMode = 'live' | 'source' | 'read';
+export type EditorMode = 'live' | 'source' | 'read' | 'split';
 export const modeCompartment = new Compartment();
 const fontCompartment = new Compartment();
 const editableCompartment = new Compartment();

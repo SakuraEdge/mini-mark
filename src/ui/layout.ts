@@ -1,6 +1,6 @@
-import { createIcons, PanelLeft, FilePlus2, FolderOpen, Save, ChevronDown, Bold, Italic, Link2, Code2, Sigma, Table2, Quote, Undo2, Redo2, Search, Sun, Moon, Focus, MoreHorizontal, FileCode2, Download, X, Check, Circle, List, PencilLine } from 'lucide';
+import { createIcons, PanelLeft, FilePlus2, FolderOpen, Save, ChevronDown, Bold, Italic, Link2, Code2, Sigma, Table2, Quote, Undo2, Redo2, Search, Sun, Moon, Focus, MoreHorizontal, FileCode2, Download, X, Check, Circle, List, PencilLine, Columns2 } from 'lucide';
 
-const icons = { PanelLeft, FilePlus2, FolderOpen, Save, ChevronDown, Bold, Italic, Link2, Code2, Sigma, Table2, Quote, Undo2, Redo2, Search, Sun, Moon, Focus, MoreHorizontal, FileCode2, Download, X, Check, Circle, List, PencilLine };
+const icons = { PanelLeft, FilePlus2, FolderOpen, Save, ChevronDown, Bold, Italic, Link2, Code2, Sigma, Table2, Quote, Undo2, Redo2, Search, Sun, Moon, Focus, MoreHorizontal, FileCode2, Download, X, Check, Circle, List, PencilLine, Columns2 };
 export function icon(name: string) { return `<i data-lucide="${name}"></i>`; }
 function tool(id: string, label: string, glyph: string, shortcut = '') {
   return `<button class="icon-button" id="${id}" aria-label="${label}" title="${label}${shortcut ? ` · ${shortcut}` : ''}">${icon(glyph)}</button>`;
@@ -30,7 +30,7 @@ export function mountApp(isDesktop: boolean, version: string) {
           ${tool('bold', '加粗', 'bold', 'Ctrl+B')}${tool('italic', '斜体', 'italic', 'Ctrl+I')}${tool('link', '链接', 'link-2', 'Ctrl+K')}<span class="divider"></span>
           ${tool('code', '代码块', 'code-2')}${tool('math', '公式', 'sigma')}${tool('table', '表格', 'table-2')}${tool('quote', '引用', 'quote')}
         </div>
-        <div class="view-switch" role="group" aria-label="编辑视图"><button data-mode="live" class="active" aria-pressed="true">即时</button><button data-mode="source" aria-pressed="false">源码</button><button data-mode="read" aria-pressed="false">阅读</button></div>
+        <div class="view-switch" role="group" aria-label="编辑视图"><button data-mode="live" class="active" aria-pressed="true">即时</button><button data-mode="source" aria-pressed="false">源码</button><button data-mode="read" aria-pressed="false">阅读</button><button data-mode="split" aria-pressed="false" title="左侧源码，右侧阅读">${icon('columns-2')}<span>分屏</span></button></div>
         ${tool('search', '查找与替换', 'search', 'Ctrl+F')}
       </div>
       <div class="document-surface" id="surface"><div id="editor"></div><article class="markdown-body reading-view" id="reading-view" hidden></article></div>
