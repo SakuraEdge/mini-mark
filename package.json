@@ -1,6 +1,6 @@
 {
   "name": "moye-markdown",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "A fast, local-first Windows Markdown editor with Chinese slash commands.",
   "type": "module",

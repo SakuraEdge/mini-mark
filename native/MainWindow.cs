@@ -25,11 +25,14 @@ public sealed class MainWindow : Form {
     private string? closingRequest;
     private PdfRequest? pdfRequest;
     private readonly GitHubUpdates updates;
+    private CancellationTokenSource? updateDownload;
+    private DownloadedInstaller? preparedInstaller;
+    public DownloadedInstaller? InstallerToRun { get; private set; }
     private sealed record PdfRequest(string Id, string DocumentId, string Name, string Text, string? SourceFolder, string Target, TaskCompletionSource<string> Html);
 
     public MainWindow(string[] arguments) {
         args = arguments;
-        dataRoot = Environment.GetEnvironmentVariable("MOYE_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Moye");
+        dataRoot = AppPaths.DataRoot;
         Directory.CreateDirectory(dataRoot);
         sessionFile = Path.Combine(dataRoot, "session-v2.json");
         updates = new GitHubUpdates(dataRoot);
@@ -46,7 +49,7 @@ public sealed class MainWindow : Form {
             CenterToScreen(); await Initialize();
         };
         FormClosing += OnClosing;
-        FormClosed += (_, _) => { draftTimer.Stop(); draftTimer.Dispose(); browser.Dispose(); };
+        FormClosed += (_, _) => { updateDownload?.Cancel(); draftTimer.Stop(); draftTimer.Dispose(); browser.Dispose(); };
         draftTimer.Tick += (_, _) => { draftTimer.Stop(); Persist(); };
     }
 
@@ -109,6 +112,8 @@ public sealed class MainWindow : Form {
             if (type == "openExternal") { OpenExternal(message.GetProperty("url").GetString()); return; }
             if (type == "rendered") { RecordStartup(message); return; }
             if (type == "checkUpdates") { _ = CheckUpdates(message.GetProperty("requestId").GetString()!); return; }
+            if (type == "installUpdate") { _ = InstallUpdate(message.GetProperty("version").GetString()!); return; }
+            if (type == "cancelUpdate") { updateDownload?.Cancel(); return; }
             if (type == "closingText" && (closingRequest is null || message.GetProperty("requestId").GetString() != closingRequest)) return;
             if (!message.TryGetProperty("documentId", out var id)) return;
             var document = workspace.Find(id.GetString());
@@ -151,7 +156,7 @@ public sealed class MainWindow : Form {
         // Leave WebView2's callback before entering a native modal message loop.
         BeginInvoke(() => {
             try { actions.Dequeue()(); }
-            catch (Exception exception) { closingRequest = null; if (!IsDisposed) Post(new { type = "error", message = exception.Message }); }
+            catch (Exception exception) { closingRequest = null; preparedInstaller = null; if (!IsDisposed) Post(new { type = "error", message = exception.Message }); }
             finally {
                 busy = false;
                 if (!IsDisposed) {
@@ -263,18 +268,23 @@ public sealed class MainWindow : Form {
         var decisions = new List<(OpenDocument Document, DialogResult Decision)>();
         foreach (var document in workspace.Documents.Where(item => item.Dirty)) {
             var answer = AskSave(document);
-            if (answer == DialogResult.Cancel) { closingRequest = null; return; }
+            if (answer == DialogResult.Cancel) { CancelClosingUpdate(); return; }
             decisions.Add((document, answer));
         }
         foreach (var (document, decision) in decisions) {
-            if (decision == DialogResult.Yes && !Save(document, false, false)) { closingRequest = null; return; }
+            if (decision == DialogResult.Yes && !Save(document, false, false)) { CancelClosingUpdate(); return; }
         }
         foreach (var (document, decision) in decisions) {
             if (decision != DialogResult.No) continue;
             if (document.Path is null) workspace.Remove(document.Id);
             else document.Text = document.Baseline;
         }
-        Persist(); closingConfirmed = true; Close();
+        Persist(); InstallerToRun = preparedInstaller; closingConfirmed = true; Close();
+    }
+    private void CancelClosingUpdate() {
+        closingRequest = null;
+        if (preparedInstaller is not null) Post(new { type = "updateInstallStatus", message = "已取消安装，继续编辑。", downloading = false });
+        preparedInstaller = null;
     }
     private void Persist() {
         if (!initialized || persistenceBlocked) return;
@@ -324,11 +334,30 @@ public sealed class MainWindow : Form {
     }
     private async Task CheckUpdates(string requestId) {
         try {
-            var releases = await updates.Check();
-            if (!IsDisposed) Post(new { type = "updateResult", requestId, releases });
+            var result = await updates.Check();
+            if (!IsDisposed) Post(new { type = "updateResult", requestId, releases = result.Manifest.Releases, cacheNotice = result.CacheNotice, installSupported = true });
         } catch (Exception exception) {
             if (!IsDisposed) Post(new { type = "updateResult", requestId, error = exception.Message });
         }
+    }
+    private async Task InstallUpdate(string version) {
+        if (updateDownload is not null) return;
+        if (pdfRequest is not null) { Post(new { type = "updateInstallStatus", message = "请先等待 PDF 导出完成。", downloading = false }); return; }
+        updateDownload = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        try {
+            var progress = new Progress<int>(percent => { if (!IsDisposed) Post(new { type = "updateInstallStatus", message = $"正在下载更新… {percent}%", downloading = true }); });
+            var installer = await updates.DownloadInstaller(version, progress, updateDownload.Token);
+            if (IsDisposed) return;
+            if (pdfRequest is not null) { Post(new { type = "updateInstallStatus", message = "安装包已准备好，PDF 导出完成后请再次点击更新。", downloading = false }); return; }
+            if (busy || closingRequest is not null) { Post(new { type = "updateInstallStatus", message = "安装包已准备好，当前操作结束后请再次点击更新。", downloading = false }); return; }
+            preparedInstaller = installer;
+            Post(new { type = "updateInstallStatus", message = "校验通过，正在保存文档并准备覆盖安装。", downloading = false });
+            Close();
+        } catch (OperationCanceledException) {
+            if (!IsDisposed) Post(new { type = "updateInstallStatus", message = "下载已取消或超时，可以重新尝试。", downloading = false });
+        } catch (Exception exception) {
+            if (!IsDisposed) Post(new { type = "updateInstallStatus", message = $"更新未安装：{exception.Message}", downloading = false });
+        } finally { updateDownload?.Dispose(); updateDownload = null; }
     }
     private void RecordStartup(JsonElement message) {
         var file = Environment.GetEnvironmentVariable("MOYE_DIAGNOSTICS_PATH");

@@ -1,51 +1,121 @@
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace Moye;
 
 public sealed class GitHubUpdates {
+    private static readonly string[] Feeds = [
+        "https://raw.githubusercontent.com/SakuraEdge/moye-markdown/updates/stable.json",
+        "https://github.com/SakuraEdge/moye-markdown/releases/latest/download/update.json"
+    ];
     private readonly HttpClient client;
-    private Task<JsonElement>? pending;
+    private readonly string cacheFile, downloadDirectory;
+    private Task<UpdateCheck>? pending;
+    private UpdateCheck? lastResult;
     public GitHubUpdates(string dataRoot, HttpMessageHandler? handler = null) {
-        client = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(15) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("Moye/1.0.0");
-        client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
-        client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+        cacheFile = Path.Combine(dataRoot, "update-cache.json");
+        downloadDirectory = Path.Combine(dataRoot, "Updates");
+        client = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Moye/" + (typeof(GitHubUpdates).Assembly.GetName().Version?.ToString(3) ?? "1.0.2"));
     }
-    public async Task<JsonElement> Check() {
+    public async Task<UpdateCheck> Check() {
+        if (lastResult is { OfflineCache: false } cached && DateTimeOffset.UtcNow >= cached.CheckedAt && DateTimeOffset.UtcNow - cached.CheckedAt < TimeSpan.FromSeconds(10)) return cached;
         var task = pending;
         if (task is null || task.IsCompleted) pending = task = Fetch();
         try { return await task; }
         finally { if (ReferenceEquals(pending, task)) pending = null; }
     }
-    private async Task<JsonElement> Fetch() {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/SakuraEdge/moye-markdown/releases?per_page=100");
+    private async Task<UpdateCheck> Fetch() {
+        foreach (var feed in Feeds) {
+            try {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(7));
+                using var response = await Get(new Uri(feed), timeout.Token);
+                var bytes = await ReadLimited(response, 64 * 1024, timeout.Token);
+                var manifest = UpdateManifest.Parse(bytes);
+                lastResult = new UpdateCheck(manifest, DateTimeOffset.UtcNow, false);
+                try {
+                    Directory.CreateDirectory(Path.GetDirectoryName(cacheFile)!);
+                    DocumentStore.AtomicWrite(cacheFile, JsonSerializer.SerializeToUtf8Bytes(lastResult, UpdateManifest.JsonOptions));
+                } catch (IOException) { } catch (UnauthorizedAccessException) { }
+                return lastResult;
+            } catch (Exception error) when (error is HttpRequestException or IOException or JsonException or OperationCanceledException) { }
+        }
         try {
-            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-            if (response.StatusCode == HttpStatusCode.NotFound) throw new IOException("暂时找不到 GitHub 发布信息，请稍后重试。");
-            if (response.StatusCode == HttpStatusCode.Forbidden || (int)response.StatusCode == 429) throw new IOException("GitHub 请求次数受限，请稍后重试。");
-            if (!response.IsSuccessStatusCode) throw new IOException($"GitHub 暂时不可用（HTTP {(int)response.StatusCode}）。");
-            if (response.Content.Headers.ContentLength > 4 * 1024 * 1024) throw new IOException("GitHub 版本列表过大。");
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
-            using var buffer = new MemoryStream();
-            var chunk = new byte[8192];
-            int read;
-            while ((read = await stream.ReadAsync(chunk, timeout.Token)) > 0) {
-                if (buffer.Length + read > 4 * 1024 * 1024) throw new IOException("GitHub 版本列表过大。");
-                buffer.Write(chunk, 0, read);
+            var cached = JsonSerializer.Deserialize<UpdateCheck>(File.ReadAllBytes(cacheFile), UpdateManifest.JsonOptions);
+            if (cached?.Manifest is not null && cached.CheckedAt <= DateTimeOffset.UtcNow.AddMinutes(1)) {
+                cached.Manifest.Validate();
+                return lastResult = cached with { OfflineCache = true };
             }
-            using var json = JsonDocument.Parse(buffer.ToArray());
-            if (json.RootElement.ValueKind != JsonValueKind.Array) throw new IOException("GitHub 返回的版本列表无效。");
-            // Only expose version metadata to the renderer, never credentials or request headers.
-            return JsonSerializer.SerializeToElement(json.RootElement.EnumerateArray().Select(r => new {
-                tag_name = r.GetProperty("tag_name").GetString(),
-                draft = r.GetProperty("draft").GetBoolean(),
-                prerelease = r.GetProperty("prerelease").GetBoolean()
-            }));
-        } catch (OperationCanceledException) { throw new IOException("连接 GitHub 超时，请稍后重试。"); }
-        catch (HttpRequestException) { throw new IOException("无法连接 GitHub，请检查网络后重试。"); }
-        catch (JsonException) { throw new IOException("GitHub 返回的版本信息无法读取。"); }
+        } catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or ArgumentException) { }
+        throw new IOException("暂时无法连接更新服务，请检查网络后重试。");
+    }
+    private async Task<HttpResponseMessage> Get(Uri uri, CancellationToken cancellation) {
+        for (var hop = 0; hop < 5; hop++) {
+            if (uri.Scheme != "https" || !new[] { "github.com", "raw.githubusercontent.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com" }.Contains(uri.Host))
+                throw new IOException("更新服务重定向到不受信任的地址。");
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation);
+            if ((int)response.StatusCode is 301 or 302 or 303 or 307 or 308) {
+                var next = response.Headers.Location; response.Dispose();
+                if (next is null) throw new IOException("更新地址无效。");
+                uri = new Uri(uri, next); continue;
+            }
+            if (!response.IsSuccessStatusCode) { var status = (int)response.StatusCode; response.Dispose(); throw new IOException($"更新服务暂不可用（HTTP {status}）。"); }
+            return response;
+        }
+        throw new IOException("更新服务重定向过多。");
+    }
+    private static async Task<byte[]> ReadLimited(HttpResponseMessage response, long limit, CancellationToken cancellation) {
+        if (response.Content.Headers.ContentLength > limit) throw new IOException("更新响应超出大小限制。");
+        await using var input = await response.Content.ReadAsStreamAsync(cancellation);
+        using var output = new MemoryStream();
+        var buffer = new byte[8192]; int count;
+        while ((count = await input.ReadAsync(buffer, cancellation)) > 0) {
+            if (output.Length + count > limit) throw new IOException("更新响应超出大小限制。");
+            output.Write(buffer, 0, count);
+        }
+        return output.ToArray();
+    }
+    public async Task<DownloadedInstaller> DownloadInstaller(string tag, IProgress<int> progress, CancellationToken cancellation) {
+        var manifest = lastResult?.Manifest ?? throw new IOException("请先检测更新。");
+        manifest.Validate();
+        var installed = typeof(GitHubUpdates).Assembly.GetName().Version ?? new Version(1, 0, 2);
+        if (tag != "v" + manifest.Version || new Version(manifest.Version) <= new Version(installed.Major, installed.Minor, installed.Build)) throw new IOException("此版本不高于当前版本，请重新检测更新。");
+        Directory.CreateDirectory(downloadDirectory);
+        var target = Path.Combine(downloadDirectory, "Moye-Update.exe");
+        if (await VerifyInstaller(target, manifest.Windows, cancellation)) return new(target, manifest.Windows);
+        var temporary = target + ".part";
+        try {
+            using var response = await Get(new Uri(manifest.Windows.Url), cancellation);
+            if (response.Content.Headers.ContentLength is long declared && declared != manifest.Windows.Size) throw new IOException("安装包大小与发布清单不一致。");
+            await using (var input = await response.Content.ReadAsStreamAsync(cancellation))
+            await using (var output = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true)) {
+                var buffer = new byte[81920]; long received = 0; int count, reported = -1;
+                while ((count = await input.ReadAsync(buffer, cancellation)) > 0) {
+                    received += count;
+                    if (received > manifest.Windows.Size) throw new IOException("安装包超出发布大小。");
+                    await output.WriteAsync(buffer.AsMemory(0, count), cancellation);
+                    var percent = (int)(received * 100 / manifest.Windows.Size);
+                    if (percent != reported) { reported = percent; progress.Report(percent); }
+                }
+                await output.FlushAsync(cancellation);
+            }
+            if (!await VerifyInstaller(temporary, manifest.Windows, cancellation)) throw new IOException("安装包 SHA-256 校验失败，请重试。");
+            File.Move(temporary, target, true);
+            return new(target, manifest.Windows);
+        } finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
+    public static async Task<bool> VerifyInstaller(string file, UpdateAsset asset, CancellationToken cancellation) {
+        if (!File.Exists(file) || new FileInfo(file).Length != asset.Size) return false;
+        await using var stream = File.OpenRead(file);
+        var hash = await SHA256.HashDataAsync(stream, cancellation);
+        return Convert.ToHexString(hash).Equals(asset.Sha256, StringComparison.OrdinalIgnoreCase);
+    }
+    public static bool VerifyBeforeLaunch(DownloadedInstaller installer) {
+        if (!File.Exists(installer.Path) || new FileInfo(installer.Path).Length != installer.Asset.Size) return false;
+        using var stream = File.OpenRead(installer.Path);
+        return Convert.ToHexString(SHA256.HashData(stream)).Equals(installer.Asset.Sha256, StringComparison.OrdinalIgnoreCase);
     }
 }

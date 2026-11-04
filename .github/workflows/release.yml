@@ -42,6 +42,7 @@ jobs:
           tag="v$version"
           notes="$PWD/docs/release-$tag.md"
           test -f "$notes"
+          node scripts/update-manifest.mjs "$version" release-assets
           cd release-assets
           files=("Moye-Setup-$version-windows-x64.exe" "Moye-$version-windows-x64.zip" "Moye-$version-macos-universal.dmg" "Moye-$version-macos-universal.zip")
           for file in "${files[@]}"; do test -s "$file"; done
@@ -51,6 +52,13 @@ jobs:
           else
             gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$BUILD_SHA" --title "墨页 Moye $tag" --notes-file "$notes" --draft
           fi
-          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" "${files[@]}" "SHA256SUMS-$tag.txt" --clobber
+          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" "${files[@]}" "SHA256SUMS-$tag.txt" update.json --clobber
           gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/updates" > /dev/null 2>&1; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/heads/updates -f sha="$BUILD_SHA"
+          fi
+          if ! old_sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/stable.json?ref=updates" --jq .sha 2>/dev/null); then old_sha=''; fi
+          jq -n --arg message "Publish update feed $tag" --arg content "$(base64 -w 0 update.json)" --arg sha "$old_sha" \
+            '{message:$message,content:$content,branch:"updates"} + (if $sha == "" then {} else {sha:$sha} end)' > feed-request.json
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/stable.json" --input feed-request.json > /dev/null
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url,isDraft,isPrerelease,assets

@@ -185,7 +185,7 @@ svg { width: 17px; height: 17px; flex-shrink: 0; }
 .update-dialog header, .update-dialog footer, .update-account { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .update-dialog h2 { font-size: 18px; margin: 0; }
 .update-version, .update-account { font-size: 12px; color: var(--soft); }
-.update-dialog #update-status { min-height: 48px; line-height: 1.7; overflow-wrap: anywhere; }
+.update-dialog #update-status { min-height: 48px; line-height: 1.7; overflow-wrap: anywhere; white-space: pre-line; }
 .update-options { display: grid; gap: 14px; padding: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .update-options label { display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
 .update-options input { accent-color: var(--accent); margin-top: 3px; }

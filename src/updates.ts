@@ -51,6 +51,8 @@ let dialog: HTMLDialogElement;
 let settings = readSettings();
 let pending: { id: string; manual: boolean; timer: ReturnType<typeof setTimeout> } | undefined;
 let candidate: Release | null = null;
+let installSupported = false;
+let installing = false;
 function element<T extends HTMLElement>(id: string) { return document.getElementById(id) as T; }
 function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
@@ -61,8 +63,11 @@ function openDialog() {
 }
 function setResult(text: string) {
   element('update-status').textContent = text;
-  element<HTMLButtonElement>('update-check').disabled = Boolean(pending);
+  element<HTMLButtonElement>('update-check').disabled = Boolean(pending) || installing;
   element<HTMLButtonElement>('update-release').hidden = !candidate;
+  element<HTMLButtonElement>('update-install').hidden = !candidate || !installSupported;
+  element<HTMLButtonElement>('update-install').disabled = installing;
+  element<HTMLButtonElement>('update-cancel').hidden = !installing;
 }
 export function initializeUpdates() {
   const container = document.createElement('div');
@@ -74,7 +79,7 @@ export function initializeUpdates() {
       <label><input id="update-auto" type="checkbox">自动检测更新</label>
       <label><input id="update-suppress" type="checkbox">不再弹出大版本更新提醒</label>
     </div>
-    <footer><button id="update-check">检测更新</button><button id="update-release" class="primary" hidden>查看新版 / 下载</button></footer>
+    <footer><button id="update-cancel" hidden>取消下载</button><button id="update-check">检测更新</button><button id="update-release" hidden>查看新版 / 下载</button><button id="update-install" class="primary" hidden>下载并覆盖更新</button></footer>
   </dialog>`;
   document.body.append(container);
   dialog = element('update-dialog');
@@ -84,6 +89,12 @@ export function initializeUpdates() {
   element('update-auto').onchange = () => { settings.auto = element<HTMLInputElement>('update-auto').checked; saveSettings(); };
   element('update-suppress').onchange = () => { settings.notifyMajor = !element<HTMLInputElement>('update-suppress').checked; saveSettings(); };
   element('update-check').onclick = () => checkUpdates(true);
+  element('update-cancel').onclick = () => send('cancelUpdate');
+  element('update-install').onclick = () => {
+    if (!candidate || installing) return;
+    installing = true; setResult('正在准备更新安装包…');
+    send('installUpdate', { version: candidate.tag_name });
+  };
   element('update-release').onclick = () => { if (candidate) send('openExternal', { url: `https://github.com/SakuraEdge/moye-markdown/releases/tag/${encodeURIComponent(candidate.tag_name)}` }); };
 }
 export function openUpdates() {
@@ -99,6 +110,7 @@ export function scheduleUpdateCheck() {
   setTimeout(() => { if (settings.auto) checkUpdates(false); }, 5000);
 }
 function checkUpdates(manual: boolean) {
+  if (installing) return;
   if (!isDesktop) { setResult('请在桌面版中检测更新。'); return; }
   if (pending) { pending.manual ||= manual; return; }
   if (!manual) { settings.lastAttempt = Date.now(); saveSettings(); }
@@ -109,6 +121,11 @@ function checkUpdates(manual: boolean) {
   send('checkUpdates', { requestId: id });
 }
 export function handleUpdateMessage(message: HostMessage): boolean {
+  if (message.type === 'updateInstallStatus') {
+    installing = message.downloading;
+    setResult(message.message);
+    return true;
+  }
   if (message.type !== 'updateResult') return false;
   if (!pending || pending.id !== message.requestId) return true;
   const manual = pending.manual;
@@ -116,8 +133,10 @@ export function handleUpdateMessage(message: HostMessage): boolean {
   if (message.error) { setResult(message.error); return true; }
   try {
     candidate = latestRelease(message.releases, APP_VERSION);
-    setResult(candidate ? `发现${isMajorUpdate(APP_VERSION, candidate.tag_name) ? '大版本' : '新版本'} ${candidate.tag_name}。` : `当前已是最新正式版本（${APP_VERSION}）。`);
-    if (candidate && !manual && shouldPrompt(settings, APP_VERSION, candidate.tag_name)) {
+    installSupported = message.installSupported === true;
+    const summary = candidate ? `发现${isMajorUpdate(APP_VERSION, candidate.tag_name) ? '大版本' : '新版本'} ${candidate.tag_name}。` : message.cacheNotice ? '缓存中没有高于当前版本的更新。' : `当前已是最新正式版本（${APP_VERSION}）。`;
+    setResult(message.cacheNotice ? `${message.cacheNotice}\n${summary}` : summary);
+    if (candidate && !manual && !message.cacheNotice && shouldPrompt(settings, APP_VERSION, candidate.tag_name)) {
       // Defer the modal until this window is active, so it cannot steal focus.
       const show = () => {
         if (!candidate || !shouldPrompt(settings, APP_VERSION, candidate.tag_name)) return;

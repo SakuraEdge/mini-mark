@@ -10,7 +10,12 @@ public static class Program {
     [STAThread]
     public static void Main(string[] args) {
         Startup.Restart();
-        var dataRoot = Path.GetFullPath(Environment.GetEnvironmentVariable("MOYE_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Moye"));
+        string dataRoot;
+        try { dataRoot = AppPaths.DataRoot; Directory.CreateDirectory(dataRoot); }
+        catch (Exception exception) {
+            MessageBox.Show($"无法打开墨页数据目录，请检查磁盘是否可用。\n{exception.Message}", "墨页", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
         using var instance = new SingleInstance(dataRoot);
         if (!instance.IsPrimary) {
             try { instance.Forward(args); }
@@ -25,5 +30,16 @@ public static class Program {
         var window = new MainWindow(args);
         window.HandleCreated += (_, _) => instance.Listen(arguments => window.BeginInvoke(() => window.OpenFromArguments(arguments)));
         Application.Run(window);
+        if (window.InstallerToRun is DownloadedInstaller installer) {
+            try {
+                if (!GitHubUpdates.VerifyBeforeLaunch(installer)) throw new IOException("安装包在下载后发生变化，已停止安装。");
+                var start = new ProcessStartInfo(installer.Path) { UseShellExecute = true };
+                start.ArgumentList.Add("/DIR=" + AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar));
+                start.ArgumentList.Add("/NORESTART");
+                Process.Start(start);
+            } catch (Exception exception) {
+                MessageBox.Show($"安装程序未能启动，当前版本仍保留。\n{exception.Message}", "墨页更新", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
     }
 }

@@ -12,7 +12,7 @@
 [![Build](https://github.com/SakuraEdge/moye-markdown/actions/workflows/build.yml/badge.svg)](https://github.com/SakuraEdge/moye-markdown/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-MIT-4f729a)](LICENSE)
 
-[下载 Windows 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.1/Moye-Setup-1.0.1-windows-x64.exe) · [下载 macOS 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.1/Moye-1.0.1-macos-universal.dmg) · [全部版本](https://github.com/SakuraEdge/moye-markdown/releases)
+[下载 Windows 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.2/Moye-Setup-1.0.2-windows-x64.exe) · [下载 macOS 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.2/Moye-1.0.2-macos-universal.dmg) · [全部版本](https://github.com/SakuraEdge/moye-markdown/releases)
 
 </div>
 
@@ -34,16 +34,16 @@
 | 同时整理几份笔记 | 多标签、独立撤销、未保存提示、整组草稿恢复 |
 | 把成果分享出去 | 保存 `.md`，导出 A4 PDF 或独立 HTML |
 | 留在自己的电脑里 | 原生文件读写，无账号、云同步或遥测 |
-| 跟上新的正式版本 | GitHub 更新检测，大版本提醒可关闭 |
+| 跟上新的正式版本 | 免登录检测，Windows 覆盖更新，大版本提醒可关闭 |
 
 ## 下载与安装
 
 | 系统 | 推荐下载 | 其他方式 |
 | --- | --- | --- |
-| Windows 10 / 11，x64 | [安装程序 `.exe`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.1/Moye-Setup-1.0.1-windows-x64.exe) | [便携版 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.1/Moye-1.0.1-windows-x64.zip) |
-| macOS 13 Ventura 或更新版本 | [通用版 `.dmg`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.1/Moye-1.0.1-macos-universal.dmg) | [应用包 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.1/Moye-1.0.1-macos-universal.zip) |
+| Windows 10 / 11，x64 | [安装程序 `.exe`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.2/Moye-Setup-1.0.2-windows-x64.exe) | [便携版 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.2/Moye-1.0.2-windows-x64.zip) |
+| macOS 13 Ventura 或更新版本 | [通用版 `.dmg`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.2/Moye-1.0.2-macos-universal.dmg) | [应用包 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.2/Moye-1.0.2-macos-universal.zip) |
 
-macOS 通用版同时包含 **Apple Silicon 与 Intel** 两种架构。校验和见 [SHA256SUMS](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.1/SHA256SUMS-v1.0.1.txt)。
+macOS 通用版同时包含 **Apple Silicon 与 Intel** 两种架构。校验和见 [SHA256SUMS](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.2/SHA256SUMS-v1.0.2.txt)。
 
 ### Windows
 
@@ -94,9 +94,13 @@ PDF 保留可选择的中文文字、数学公式、代码高亮、表格和本�
 
 ## 更新与本地数据
 
-“更多 → 检测更新”可随时检查 GitHub 正式版本。自动检查在编辑器就绪后后台进行，每天最多一次；网络失败不会打断写作。
+“更多 → 检测更新”可随时检查 GitHub 正式版本。v1.0.2 起使用公开静态清单和备用下载地址，不占用 GitHub REST API 的匿名调用额度。自动检查在编辑器就绪后后台进行，每天最多一次；网络失败不会打断写作。有缓存时会显示上次成功检测的时间，不会把缓存当成当前最新结果。
 
-主版本号变化才自动弹窗，例如 **`1.x → 2.x`**。同一主版本不会重复提醒，勾选“不再弹出大版本更新提醒”后会记住选择，手动检测仍然有效。更新只打开发布页，由你选择下载和安装。
+主版本号变化才自动弹窗，例如 **`1.x → 2.x`**。同一主版本不会重复提醒，勾选“不再弹出大版本更新提醒”后会记住选择，手动检测仍然有效。
+
+**Windows：** 点击“下载并覆盖更新”，应用校验安装包大小与 SHA-256，通过正常保存/退出流程后，在原目录运行安装程序。取消保存或下载就取消本次更新。安装器会覆盖同名程序文件，并清理文件清单中已废弃且未被改动的旧文件；草稿、文档、自行新增的文件及 `Data`、`Source`、`Backups` 目录不会被这项清理删除。下载缓存使用固定文件名，不按版本重复堆积。首次从旧版升级需手动下载一次本版安装器。
+
+**macOS：** 下载新版 DMG，将 `Moye.app` 放入原来的 Applications 目录，选择替换。应用外的文档与草稿保留。
 
 <details>
 <summary>查看更新设置</summary>
@@ -111,6 +115,8 @@ PDF 保留可选择的中文文字、数学公式、代码高亮、表格和本�
 | --- | --- | --- |
 | 标签与草稿 | `%LOCALAPPDATA%\Moye\session-v2.json` | `~/Library/Application Support/Moye/session-mac-v1.json` |
 | 旧版迁移 | 自动迁移 v0.1 草稿，保留旧文件 | 首次发布，无旧版数据 |
+
+Windows 可以将程序安装到其他磁盘。需要同时迁移草稿与 WebView2 偏好时，先退出应用，完整复制原数据目录并校验，再将当前用户注册表 `HKCU\Software\Moye\DataDirectory` 设置为新的绝对路径。开发测试可用 `MOYE_DATA_DIR` 环境变量覆盖；数据盘不可用时会报错，不会悄悄切换到空白目录。更新安装器会沿用程序安装路径。
 
 草稿在停止输入后约 820 ms 备份，不会自动覆盖源文件；切换和关闭会同步最后输入。原生保存采用原子写入，保留 UTF-8 BOM、LF/CRLF，检测外部修改。崩溃仍可能丢失备份时间窗口内的输入，请定期保存重要文件。
 

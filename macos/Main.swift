@@ -99,7 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             let id = body["requestId"] as? String ?? ""
             updates.check { result in
                 switch result {
-                case .success(let releases): self.post(["type": "updateResult", "requestId": id, "releases": releases])
+                case .success(let result): self.post(["type": "updateResult", "requestId": id, "releases": result.releases, "cacheNotice": result.cacheNotice as Any? ?? NSNull()])
                 case .failure(let error): self.post(["type": "updateResult", "requestId": id, "error": error.localizedDescription])
                 }
             }; return
