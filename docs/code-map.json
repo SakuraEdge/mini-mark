@@ -215,6 +215,7 @@
       "purpose": "构建与发布",
       "files": [
         ".github/workflows/build.yml",
+        ".github/workflows/local-patch.yml",
         ".github/workflows/release.yml"
       ]
     },

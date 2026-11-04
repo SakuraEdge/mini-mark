@@ -53,6 +53,7 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 | 更新、提醒、下载 | `src/features/updates/`、两平台的 `Updates/` |
 | 数据盘、单实例 | `native/Infrastructure/` |
 | 安装位置、快捷方式、旧文件清理 | `installer/Moye.iss`、`scripts/package-win.ps1` |
+| 网络受限时的维护安装包 | `.github/workflows/local-patch.yml`；基于已经通过验证的发行包生成差异，并校验其余程序文件 |
 
 ## 消息和文档约定
 
