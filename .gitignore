@@ -12,3 +12,4 @@ playwright-report/
 *.user
 *.log
 .DS_Store
+installer/ChineseSimplified.isl

@@ -24,6 +24,7 @@ public sealed class MainWindow : Form {
     private bool initialized, closingConfirmed, busy, persistenceBlocked, draftErrorShown, startupRecorded;
     private string? closingRequest;
     private PdfRequest? pdfRequest;
+    private readonly GitHubUpdates updates;
     private sealed record PdfRequest(string Id, string DocumentId, string Name, string Text, string? SourceFolder, string Target, TaskCompletionSource<string> Html);
 
     public MainWindow(string[] arguments) {
@@ -31,6 +32,7 @@ public sealed class MainWindow : Form {
         dataRoot = Environment.GetEnvironmentVariable("MOYE_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Moye");
         Directory.CreateDirectory(dataRoot);
         sessionFile = Path.Combine(dataRoot, "session-v2.json");
+        updates = new GitHubUpdates(dataRoot);
         Text = "墨页 Moye";
         Width = 1180; Height = 840; MinimumSize = new Size(720, 520);
         StartPosition = FormStartPosition.CenterScreen; BackColor = Color.White;
@@ -106,6 +108,7 @@ public sealed class MainWindow : Form {
             }
             if (type == "openExternal") { OpenExternal(message.GetProperty("url").GetString()); return; }
             if (type == "rendered") { RecordStartup(message); return; }
+            if (type == "checkUpdates") { _ = CheckUpdates(message.GetProperty("requestId").GetString()!); return; }
             if (type == "closingText" && (closingRequest is null || message.GetProperty("requestId").GetString() != closingRequest)) return;
             if (!message.TryGetProperty("documentId", out var id)) return;
             var document = workspace.Find(id.GetString());
@@ -318,6 +321,14 @@ public sealed class MainWindow : Form {
     }
     private static void OpenExternal(string? value) {
         if (Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https") Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+    }
+    private async Task CheckUpdates(string requestId) {
+        try {
+            var releases = await updates.Check();
+            if (!IsDisposed) Post(new { type = "updateResult", requestId, releases });
+        } catch (Exception exception) {
+            if (!IsDisposed) Post(new { type = "updateResult", requestId, error = exception.Message });
+        }
     }
     private void RecordStartup(JsonElement message) {
         var file = Environment.GetEnvironmentVariable("MOYE_DIAGNOSTICS_PATH");

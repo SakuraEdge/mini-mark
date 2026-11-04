@@ -35,7 +35,7 @@ export function renderMarkdown(text: string, resolveLocalImages = true): string 
   template.innerHTML = html;
   for (const image of template.content.querySelectorAll('img')) {
     const src = image.getAttribute('src') ?? '';
-    if (src && !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWith('//')) image.src = new URL(src, 'https://document.moye.local/').href;
+    if (src && !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWith('//')) image.src = new URL(src, location.protocol === 'moye:' ? 'moye://document/' : 'https://document.moye.local/').href;
   }
   return template.innerHTML;
 }

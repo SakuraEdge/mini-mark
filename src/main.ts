@@ -6,6 +6,7 @@ import { createEditor, insertCommand, modeCompartment, modeExtensions, replaceDo
 import { connect, isDesktop, send, type DocumentData, type TabData } from './bridge';
 import { headings, renderMarkdown, wordCount } from './markdown';
 import { sample } from './sample';
+import { APP_VERSION, initializeUpdates, openUpdates, scheduleUpdateCheck, handleUpdateMessage } from './updates';
 import './style.css';
 
 const icons = { PanelLeft, FilePlus2, FolderOpen, Save, ChevronDown, Bold, Italic, Link2, Code2, Sigma, Table2, Quote, Undo2, Redo2, Search, Sun, Moon, Focus, MoreHorizontal, FileCode2, Download, X, Check, Circle, List, PencilLine };
@@ -22,7 +23,7 @@ app.innerHTML = `
     <button class="current-file" id="current-file">${icon('file-code-2')}<span id="sidebar-filename">未命名.md</span><span class="dirty-dot" id="sidebar-dirty"></span></button>
     <div class="outline-heading"><span class="section-label">大纲</span>${icon('list')}</div>
     <nav class="outline" id="outline" aria-label="文档大纲"></nav>
-    <div class="sidebar-bottom"><span class="local-dot"></span><span>${isDesktop ? '本地文档' : '浏览器预览'}</span><span class="version">v0.2</span></div>
+    <div class="sidebar-bottom"><span class="local-dot"></span><span>${isDesktop ? '本地文档' : '浏览器预览'}</span><span class="version">v${APP_VERSION}</span></div>
   </aside>
   <main class="workspace">
     <header class="topbar">
@@ -46,6 +47,7 @@ app.innerHTML = `
     <button id="save-as">${icon('save')}<span>另存为</span><kbd>Ctrl Shift S</kbd></button>
     <button id="export-html">${icon('download')}<span>导出 HTML</span></button>
     <button id="sample">${icon('file-code-2')}<span>示例文档</span></button>
+    <button id="check-updates">${icon('download')}<span>检测更新</span></button>
   </div>
   <div id="save-menu" class="popup-menu save-menu" role="menu" aria-label="保存格式" hidden>
     <button id="save-markdown" role="menuitem">${icon('file-code-2')}<span>保存 Markdown (.md)</span><kbd>Ctrl S</kbd></button>
@@ -54,6 +56,7 @@ app.innerHTML = `
   </div>
   <div class="toast" id="toast" role="status" hidden></div>`;
 createIcons({ icons, attrs: { 'stroke-width': 1.65 } });
+initializeUpdates();
 
 let mode: EditorMode = 'live';
 let name = '未命名.md';
@@ -244,6 +247,7 @@ function applyFont() {
 }
 applyFont();
 on('more', () => { const menu = document.querySelector<HTMLElement>('#more-menu')!; menu.hidden = !menu.hidden; });
+on('check-updates', () => { document.querySelector<HTMLElement>('#more-menu')!.hidden = true; openUpdates(); });
 document.addEventListener('click', (event) => {
   if (!(event.target as Element).closest('#more,#more-menu')) document.querySelector<HTMLElement>('#more-menu')!.hidden = true;
   if (!(event.target as Element).closest('#save-file,#save-menu')) document.querySelector<HTMLElement>('#save-menu')!.hidden = true;
@@ -271,6 +275,7 @@ on('export-html', async () => {
 });
 document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) => button.addEventListener('click', () => setMode(button.dataset.mode as EditorMode)));
 document.addEventListener('keydown', (event) => {
+  if (document.querySelector('dialog[open]')) return;
   if (event.isComposing || event.keyCode === 229 || !(event.ctrlKey || event.metaKey)) return;
   if (transitionPending) { event.preventDefault(); event.stopPropagation(); return; }
   const key = event.key.toLowerCase();
@@ -295,7 +300,9 @@ document.addEventListener('keydown', (event) => {
 }, true);
 document.addEventListener('visibilitychange', () => { if (document.hidden && activeId) send('edit', snapshotCurrent()); });
 
+let updateScheduled = false;
 connect((message) => {
+  if (handleUpdateMessage(message)) return;
   if (message.type === 'workspace') {
     const doc = message.document;
     clearTimeout(persistTimer);
@@ -334,6 +341,7 @@ connect((message) => {
     void document.fonts.ready.then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
       window.__MOYE_READY__ = performance.now();
       send('rendered', { elapsed: window.__MOYE_READY__ });
+      if (!updateScheduled) { updateScheduled = true; scheduleUpdateCheck(); }
     })));
   } else if (message.type === 'saved') {
     const cached = documents.get(message.documentId);
@@ -361,6 +369,6 @@ connect((message) => {
   } else if (message.type === 'operationComplete') setTransitionPending(false);
   else {
     if (message.type === 'error') setTransitionPending(false);
-    showToast(message.message);
+    if ('message' in message) showToast(message.message);
   }
 });

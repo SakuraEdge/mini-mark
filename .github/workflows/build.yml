@@ -1,9 +1,10 @@
 name: Build and Test
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**']
     tags: ['v*']
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -24,7 +25,39 @@ jobs:
       - run: npx playwright install msedge
       - run: npm run test:e2e
       - run: npm run package:win
+      - run: ./scripts/package-win.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: Moye-windows-x64
-          path: release/Moye/
+          path: |
+            release/Moye-*.exe
+            release/Moye-*.zip
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install chromium
+      - run: bash scripts/package-mac.sh
+      - name: Validate native macOS storage
+        run: release/mac/Moye.app/Contents/MacOS/Moye --self-test
+      - name: Validate actual WKWebView and PDF
+        run: MOYE_DATA_DIR="$RUNNER_TEMP/moye-smoke-profile" release/mac/Moye.app/Contents/MacOS/Moye --smoke "$RUNNER_TEMP/moye-smoke"
+        timeout-minutes: 3
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Moye-macos-smoke
+          path: ${{ runner.temp }}/moye-smoke/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Moye-macos-universal
+          path: |
+            release/Moye-*.zip
+            release/Moye-*.dmg

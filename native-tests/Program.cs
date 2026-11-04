@@ -1,5 +1,7 @@
 using System.Text;
 using Moye;
+using System.Net;
+using System.Text.Json;
 
 var folder = Path.Combine(Path.GetTempPath(), "moye-tests-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(folder);
@@ -55,5 +57,35 @@ try {
     Check(DocumentStore.ReadDraft(draftFile) == legacy, "Legacy backup was changed");
     var migratedAgain = DocumentWorkspace.Restore(Path.Combine(folder, "migrated-v2.json"), draftFile);
     Check(migratedAgain.Documents.Count == 1 && migratedAgain.ActiveId == migrated.ActiveId, "Migration created duplicate tabs");
-    Console.WriteLine($"PASS {count} native storage checks");
+    var handler = new FakeGitHubHandler();
+    var updater = new GitHubUpdates(folder, handler);
+    var checkA = updater.Check(); var checkB = updater.Check();
+    var results = await Task.WhenAll(checkA, checkB);
+    Check(handler.Requests == 1 && results[0].GetArrayLength() == 1, "Concurrent update requests were not merged");
+    Check(handler.AuthHeaderAbsent && handler.ExpectedUrl, "Public updates used credentials or wrong endpoint");
+    Check(results[0][0].GetProperty("tag_name").GetString() == "v2.0.0", "Release version was lost");
+    handler.Status = HttpStatusCode.Forbidden;
+    try { await updater.Check(); throw new Exception("Rate limit was not reported"); }
+    catch (IOException error) { Check(error.Message.Contains("次数受限"), "Unclear rate-limit error"); }
+    handler.Status = HttpStatusCode.NotFound;
+    try { await updater.Check(); throw new Exception("404 was not reported"); }
+    catch (IOException error) { Check(error.Message.Contains("发布信息"), "Unclear missing-repository error"); }
+    handler.Status = HttpStatusCode.OK; handler.Body = "{broken";
+    try { await updater.Check(); throw new Exception("Malformed JSON accepted"); }
+    catch (IOException) { count++; }
+    Console.WriteLine($"PASS {count} native storage and update checks");
 } finally { Directory.Delete(folder, true); }
+
+sealed class FakeGitHubHandler : HttpMessageHandler {
+    public int Requests;
+    public bool AuthHeaderAbsent, ExpectedUrl;
+    public HttpStatusCode Status = HttpStatusCode.OK;
+    public string Body = """[{"tag_name":"v2.0.0","draft":false,"prerelease":false}]""";
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+        Requests++;
+        AuthHeaderAbsent = request.Headers.Authorization is null;
+        ExpectedUrl = request.RequestUri?.AbsoluteUri == "https://api.github.com/repos/SakuraEdge/moye-markdown/releases?per_page=100";
+        await Task.Delay(40, cancellationToken);
+        return new HttpResponseMessage(Status) { Content = new StringContent(Body) };
+    }
+}

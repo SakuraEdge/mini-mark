@@ -8,6 +8,7 @@ export type HostMessage =
   | { type: 'requestClosingText'; requestId: string }
   | { type: 'requestExportPdf'; requestId: string; documentId: string; text: string; name: string }
   | { type: 'operationComplete' }
+  | { type: 'updateResult'; requestId: string; releases?: unknown; error?: string }
   | { type: 'error' | 'notice'; message: string };
 
 const native = window.chrome?.webview;

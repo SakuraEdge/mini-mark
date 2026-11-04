@@ -8,5 +8,6 @@
   <ItemGroup>
     <Compile Include="../native/DocumentStore.cs" Link="DocumentStore.cs" />
     <Compile Include="../native/DocumentWorkspace.cs" Link="DocumentWorkspace.cs" />
+    <Compile Include="../native/GitHubUpdates.cs" Link="GitHubUpdates.cs" />
   </ItemGroup>
 </Project>
