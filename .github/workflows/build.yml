@@ -1,0 +1,30 @@
+name: Build and Test
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:native
+      - run: npx playwright install msedge
+      - run: npm run test:e2e
+      - run: npm run package:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Moye-windows-x64
+          path: release/Moye/

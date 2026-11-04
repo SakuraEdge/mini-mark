@@ -1,0 +1,308 @@
+import { Compartment, EditorSelection, EditorState, Prec, RangeSetBuilder, StateField, type Extension } from '@codemirror/state';
+import { Decoration, EditorView, ViewPlugin, WidgetType, drawSelection, highlightActiveLine, keymap, lineNumbers, placeholder, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { HighlightStyle, bracketMatching, foldGutter, indentOnInput, syntaxHighlighting, syntaxTree } from '@codemirror/language';
+import { markdown, markdownLanguage, markdownKeymap } from '@codemirror/lang-markdown';
+import { languages } from '@codemirror/language-data';
+import { search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
+import { tags } from '@lezer/highlight';
+import { commands, imeBlocksCommand, matchingCommands, slashQuery, type SlashCommand } from './commands';
+import { renderMarkdown, renderMath } from './markdown';
+
+export type EditorMode = 'live' | 'source' | 'read';
+export const modeCompartment = new Compartment();
+const fontCompartment = new Compartment();
+
+const colors = HighlightStyle.define([
+  { tag: tags.heading1, class: 'syntax-h1' },
+  { tag: tags.heading2, class: 'syntax-h2' },
+  { tag: [tags.heading3, tags.heading4, tags.heading5, tags.heading6], class: 'syntax-h3' },
+  { tag: tags.strong, fontWeight: '700', class: 'syntax-strong' },
+  { tag: tags.emphasis, fontStyle: 'italic' },
+  { tag: tags.strikethrough, textDecoration: 'line-through' },
+  { tag: [tags.url, tags.link], class: 'syntax-link' },
+  { tag: tags.monospace, class: 'syntax-inline-code' },
+  { tag: [tags.keyword, tags.modifier, tags.controlKeyword], class: 'syntax-keyword' },
+  { tag: [tags.string, tags.special(tags.string)], class: 'syntax-string' },
+  { tag: [tags.number, tags.bool, tags.null], class: 'syntax-number' },
+  { tag: [tags.typeName, tags.className], class: 'syntax-type' },
+  { tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], class: 'syntax-function' },
+  { tag: [tags.comment, tags.meta], class: 'syntax-comment' },
+  { tag: tags.processingInstruction, class: 'syntax-keyword' },
+]);
+
+function inCode(state: EditorState, pos: number): boolean {
+  let node = syntaxTree(state).resolveInner(pos, -1);
+  for (;;) {
+    if (/^(FencedCode|CodeBlock|InlineCode)$/.test(node.name)) return true;
+    if (!node.parent) return false;
+    node = node.parent;
+  }
+}
+
+class RenderedBlock extends WidgetType {
+  constructor(readonly html: string, readonly position: number, readonly kind: string) { super(); }
+  eq(other: RenderedBlock) { return this.html === other.html && this.position === other.position; }
+  toDOM(view: EditorView) {
+    const element = document.createElement('div');
+    element.className = `rendered-block markdown-body ${this.kind}`;
+    element.innerHTML = this.html;
+    element.setAttribute('aria-label', this.kind === 'math-block' ? '数学公式，点击编辑' : '表格，点击编辑');
+    element.addEventListener('mousedown', (event) => {
+      if ((event.target as HTMLElement).closest('a')) return;
+      event.preventDefault();
+      view.dispatch({ selection: { anchor: this.position }, scrollIntoView: true });
+      view.focus();
+    });
+    return element;
+  }
+  ignoreEvent() { return false; }
+}
+
+function liveDecorations(state: EditorState): DecorationSet {
+  const decorations: { from: number; to: number; value: Decoration }[] = [];
+  const covered: { from: number; to: number }[] = [];
+  const selected = state.selection.ranges.map((range) => ({
+    from: state.doc.lineAt(range.from).from, to: state.doc.lineAt(range.to).to,
+  }));
+  const active = (from: number, to: number) => selected.some((range) => range.from <= to && range.to >= from);
+  const add = (from: number, to: number, value: Decoration) => decorations.push({ from, to, value });
+  const text = state.doc.toString();
+  const math = /^ {0,3}\$\$[ \t]*\n([\s\S]*?)\n {0,3}\$\$[ \t]*$/gm;
+  let match: RegExpExecArray | null;
+  while ((match = math.exec(text))) {
+    const from = match.index, to = from + match[0].length;
+    if (!active(from, to) && !inCode(state, from + 1)) {
+      add(from, to, Decoration.replace({ widget: new RenderedBlock(renderMath(match[1]), from + match[0].indexOf('\n') + 1, 'math-block'), block: true }));
+      covered.push({ from, to });
+    }
+  }
+  syntaxTree(state).iterate({
+    enter(node) {
+      if (covered.some((range) => node.from >= range.from && node.to <= range.to)) return false;
+      if (node.name === 'FencedCode' || node.name === 'CodeBlock') {
+        const fromLine = state.doc.lineAt(node.from).number;
+        const toLine = state.doc.lineAt(node.to).number;
+        for (let n = fromLine; n <= toLine; n++) {
+          const line = state.doc.line(n);
+          add(line.from, line.from, Decoration.line({ class: `code-line${n === fromLine ? ' code-first' : ''}${n === toLine ? ' code-last' : ''}` }));
+        }
+        return false;
+      }
+      if (node.name === 'Table' && !active(node.from, node.to)) {
+        add(node.from, node.to, Decoration.replace({ widget: new RenderedBlock(renderMarkdown(state.sliceDoc(node.from, node.to)), node.from + 2, 'table-block'), block: true }));
+        return false;
+      }
+      if (/^ATXHeading[1-6]$/.test(node.name)) {
+        add(node.from, node.from, Decoration.line({ class: `heading-line heading-${node.name.slice(-1)}` }));
+      }
+      if (node.name === 'Blockquote') {
+        const end = state.doc.lineAt(node.to).number;
+        for (let n = state.doc.lineAt(node.from).number; n <= end; n++) add(state.doc.line(n).from, state.doc.line(n).from, Decoration.line({ class: 'quote-line' }));
+      }
+      if (!active(node.from, node.to) && /^(HeaderMark|EmphasisMark|CodeMark|StrikethroughMark|QuoteMark)$/.test(node.name)) {
+        let to = node.to;
+        if ((node.name === 'HeaderMark' || node.name === 'QuoteMark') && state.sliceDoc(to, to + 1) === ' ') to++;
+        add(node.from, to, Decoration.replace({}));
+      }
+    },
+  });
+  for (let n = 1; n <= state.doc.lines; n++) {
+    const line = state.doc.line(n);
+    if (!line.length && !covered.some((range) => line.from >= range.from && line.from < range.to)) {
+      add(line.from, line.from, Decoration.line({ class: 'blank-line' }));
+    }
+  }
+  decorations.sort((a, b) => a.from - b.from || a.value.startSide - b.value.startSide);
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const item of decorations) builder.add(item.from, item.to, item.value);
+  return builder.finish();
+}
+
+const liveField = StateField.define<DecorationSet>({
+  create: liveDecorations,
+  update: (_, transaction) => liveDecorations(transaction.state),
+  provide: (field) => EditorView.decorations.from(field),
+});
+
+class SlashMenu {
+  dom = document.createElement('div');
+  options: SlashCommand[] = [];
+  selected = 0;
+  from = 0;
+  to = 0;
+  composing = false;
+  compositionEnd = -Infinity;
+  dismissed = '';
+  signature = '';
+  captureKey = (event: KeyboardEvent) => {
+    if (!this.options.length || event.key !== 'Enter') return;
+    if (event.isComposing || event.keyCode === 229 || this.composing || this.view.compositionStarted) {
+      // Keep the IME's default commit, but do not let editor keymaps insert a newline.
+      event.stopImmediatePropagation();
+    } else if (performance.now() - this.compositionEnd < 80) {
+      event.preventDefault(); event.stopImmediatePropagation();
+    }
+  };
+  constructor(readonly view: EditorView) {
+    this.dom.className = 'slash-menu';
+    this.dom.hidden = true;
+    this.dom.setAttribute('role', 'listbox');
+    this.dom.setAttribute('aria-label', '插入内容');
+    document.body.append(this.dom);
+    view.contentDOM.addEventListener('keydown', this.captureKey, true);
+    this.refresh();
+  }
+  update(update: ViewUpdate) {
+    if (update.docChanged || update.selectionSet || update.focusChanged) this.refresh();
+    else if (update.geometryChanged && this.options.length) this.position();
+  }
+  refresh() {
+    const { state } = this.view;
+    const pos = state.selection.main.head;
+    const line = state.doc.lineAt(pos);
+    const query = slashQuery(line.text, pos - line.from);
+    this.signature = `${line.from}:${line.text}`;
+    if (!query || !state.selection.main.empty || state.selection.ranges.length !== 1 || inCode(state, pos) || this.signature === this.dismissed || !this.view.hasFocus) {
+      this.options = []; this.dom.hidden = true; return;
+    }
+    this.from = line.from + query.from; this.to = line.from + query.to;
+    this.options = matchingCommands(query.query);
+    this.selected = Math.min(this.selected, this.options.length - 1);
+    this.render();
+  }
+  render() {
+    this.dom.hidden = !this.options.length;
+    this.dom.replaceChildren();
+    const title = document.createElement('div');
+    title.className = 'slash-title'; title.textContent = '插入内容';
+    this.dom.append(title);
+    this.options.forEach((command, index) => {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = `slash-option ${index === this.selected ? 'selected' : ''}`;
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-selected', String(index === this.selected));
+      const symbol = document.createElement('span');
+      symbol.className = 'slash-symbol';
+      symbol.textContent = ({ math: '∑', 'inline-math': 'x', code: '</>', table: '▦', todo: '☑', quote: '❞', h1: 'H₁', h2: 'H₂', rule: '—' } as Record<string, string>)[command.id];
+      const name = document.createElement('span'); name.className = 'slash-name'; name.textContent = command.label;
+      const hint = document.createElement('small'); hint.textContent = command.hint; name.append(hint);
+      button.append(symbol, name);
+      button.addEventListener('mousedown', (event) => { event.preventDefault(); this.apply(command); });
+      this.dom.append(button);
+    });
+    this.position();
+  }
+  position() {
+    this.view.requestMeasure({
+      key: this,
+      read: () => this.view.coordsAtPos(this.view.state.selection.main.head),
+      write: (coords) => {
+        if (!coords || this.dom.hidden) return;
+        const height = this.dom.getBoundingClientRect().height;
+        this.dom.style.left = `${Math.max(8, Math.min(coords.left, window.innerWidth - 332))}px`;
+        this.dom.style.top = `${coords.bottom + height + 14 < window.innerHeight ? coords.bottom + 8 : Math.max(8, coords.top - height - 8)}px`;
+      },
+    });
+  }
+  apply(command: SlashCommand) {
+    if (this.composing || this.view.composing) return;
+    this.view.dispatch({
+      changes: { from: this.from, to: this.to, insert: command.text },
+      selection: { anchor: this.from + command.cursor },
+      userEvent: 'input.complete',
+      scrollIntoView: true,
+    });
+    this.view.focus(); this.options = []; this.dom.hidden = true; this.selected = 0;
+  }
+  key(event: KeyboardEvent): boolean {
+    if (!this.options.length) return false;
+    if (imeBlocksCommand(event, this.composing || this.view.composing, performance.now(), this.compositionEnd)) {
+      return !event.isComposing && event.keyCode !== 229 && !this.composing && !this.view.composing && event.key === 'Enter';
+    }
+    if (event.key === 'Escape') {
+      this.dismissed = this.signature; this.options = []; this.dom.hidden = true; return true;
+    }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      this.selected = (this.selected + (event.key === 'ArrowDown' ? 1 : -1) + this.options.length) % this.options.length;
+      this.render(); this.dom.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); return true;
+    }
+    if (event.key === 'Enter' || event.key === 'Tab') { this.apply(this.options[this.selected]); return true; }
+    return false;
+  }
+  destroy() { this.view.contentDOM.removeEventListener('keydown', this.captureKey, true); this.dom.remove(); }
+}
+
+const slashPlugin = ViewPlugin.fromClass(SlashMenu, {
+  eventHandlers: {
+    compositionstart() { this.composing = true; },
+    compositionend() { this.composing = false; this.compositionEnd = performance.now(); },
+    keydown(event) { return this.key(event); },
+  },
+});
+
+export function modeExtensions(mode: EditorMode): Extension {
+  return mode === 'live' ? [liveField] : [lineNumbers(), foldGutter(), highlightActiveLine()];
+}
+
+const listeners = new WeakMap<EditorView, (update: ViewUpdate) => void>();
+
+function makeState(doc: string, onChange: (update: ViewUpdate) => void, mode: EditorMode) {
+  return EditorState.create({
+      doc,
+      extensions: [
+        history(), drawSelection(), indentOnInput(), bracketMatching(), highlightSelectionMatches(),
+        markdown({ base: markdownLanguage, codeLanguages: languages }),
+        syntaxHighlighting(colors),
+        search({ top: true }),
+        Prec.highest(slashPlugin),
+        keymap.of([...markdownKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
+        placeholder('写点什么…'),
+        EditorView.lineWrapping,
+        EditorState.tabSize.of(4),
+        EditorView.contentAttributes.of({ 'aria-label': 'Markdown 编辑器', spellcheck: 'false' }),
+        modeCompartment.of(modeExtensions(mode)),
+        fontCompartment.of(EditorView.theme({ '.cm-content': { fontSize: '16px' } })),
+        EditorView.updateListener.of(onChange),
+      ],
+  });
+}
+
+export function createEditor(parent: HTMLElement, onChange: (update: ViewUpdate) => void) {
+  const view = new EditorView({ parent, state: makeState('', onChange, 'live') });
+  listeners.set(view, onChange);
+  return view;
+}
+
+export function replaceDocument(view: EditorView, text: string, mode: EditorMode) {
+  view.setState(makeState(text, listeners.get(view)!, mode));
+}
+
+export function setEditorFont(view: EditorView, size: number) {
+  view.dispatch({ effects: fontCompartment.reconfigure(EditorView.theme({ '.cm-content': { fontSize: `${size}px` } })) });
+}
+
+export function surround(view: EditorView, before: string, after = before) {
+  const selection = view.state.selection.main;
+  const text = view.state.sliceDoc(selection.from, selection.to);
+  view.dispatch({
+    changes: { from: selection.from, to: selection.to, insert: `${before}${text}${after}` },
+    selection: EditorSelection.range(selection.from + before.length, selection.from + before.length + text.length),
+    userEvent: 'input',
+  });
+  view.focus();
+}
+
+export function insertCommand(view: EditorView, id: string) {
+  const command = commands.find((item) => item.id === id)!;
+  const selection = view.state.selection.main;
+  const line = view.state.doc.lineAt(selection.from);
+  const prefix = line.from !== selection.from ? '\n\n' : '';
+  view.dispatch({
+    changes: { from: selection.from, to: selection.to, insert: prefix + command.text + '\n' },
+    selection: { anchor: selection.from + prefix.length + command.cursor },
+    userEvent: 'input',
+    scrollIntoView: true,
+  });
+  view.focus();
+}

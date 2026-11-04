@@ -1,0 +1,12 @@
+node_modules/
+dist/
+release/
+native/bin/
+native/obj/
+native-tests/bin/
+native-tests/obj/
+test-results/
+playwright-report/
+*.user
+*.log
+.DS_Store
