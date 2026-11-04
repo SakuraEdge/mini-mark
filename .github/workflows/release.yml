@@ -47,13 +47,24 @@ jobs:
           files=("Moye-Setup-$version-windows-x64.exe" "Moye-$version-windows-x64.zip" "Moye-$version-macos-universal.dmg" "Moye-$version-macos-universal.zip")
           for file in "${files[@]}"; do test -s "$file"; done
           sha256sum "${files[@]}" > "SHA256SUMS-$tag.txt"
+          already_published=false
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft > existing.json 2>/dev/null; then
-            test "$(jq -r .isDraft existing.json)" = true
+            if test "$(jq -r .isDraft existing.json)" = false; then
+              already_published=true
+              gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > published.json
+              for file in "${files[@]}" "SHA256SUMS-$tag.txt" update.json; do
+                expected="sha256:$(sha256sum "$file" | cut -d ' ' -f 1)"
+                actual=$(jq -r --arg name "$file" '.assets[] | select(.name == $name) | .digest' published.json)
+                test "$actual" = "$expected"
+              done
+            fi
           else
             gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$BUILD_SHA" --title "墨页 Moye $tag" --notes-file "$notes" --draft
           fi
-          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" "${files[@]}" "SHA256SUMS-$tag.txt" update.json --clobber
-          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          if test "$already_published" = false; then
+            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" "${files[@]}" "SHA256SUMS-$tag.txt" update.json --clobber
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          fi
           if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/updates" > /dev/null 2>&1; then
             gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/heads/updates -f sha="$BUILD_SHA"
           fi
