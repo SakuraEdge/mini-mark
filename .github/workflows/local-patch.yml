@@ -1,0 +1,83 @@
+name: Build Verified Maintenance Patch
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Verified Windows build run
+        required: true
+        type: string
+permissions:
+  actions: read
+  contents: read
+jobs:
+  patch:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_ID: ${{ inputs.build_run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify build and obtain immutable binaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          if($env:RUN_ID -notmatch '^\d+$') { throw 'Invalid build run' }
+          $run=gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:RUN_ID" | ConvertFrom-Json
+          if($LASTEXITCODE -ne 0 -or $run.conclusion -ne 'success' -or $run.head_branch -ne 'main' -or $run.path -ne '.github/workflows/build.yml') { throw 'Unverified build' }
+          gh run download $env:RUN_ID --repo $env:GITHUB_REPOSITORY --name Moye-windows-x64 --dir release-assets
+          if($LASTEXITCODE -ne 0) { throw 'Artifact download failed' }
+          Expand-Archive -LiteralPath release-assets/Moye-1.0.3-windows-x64.zip -DestinationPath release/new
+          gh release download v1.0.2 --repo $env:GITHUB_REPOSITORY --pattern Moye-1.0.2-windows-x64.zip --pattern Moye-Setup-1.0.2-windows-x64.exe --dir release/base
+          if($LASTEXITCODE -ne 0) { throw 'Base release download failed' }
+          Expand-Archive -LiteralPath release/base/Moye-1.0.2-windows-x64.zip -DestinationPath release/base-expanded
+      - name: Build and validate incremental installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $new=(Resolve-Path release/new/Moye).Path
+          $old=(Resolve-Path release/base-expanded/Moye).Path
+          $stage=Join-Path $PWD 'release/patch'
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          $base=@{}
+          foreach($line in Get-Content (Join-Path $old 'installed-files.txt')) { $hash,$relative=$line.Split('|',2); $base[$relative]=$hash }
+          $changed=@()
+          foreach($line in Get-Content (Join-Path $new 'installed-files.txt')) {
+            $hash,$relative=$line.Split('|',2)
+            if($base[$relative] -eq $hash) { continue }
+            $source=[IO.Path]::GetFullPath((Join-Path $new $relative))
+            $target=[IO.Path]::GetFullPath((Join-Path $stage $relative))
+            if(-not $source.StartsWith($new+'\') -or -not $target.StartsWith($stage+'\')) { throw 'Unsafe package path' }
+            if((Get-FileHash -LiteralPath $source).Hash -ne $hash) { throw 'Verified artifact file mismatch' }
+            New-Item -ItemType Directory -Path (Split-Path $target) -Force | Out-Null
+            Copy-Item -LiteralPath $source -Destination $target
+            $changed+=$relative.ToLowerInvariant()
+          }
+          Copy-Item -LiteralPath (Join-Path $new 'installed-files.txt') -Destination (Join-Path $stage 'installed-files.txt')
+          $list=Join-Path $PWD 'release/patch-files.txt'
+          [IO.File]::WriteAllLines($list,$changed,[Text.UTF8Encoding]::new($false))
+          $iscc=Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'
+          & $iscc /DAppVersion=1.0.3 "/DPublishDir=$stage" "/DPatchList=$list" installer/Moye.iss
+          if($LASTEXITCODE -ne 0) { throw 'Patch compilation failed' }
+          Move-Item -LiteralPath release/Moye-Setup-1.0.3-windows-x64.exe -Destination release/Moye-Patch-1.0.3-windows-x64.exe
+          $target=Join-Path $env:RUNNER_TEMP 'Moye-patch-test'
+          $baseInstaller=(Resolve-Path release/base/Moye-Setup-1.0.2-windows-x64.exe).Path
+          $patchInstaller=(Resolve-Path release/Moye-Patch-1.0.3-windows-x64.exe).Path
+          $arguments=@('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="'+$target+'"'))
+          $process=Start-Process $baseInstaller -ArgumentList $arguments -WindowStyle Hidden -PassThru -Wait
+          if($process.ExitCode -ne 0) { throw 'Base installation failed' }
+          $data=Join-Path $target 'Data/session-v2.json'
+          New-Item -ItemType Directory -Path (Split-Path $data) -Force | Out-Null
+          [IO.File]::WriteAllText($data,'preserved user data')
+          $process=Start-Process $patchInstaller -ArgumentList $arguments -WindowStyle Hidden -PassThru -Wait
+          if($process.ExitCode -ne 0) { throw 'Patch installation failed' }
+          foreach($line in Get-Content (Join-Path $new 'installed-files.txt')) {
+            $hash,$relative=$line.Split('|',2)
+            if((Get-FileHash -LiteralPath (Join-Path $target $relative)).Hash -ne $hash) { throw "Patched program differs: $relative" }
+          }
+          if([IO.File]::ReadAllText($data) -ne 'preserved user data') { throw 'Patch changed user data' }
+          Write-Output "PASS incremental installation: $($changed.Count) changed files, all resulting program hashes match verified release"
+          Get-Item -LiteralPath $patchInstaller | Select-Object Name,Length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Moye-maintenance-patch
+          path: release/Moye-Patch-1.0.3-windows-x64.exe

@@ -44,6 +44,9 @@ Name: "defaultmd"; Description: "将墨页设为 .md 默认应用（安装后在
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PublishDir}\installed-files.txt"; DestName: "moye-new-files.txt"; Flags: dontcopy
+#ifdef PatchList
+Source: "{#PatchList}"; DestName: "moye-patch-files.txt"; Flags: dontcopy
+#endif
 
 [Icons]
 Name: "{group}\墨页 Moye"; Filename: "{app}\Moye.exe"; WorkingDir: "{app}"
@@ -104,6 +107,10 @@ function PrepareToInstall(var NeedsRestart: Boolean): string;
 var
   I, Separator: Integer;
   Line: string;
+#ifdef PatchList
+  PatchFiles, RequiredFiles: TStringList;
+  Hash, Relative, Full: string;
+#endif
 begin
   Result := '';
   OldFiles := TStringList.Create;
@@ -112,6 +119,29 @@ begin
     OldFiles.LoadFromFile(ExpandConstant('{app}\installed-files.txt'));
   ExtractTemporaryFile('moye-new-files.txt');
   NewFiles.LoadFromFile(ExpandConstant('{tmp}\moye-new-files.txt'));
+#ifdef PatchList
+  PatchFiles := TStringList.Create;
+  RequiredFiles := TStringList.Create;
+  ExtractTemporaryFile('moye-patch-files.txt');
+  PatchFiles.LoadFromFile(ExpandConstant('{tmp}\moye-patch-files.txt'));
+  RequiredFiles.LoadFromFile(ExpandConstant('{tmp}\moye-new-files.txt'));
+  for I := 0 to RequiredFiles.Count - 1 do begin
+    Line := RequiredFiles[I];
+    Separator := Pos('|', Line);
+    Hash := Copy(Line, 1, 64);
+    Relative := Copy(Line, Separator + 1, Length(Line));
+    if PatchFiles.IndexOf(Lowercase(Relative)) >= 0 then Continue;
+    Full := ExpandConstant('{app}\') + Relative;
+    if (Separator <> 65) or not SafeOwnedPath(Relative) or not FileExists(Full) then begin
+      Result := '此修复包需要完整的旧版墨页，请使用完整安装包。';
+      Exit;
+    end;
+    if CompareText(GetSHA256OfFile(Full), Hash) <> 0 then begin
+      Result := '现有程序文件与修复包不匹配，请使用完整安装包。';
+      Exit;
+    end;
+  end;
+#endif
   for I := 0 to NewFiles.Count - 1 do begin
     Line := NewFiles[I];
     Separator := Pos('|', Line);
