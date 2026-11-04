@@ -53,6 +53,14 @@ final class PdfExporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
         operation.runModal(for: owner, delegate: self, didRun: #selector(printFinished(_:success:contextInfo:)), contextInfo: nil)
     }
     @objc private func printFinished(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
+        // AppKit still owns the printing view during this delegate call.
+        // Dispose the WKWebView only after AppKit finishes unwinding it.
+        DispatchQueue.main.async { [self, operation] in
+            _ = operation
+            completePrint(success)
+        }
+    }
+    private func completePrint(_ success: Bool) {
         guard completion != nil, let temporary = temporary, let target = target else { return }
         guard success else { finish(Store.failure("PDF 打印失败。")); return }
         do {

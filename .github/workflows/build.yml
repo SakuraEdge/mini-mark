@@ -26,6 +26,7 @@ jobs:
       - run: npm run test:e2e
       - run: npm run package:win
       - run: ./scripts/package-win.ps1
+      - run: ./scripts/test-installer.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: Moye-windows-x64
@@ -48,7 +49,16 @@ jobs:
       - name: Validate native macOS storage
         run: release/mac/Moye.app/Contents/MacOS/Moye --self-test
       - name: Validate actual WKWebView and PDF
-        run: MOYE_DATA_DIR="$RUNNER_TEMP/moye-smoke-profile" release/mac/Moye.app/Contents/MacOS/Moye --smoke "$RUNNER_TEMP/moye-smoke"
+        run: |
+          set +e
+          MOYE_DATA_DIR="$RUNNER_TEMP/moye-smoke-profile" release/mac/Moye.app/Contents/MacOS/Moye --smoke "$RUNNER_TEMP/moye-smoke"
+          result=$?
+          if [ "$result" -ne 0 ]; then
+            mkdir -p "$RUNNER_TEMP/moye-smoke/diagnostics"
+            sleep 3
+            find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -name 'Moye*' -exec cp {} "$RUNNER_TEMP/moye-smoke/diagnostics/" \;
+          fi
+          exit "$result"
         timeout-minutes: 3
       - uses: actions/upload-artifact@v4
         if: always()
