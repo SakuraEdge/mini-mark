@@ -25,7 +25,11 @@ function Normalize-ShortcutPath([string]$path) {
 }
 foreach($link in @((Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) '墨页 Moye.lnk'), (Join-Path ([Environment]::GetFolderPath('Programs')) '墨页 Moye/墨页 Moye.lnk'))) {
   if(-not (Test-Path -LiteralPath $link)) { throw "Missing shortcut: $link" }
-  $shortcut = $shell.CreateShortcut($link)
+  # WSH cannot load filenames outside the system ANSI code page; inspect identical bytes under an ASCII name.
+  $readableLink = Join-Path $env:RUNNER_TEMP 'moye-shortcut-check.lnk'
+  Copy-Item -LiteralPath $link -Destination $readableLink -Force
+  if((Get-FileHash -LiteralPath $link).Hash -ne (Get-FileHash -LiteralPath $readableLink).Hash) { throw 'Shortcut verification copy differs' }
+  $shortcut = $shell.CreateShortcut($readableLink)
   if((Normalize-ShortcutPath $shortcut.TargetPath) -ne (Normalize-ShortcutPath (Join-Path $target 'Moye.exe')) -or (Normalize-ShortcutPath $shortcut.WorkingDirectory) -ne (Normalize-ShortcutPath $target)) {
     throw "Shortcut points outside installation: target=$($shortcut.TargetPath); working=$($shortcut.WorkingDirectory); expected=$target"
   }
