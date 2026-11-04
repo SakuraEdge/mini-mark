@@ -70,6 +70,17 @@ let transitionPending = false;
 interface CachedDocument { document: DocumentData; state: EditorState; mode: EditorMode; scroll: number }
 const documents = new Map<string, CachedDocument>();
 let renderedTabsKey = '';
+const tabElements = new Map<string, HTMLElement>();
+const tabsContainer = document.querySelector<HTMLElement>('#tabs')!;
+const tabIndicator = document.createElement('span');
+tabIndicator.className = 'tab-indicator';
+tabIndicator.setAttribute('aria-hidden', 'true');
+tabsContainer.append(tabIndicator);
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+let surfaceAnimation: Animation | undefined;
+reducedMotion.addEventListener('change', () => { if (reducedMotion.matches) surfaceAnimation?.cancel(); });
+new ResizeObserver(() => positionTabIndicator()).observe(tabsContainer);
+void document.fonts.ready.then(() => positionTabIndicator());
 let outlineTimer: ReturnType<typeof setTimeout>;
 let persistTimer: ReturnType<typeof setTimeout>;
 let toastTimer: ReturnType<typeof setTimeout>;
@@ -123,33 +134,58 @@ function renderTabs() {
   const key = JSON.stringify([activeId, tabs.map(tab => [tab.id, tab.name, tab.path, tab.dirty])]);
   if (key === renderedTabsKey) return;
   renderedTabsKey = key;
-  const container = document.querySelector('#tabs')!;
-  container.replaceChildren();
-  for (const tab of tabs) {
-    const item = document.createElement('div');
-    item.className = `document-tab${tab.id === activeId ? ' active' : ''}${tab.dirty ? ' dirty' : ''}`;
-    const button = document.createElement('button');
-    button.className = 'tab-select'; button.setAttribute('role', 'tab'); button.setAttribute('aria-selected', String(tab.id === activeId));
-    button.setAttribute('aria-controls', 'surface');
-    button.textContent = tab.name; button.title = tab.path || tab.name;
-    button.tabIndex = tab.id === activeId ? 0 : -1;
-    button.addEventListener('click', () => { if (tab.id !== activeId) nativeAction('activate', { targetId: tab.id }); });
-    button.addEventListener('keydown', event => {
-      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-      event.preventDefault();
-      const index = tabs.findIndex(item => item.id === tab.id);
-      const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
-      nativeAction('activate', { targetId: tabs[next].id });
-    });
-    const dot = document.createElement('span'); dot.className = 'tab-dirty'; dot.setAttribute('aria-label', '未保存');
-    const close = document.createElement('button');
-    close.className = 'tab-close icon-button'; close.setAttribute('aria-label', `关闭 ${tab.name}`); close.title = `关闭 ${tab.name}`;
-    close.innerHTML = icon('x');
-    close.addEventListener('click', () => nativeAction('closeTab', { targetId: tab.id }));
-    item.append(button, dot, close); container.append(item);
+  for (const [id, item] of tabElements) {
+    if (!tabs.some(tab => tab.id === id)) { item.remove(); tabElements.delete(id); }
   }
-  createIcons({ icons: { X }, root: container, attrs: { 'stroke-width': 1.65 } });
-  container.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  for (const tab of tabs) {
+    let item = tabElements.get(tab.id);
+    if (!item) {
+      item = document.createElement('div');
+      const button = document.createElement('button');
+      button.className = 'tab-select'; button.setAttribute('role', 'tab');
+      button.setAttribute('aria-controls', 'surface');
+      button.addEventListener('click', () => { if (tab.id !== activeId) nativeAction('activate', { targetId: tab.id }); });
+      button.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const index = tabs.findIndex(item => item.id === tab.id);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        nativeAction('activate', { targetId: tabs[next].id });
+      });
+      const dot = document.createElement('span'); dot.className = 'tab-dirty'; dot.setAttribute('aria-label', '未保存');
+      const close = document.createElement('button'); close.className = 'tab-close icon-button';
+      close.innerHTML = icon('x');
+      close.addEventListener('click', () => nativeAction('closeTab', { targetId: tab.id }));
+      item.append(button, dot, close);
+      tabsContainer.insertBefore(item, tabIndicator);
+      tabElements.set(tab.id, item);
+      createIcons({ icons: { X }, root: item, attrs: { 'stroke-width': 1.65 } });
+    }
+    item.className = `document-tab${tab.id === activeId ? ' active' : ''}${tab.dirty ? ' dirty' : ''}`;
+    const button = item.querySelector<HTMLButtonElement>('.tab-select')!;
+    button.setAttribute('aria-selected', String(tab.id === activeId));
+    button.setAttribute('aria-description', tab.path || tab.name);
+    button.textContent = tab.name;
+    button.tabIndex = tab.id === activeId ? 0 : -1;
+    item.querySelector('.tab-close')!.setAttribute('aria-label', `关闭 ${tab.name}`);
+  }
+  positionTabIndicator();
+  tabsContainer.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+}
+
+function positionTabIndicator() {
+  const active = tabElements.get(activeId);
+  if (!active) { tabIndicator.style.opacity = '0'; return; }
+  tabIndicator.style.width = `${active.offsetWidth}px`;
+  tabIndicator.style.transform = `translateX(${active.offsetLeft}px)`;
+  tabIndicator.style.opacity = '1';
+  requestAnimationFrame(() => tabIndicator.classList.add('positioned'));
+}
+
+function animateDocumentSwitch() {
+  surfaceAnimation?.cancel();
+  if (reducedMotion.matches) return;
+  surfaceAnimation = document.querySelector('#surface')!.animate([{ opacity: .72 }, { opacity: 1 }], { duration: 120, easing: 'ease-out' });
 }
 
 function updateOutline() {
@@ -186,6 +222,7 @@ function showToast(message: string) {
 }
 
 function setMode(next: EditorMode) {
+  const changed = mode !== next;
   mode = next;
   document.querySelector('#editor')!.toggleAttribute('hidden', next === 'read');
   const reading = document.querySelector<HTMLElement>('#reading-view')!;
@@ -201,6 +238,7 @@ function setMode(next: EditorMode) {
   });
   document.querySelectorAll<HTMLButtonElement>('#format-tools button').forEach((button) => { button.disabled = next === 'read'; });
   document.querySelector('#surface')!.setAttribute('data-mode', next);
+  if (changed) animateDocumentSwitch();
 }
 
 function nativeAction(type: string, payload: Record<string, unknown> = {}) {
@@ -305,6 +343,7 @@ connect((message) => {
   if (handleUpdateMessage(message)) return;
   if (message.type === 'workspace') {
     const doc = message.document;
+    const switchingDocument = Boolean(activeId && activeId !== doc.id);
     clearTimeout(persistTimer);
     if (activeId) send('edit', snapshotCurrent());
     cacheCurrent();
@@ -336,6 +375,7 @@ connect((message) => {
     view.requestMeasure({ read: () => scroll, write: top => { if (mode === 'read') document.querySelector('#reading-view')!.scrollTop = top; else view.scrollDOM.scrollTop = top; } });
     if (message.recovered) showToast('已恢复上次打开的文档和未保存草稿');
     setTransitionPending(false);
+    if (switchingDocument) animateDocumentSwitch();
     if (mode !== 'read') view.focus();
     if (localIsNewer) send('edit', snapshotCurrent());
     void document.fonts.ready.then(() => requestAnimationFrame(() => requestAnimationFrame(() => {

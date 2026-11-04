@@ -72,12 +72,18 @@ svg { width: 17px; height: 17px; flex-shrink: 0; }
 .workspace { min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .topbar { height: 58px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 22px; border-bottom: 1px solid var(--line); gap: 12px; }
 .document-heading, .topbar-actions { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.document-tabs { display: flex; align-items: center; gap: 5px; min-height: 38px; flex-shrink: 0; border-bottom: 1px solid var(--line); padding: 0 13px; background: var(--sidebar); }
-#tabs { display: flex; overflow-x: auto; min-width: 0; scrollbar-width: thin; }
-.document-tab { display: flex; align-items: center; flex: 0 0 auto; height: 38px; min-width: 130px; max-width: 230px; border-right: 1px solid var(--line); border-bottom: 2px solid transparent; padding: 0 6px; gap: 4px; }
-.document-tab.active { background: var(--bg); border-bottom-color: var(--accent); }
-.tab-select { text-align: left; font-size: 12px; flex: 1; padding: 10px 6px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tab-close.icon-button { width: 23px; height: 23px; }
+.document-tabs { display: flex; align-items: center; gap: 5px; min-height: 40px; flex-shrink: 0; border-bottom: 1px solid var(--line); padding: 0 13px; background: var(--sidebar); }
+#tabs { position: relative; display: flex; overflow-x: auto; overflow-y: hidden; min-width: 0; height: 40px; scrollbar-width: none; }
+#tabs::-webkit-scrollbar { display: none; }
+.document-tab { display: flex; align-items: center; flex: 0 0 auto; height: 40px; min-width: 130px; max-width: 230px; border-right: 1px solid var(--line); padding: 0 9px; gap: 5px; color: var(--soft); transition: background-color 160ms ease, color 160ms ease; }
+.document-tab:hover { background: var(--hover); }
+.document-tab.active { background: var(--bg); color: var(--text); }
+.tab-select { align-self: stretch; text-align: left; font-size: 12px; flex: 1; padding: 0 5px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab-select:hover:not(:disabled) { background: transparent; }
+.tab-indicator { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--accent); border-radius: 2px 2px 0 0; pointer-events: none; opacity: 0; }
+.tab-indicator.positioned { transition: transform 180ms cubic-bezier(.2,.7,.3,1), width 180ms cubic-bezier(.2,.7,.3,1), opacity 120ms ease; }
+.tab-close.icon-button { width: 23px; height: 23px; opacity: .55; transition: opacity 140ms ease, background-color 140ms ease, color 140ms ease; }
+.document-tab:hover .tab-close, .document-tab.active .tab-close, .document-tab:focus-within .tab-close { opacity: 1; }
 .tab-close svg { width: 12px; height: 12px; }
 .tab-dirty { height: 5px; width: 5px; flex-shrink: 0; border-radius: 50%; background: var(--accent); visibility: hidden; }
 .dirty .tab-dirty { visibility: visible; }
@@ -92,8 +98,8 @@ svg { width: 17px; height: 17px; flex-shrink: 0; }
 .toolbar { min-height: 50px; display: flex; align-items: center; padding: 7px 25px; gap: 12px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
 .format-tools { display: flex; align-items: center; gap: 2px; flex: 1; }
 .view-switch { display: flex; background: var(--sidebar); border: 1px solid var(--line); border-radius: 5px; padding: 2px; gap: 1px; flex-shrink: 0; }
-.view-switch button { font-size: 11px; padding: 5px 12px; border-radius: 3px; color: var(--soft); }
-.view-switch button.active { background: var(--bg); box-shadow: 0 1px 3px #0000000b; color: var(--accent); font-weight: 600; }
+.view-switch button { font-size: 11px; padding: 5px 12px; border-radius: 3px; color: var(--soft); transition: background-color 150ms ease, color 150ms ease; }
+.view-switch button.active { background: var(--bg); box-shadow: none; color: var(--accent); font-weight: 600; }
 .document-surface { flex: 1; min-height: 0; overflow: hidden; position: relative; }
 #editor { height: 100%; }
 .cm-editor { height: 100%; outline: none !important; }
@@ -188,6 +194,9 @@ svg { width: 17px; height: 17px; flex-shrink: 0; }
 .update-dialog button:not(.icon-button) { padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; flex-shrink: 0; }
 .update-dialog .primary { background: var(--accent); color: var(--bg); }
 .update-dialog footer { justify-content: flex-end; margin-top: 8px; flex-wrap: wrap; }
+@media (prefers-reduced-motion: reduce) {
+  .document-tab, .tab-indicator.positioned, .tab-close.icon-button, .view-switch button { transition: none; }
+}
 .sidebar-hidden, #app.focus-mode { grid-template-columns: minmax(0,1fr); }
 .sidebar-hidden .sidebar, .focus-mode .sidebar { display: none; }
 .focus-mode .toolbar { display: none; }

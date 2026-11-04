@@ -6,6 +6,7 @@ app="release/mac/Moye.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" release/mac-build
 cp macos/Info.plist "$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $version" "$app/Contents/Info.plist"
 cp -R dist "$app/Contents/Resources/wwwroot"
 cp LICENSE "$app/Contents/Resources/LICENSE.txt"
 cp THIRD_PARTY_NOTICES.txt "$app/Contents/Resources/"
