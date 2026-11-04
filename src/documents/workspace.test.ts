@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { BrowserWorkspace } from './workspace';
 
 describe('document workspace', () => {
+  it('normalizes CRLF samples and legacy sessions without inventing edits', () => {
+    const workspace = new BrowserWorkspace();
+    const doc = workspace.add('# Title\r\nText\r', 'Windows.md', '# Title\nText\n');
+    expect(workspace.tabs[0].dirty).toBe(false);
+    expect(workspace.update(doc.id, '# Title\nText\n', 0)).toBe(true);
+    const legacy = JSON.parse(workspace.serialize());
+    legacy.documents[0].text = legacy.documents[0].baseline = '# Title\r\nText\r\n';
+    const restored = BrowserWorkspace.restore(JSON.stringify(legacy))!;
+    expect(restored.active.text).toBe('# Title\nText\n');
+    expect(restored.tabs[0].dirty).toBe(false);
+  });
   it('retains dirty text and unique names when adding a tab', () => {
     const workspace = new BrowserWorkspace();
     const a = workspace.add('未保存内容');

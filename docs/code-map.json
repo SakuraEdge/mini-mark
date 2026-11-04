@@ -1,0 +1,249 @@
+{
+  "guide": "CODE_MAP.md",
+  "regenerate": "npm run docs:map",
+  "entryPoints": [
+    "index.html",
+    "src/app/main.ts",
+    "native/Program.cs",
+    "macos/App/Main.swift"
+  ],
+  "groups": [
+    {
+      "path": "src/app",
+      "purpose": "应用协调和交互",
+      "files": [
+        "src/app/main.ts"
+      ]
+    },
+    {
+      "path": "src/ui",
+      "purpose": "界面布局",
+      "files": [
+        "src/ui/layout.ts"
+      ]
+    },
+    {
+      "path": "src/editor",
+      "purpose": "编辑器与中文命令",
+      "files": [
+        "src/editor/commands.test.ts",
+        "src/editor/commands.ts",
+        "src/editor/editor.ts"
+      ]
+    },
+    {
+      "path": "src/documents",
+      "purpose": "文档模型与示例",
+      "files": [
+        "src/documents/sample.ts",
+        "src/documents/workspace.test.ts",
+        "src/documents/workspace.ts"
+      ]
+    },
+    {
+      "path": "src/markdown",
+      "purpose": "排版和导出",
+      "files": [
+        "src/markdown/export.ts",
+        "src/markdown/render.ts"
+      ]
+    },
+    {
+      "path": "src/platform",
+      "purpose": "宿主通信",
+      "files": [
+        "src/platform/bridge.ts"
+      ]
+    },
+    {
+      "path": "src/features/updates",
+      "purpose": "更新界面与版本",
+      "files": [
+        "src/features/updates/updates.test.ts",
+        "src/features/updates/updates.ts"
+      ]
+    },
+    {
+      "path": "src/styles",
+      "purpose": "视觉样式",
+      "files": [
+        "src/styles/app.css"
+      ]
+    },
+    {
+      "path": "native/Host",
+      "purpose": "Windows 宿主",
+      "files": [
+        "native/Host/MainWindow.cs"
+      ]
+    },
+    {
+      "path": "native/Documents",
+      "purpose": "Windows 文件与会话",
+      "files": [
+        "native/Documents/DocumentStore.cs",
+        "native/Documents/DocumentWorkspace.cs"
+      ]
+    },
+    {
+      "path": "native/Infrastructure",
+      "purpose": "Windows 路径与进程",
+      "files": [
+        "native/Infrastructure/AppPaths.cs",
+        "native/Infrastructure/SingleInstance.cs"
+      ]
+    },
+    {
+      "path": "native/Export",
+      "purpose": "Windows PDF",
+      "files": [
+        "native/Export/PdfExporter.cs"
+      ]
+    },
+    {
+      "path": "native/Updates",
+      "purpose": "Windows 更新",
+      "files": [
+        "native/Updates/GitHubUpdates.cs",
+        "native/Updates/UpdateManifest.cs"
+      ]
+    },
+    {
+      "path": "macos/App",
+      "purpose": "macOS 应用",
+      "files": [
+        "macos/App/Main.swift"
+      ]
+    },
+    {
+      "path": "macos/Host",
+      "purpose": "macOS 资源宿主",
+      "files": [
+        "macos/Host/AppScheme.swift"
+      ]
+    },
+    {
+      "path": "macos/Documents",
+      "purpose": "macOS 文件与会话",
+      "files": [
+        "macos/Documents/DocumentStore.swift"
+      ]
+    },
+    {
+      "path": "macos/Export",
+      "purpose": "macOS PDF",
+      "files": [
+        "macos/Export/PdfExporter.swift"
+      ]
+    },
+    {
+      "path": "macos/Updates",
+      "purpose": "macOS 更新",
+      "files": [
+        "macos/Updates/GitHubUpdates.swift"
+      ]
+    },
+    {
+      "path": "macos/Diagnostics",
+      "purpose": "macOS 实际运行验证",
+      "files": [
+        "macos/Diagnostics/SmokeTests.swift"
+      ]
+    },
+    {
+      "path": "tests",
+      "purpose": "界面回归",
+      "files": [
+        "tests/editor.spec.ts",
+        "tests/fixtures/pdf.md",
+        "tests/host-sync.spec.ts",
+        "tests/tab-motion.spec.ts",
+        "tests/updates.spec.ts"
+      ]
+    },
+    {
+      "path": "native-tests",
+      "purpose": "原生单元检查",
+      "files": [
+        "native-tests/Moye.Tests.csproj",
+        "native-tests/Program.cs",
+        "native-tests/UpdateTests.cs"
+      ]
+    },
+    {
+      "path": "native-ui-tests",
+      "purpose": "真实 WebView2 交互",
+      "files": [
+        "native-ui-tests/Moye.UiTests.csproj",
+        "native-ui-tests/Program.cs"
+      ]
+    },
+    {
+      "path": "native-pdf-tests",
+      "purpose": "真实 PDF 引擎",
+      "files": [
+        "native-pdf-tests/Moye.PdfTests.csproj",
+        "native-pdf-tests/Program.cs"
+      ]
+    },
+    {
+      "path": "installer",
+      "purpose": "Windows 安装",
+      "files": [
+        "installer/ChineseSimplified.isl",
+        "installer/Moye.iss"
+      ]
+    },
+    {
+      "path": "scripts",
+      "purpose": "开发脚本",
+      "files": [
+        "scripts/benchmark.ps1",
+        "scripts/code-map.mjs",
+        "scripts/create-icon.mjs",
+        "scripts/icon-mac.mjs",
+        "scripts/package-mac.sh",
+        "scripts/package-win.ps1",
+        "scripts/pdf-fixture.mjs",
+        "scripts/test-installer.ps1",
+        "scripts/third-party.mjs",
+        "scripts/update-manifest.mjs"
+      ]
+    },
+    {
+      "path": ".github/workflows",
+      "purpose": "构建与发布",
+      "files": [
+        ".github/workflows/build.yml",
+        ".github/workflows/release.yml"
+      ]
+    },
+    {
+      "path": "public",
+      "purpose": "应用资源",
+      "files": [
+        "public/moye.svg",
+        "public/welcome.md"
+      ]
+    },
+    {
+      "path": "docs",
+      "purpose": "开发与发布记录",
+      "files": [
+        "docs/code-map.json",
+        "docs/editor-v1.png",
+        "docs/editor.png",
+        "docs/performance.md",
+        "docs/release-v1.0.0.md",
+        "docs/release-v1.0.1.md",
+        "docs/release-v1.0.2.md",
+        "docs/release-v1.0.3.md",
+        "docs/slash-commands.png",
+        "docs/tabs-save.png",
+        "docs/updates.png",
+        "docs/validation.md",
+        "docs/写下一个好想法.md"
+      ]
+    }
+  ]
+}

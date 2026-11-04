@@ -1,4 +1,4 @@
-import { send, isDesktop, type HostMessage } from './bridge';
+import { send, isDesktop, type HostMessage } from '../../platform/bridge';
 
 export const APP_VERSION = __APP_VERSION__;
 const SETTINGS_KEY = 'moye.updates.v1';

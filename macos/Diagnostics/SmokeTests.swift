@@ -18,6 +18,10 @@ func runStoreTests() throws {
     let file = folder.appendingPathComponent("session.json"); try Store.saveSession(session, file)
     let restored = try Store.restore(file)
     guard restored.documents.count == 2, restored.activeId == second.id, restored.documents[0].text == doc.text else { throw Store.failure("Session round trip failed") }
+    let windows = Document(untitledName: "CRLF.md", text: "# Windows\r\nbody\r\n", baseline: "# Windows\r\nbody\r\n", newline: "\r\n")
+    try Store.saveSession(Session(documents: [windows], activeId: windows.id), file)
+    let normalized = try Store.restore(file).documents[0]
+    guard normalized.text == "# Windows\nbody\n", !normalized.dirty, normalized.newline == "\r\n" else { throw Store.failure("CRLF recovery normalization failed") }
     print("PASS macOS storage: UTF-8, BOM, CRLF, conflict, two-document recovery")
 }
 

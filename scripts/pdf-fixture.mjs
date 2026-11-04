@@ -16,7 +16,7 @@ try {
   await page.goto('http://127.0.0.1:4175');
   const markdown = await readFile('tests/fixtures/pdf.md', 'utf8');
   const html = await page.evaluate(async text => {
-    const { exportHtml } = await import('/src/export.ts');
+    const { exportHtml } = await import('/src/markdown/export.ts');
     return exportHtml(text, '中文排版与公式验证.md');
   }, markdown);
   await mkdir(dirname(output), { recursive: true });

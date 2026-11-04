@@ -25,6 +25,9 @@ jobs:
       - run: npx playwright install msedge
       - run: npm run test:e2e
       - run: npm run package:win
+      - name: Validate actual Windows WebView2 interaction
+        run: npm run test:native-ui
+        timeout-minutes: 3
       - run: ./scripts/package-win.ps1
       - run: ./scripts/test-installer.ps1
       - uses: actions/upload-artifact@v4

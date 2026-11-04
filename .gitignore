@@ -7,6 +7,8 @@ native-tests/bin/
 native-tests/obj/
 native-pdf-tests/bin/
 native-pdf-tests/obj/
+native-ui-tests/bin/
+native-ui-tests/obj/
 test-results/
 playwright-report/
 *.user

@@ -11,10 +11,12 @@ cp -R dist "$app/Contents/Resources/wwwroot"
 cp LICENSE "$app/Contents/Resources/LICENSE.txt"
 cp THIRD_PARTY_NOTICES.txt "$app/Contents/Resources/"
 sdk=$(xcrun --sdk macosx --show-sdk-path)
+sources=()
+while IFS= read -r source; do sources+=("$source"); done < <(find macos -name '*.swift' -type f | sort)
 for arch in arm64 x86_64; do
   swiftc -O -swift-version 5 -target "$arch-apple-macos13.0" -sdk "$sdk" \
     -framework AppKit -framework WebKit -framework CryptoKit -framework PDFKit \
-    macos/*.swift -o "release/mac-build/Moye-$arch"
+    "${sources[@]}" -o "release/mac-build/Moye-$arch"
 done
 lipo -create release/mac-build/Moye-arm64 release/mac-build/Moye-x86_64 -output "$app/Contents/MacOS/Moye"
 node scripts/icon-mac.mjs

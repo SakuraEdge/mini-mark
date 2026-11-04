@@ -7,7 +7,7 @@ import { languages } from '@codemirror/language-data';
 import { search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { tags } from '@lezer/highlight';
 import { commands, imeBlocksCommand, matchingCommands, slashQuery, type SlashCommand } from './commands';
-import { renderMarkdown, renderMath } from './markdown';
+import { renderMarkdown, renderMath } from '../markdown/render';
 
 export type EditorMode = 'live' | 'source' | 'read';
 export const modeCompartment = new Compartment();

@@ -1,6 +1,6 @@
-import { sample } from './sample';
-import { BrowserWorkspace, type DocumentData, type TabData } from './workspace';
-export type { DocumentData, TabData } from './workspace';
+import { sample } from '../documents/sample';
+import { BrowserWorkspace, type DocumentData, type TabData } from '../documents/workspace';
+export type { DocumentData, TabData } from '../documents/workspace';
 
 export type HostMessage =
   | { type: 'workspace'; tabs: TabData[]; document: DocumentData; recovered?: boolean }

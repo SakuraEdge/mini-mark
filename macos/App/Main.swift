@@ -118,7 +118,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         }
         if type == "closingText", body["requestId"] as? String != closingRequest { return }
         guard ready, let id = body["documentId"] as? String, let index = session.documents.firstIndex(where: { $0.id == id }) else { post(["type": "operationComplete"]); return }
-        if let text = body["text"] as? String, let revision = body["revision"] as? Int {
+        if let rawText = body["text"] as? String, let revision = body["revision"] as? Int {
+            let text = Store.normalize(rawText)
             if revision < session.documents[index].revision || (revision == session.documents[index].revision && text != session.documents[index].text) { publish(); return }
             session.documents[index].text = text; session.documents[index].revision = revision
         }
@@ -149,7 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
     func add(_ text: String = "", _ name: String? = nil, baseline: String = "") {
         let name = name ?? "未命名 \(session.nextUntitled).md"; session.nextUntitled += 1
-        let doc = Document(untitledName: name, text: text, baseline: baseline)
+        let doc = Document(untitledName: name, text: Store.normalize(text), baseline: Store.normalize(baseline))
         session.documents.append(doc); session.activeId = doc.id
     }
     func remove(_ id: String) {

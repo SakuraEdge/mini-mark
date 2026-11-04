@@ -55,6 +55,15 @@ try {
     Check(DocumentStore.ReadDraft(draftFile) == legacy, "Legacy backup was changed");
     var migratedAgain = DocumentWorkspace.Restore(Path.Combine(folder, "migrated-v2.json"), draftFile);
     Check(migratedAgain.Documents.Count == 1 && migratedAgain.ActiveId == migrated.ActiveId, "Migration created duplicate tabs");
+    var windows = workspace.AddNew("# Windows\r\nbody\r", "Windows.md", "# Windows\nbody\n");
+    Check(!windows.Dirty && windows.Text == windows.Baseline, "CRLF sample was marked dirty before editing");
+    Check(windows.Update("# Windows\nbody\n", 0), "Normalized editor text rejected at the same revision");
+    windows.Newline = "\r\n";
+    workspace.SaveSession(sessionFile);
+    var oldSession = File.ReadAllText(sessionFile).Replace("# Windows\\nbody\\n", "# Windows\\r\\nbody\\r\\n");
+    File.WriteAllText(sessionFile, oldSession);
+    var normalizedRestore = DocumentWorkspace.Restore(sessionFile, draftFile).Find(windows.Id)!;
+    Check(!normalizedRestore.Dirty && normalizedRestore.Text == "# Windows\nbody\n" && normalizedRestore.Newline == "\r\n", "Legacy CRLF session did not normalize while preserving save format");
     await UpdateTests.Run(folder, Check);
     if (args.Contains("--live-update")) {
         var live = await new GitHubUpdates(Path.Combine(folder, "live")).Check();

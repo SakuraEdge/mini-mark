@@ -8,8 +8,9 @@ public sealed class OpenDocument {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string UntitledName { get; set; } = "未命名.md";
     public string? Path { get; set; }
-    public string Text { get; set; } = "";
-    public string Baseline { get; set; } = "";
+    private string text = "", baseline = "";
+    public string Text { get => text; set => text = value is null ? null! : DocumentStore.Normalize(value); }
+    public string Baseline { get => baseline; set => baseline = value is null ? null! : DocumentStore.Normalize(value); }
     public string? Fingerprint { get; set; }
     public bool Bom { get; set; }
     public string Newline { get; set; } = "\n";
@@ -17,6 +18,7 @@ public sealed class OpenDocument {
     [JsonIgnore] public string Name => Path is null ? UntitledName : System.IO.Path.GetFileName(Path);
     [JsonIgnore] public bool Dirty => Text != Baseline;
     public bool Update(string text, long revision) {
+        text = DocumentStore.Normalize(text);
         if (revision < Revision || (revision == Revision && text != Text)) return false;
         Text = text; Revision = revision; return true;
     }

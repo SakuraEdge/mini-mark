@@ -1,6 +1,6 @@
 {
   "name": "moye-markdown",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "description": "A fast, local-first Windows Markdown editor with Chinese slash commands.",
   "type": "module",
@@ -12,7 +12,9 @@
     "test:e2e": "playwright test",
     "desktop": "dotnet run --project native/Moye.csproj",
     "package:win": "npm run build && dotnet publish native/Moye.csproj -c Release -r win-x64 --self-contained true -o release/Moye",
-    "test:native": "dotnet run --project native-tests/Moye.Tests.csproj"
+    "test:native": "dotnet run --project native-tests/Moye.Tests.csproj",
+    "test:native-ui": "dotnet run --project native-ui-tests/Moye.UiTests.csproj -c Release",
+    "docs:map": "node scripts/code-map.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "6.11.1",

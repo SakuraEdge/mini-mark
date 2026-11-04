@@ -1,5 +1,5 @@
 import katexCss from 'katex/dist/katex.min.css?inline';
-import { renderMarkdown } from './markdown';
+import { renderMarkdown } from './render';
 
 let embeddedCss: Promise<string> | undefined;
 async function embedMathFonts(): Promise<string> {

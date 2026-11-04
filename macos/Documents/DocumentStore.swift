@@ -51,6 +51,10 @@ enum Store {
         guard FileManager.default.fileExists(atPath: file.path) else { return Session() }
         var session = try JSONDecoder().decode(Session.self, from: Data(contentsOf: file))
         guard session.version == 1, Set(session.documents.map(\.id)).count == session.documents.count else { throw failure("会话格式无法识别，旧文件已保留。") }
+        for i in session.documents.indices {
+            session.documents[i].text = normalize(session.documents[i].text)
+            session.documents[i].baseline = normalize(session.documents[i].baseline)
+        }
         for i in session.documents.indices where !session.documents[i].dirty {
             guard let path = session.documents[i].path else { continue }
             if var disk = try? read(path) { disk.id = session.documents[i].id; session.documents[i] = disk }
