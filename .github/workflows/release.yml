@@ -1,0 +1,56 @@
+name: Publish Verified Release
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful main-branch Build and Test run
+        required: true
+        type: string
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_ID: ${{ inputs.build_run_id }}
+    steps:
+      - name: Resolve verified build
+        id: build
+        run: |
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > run.json
+          test "$(jq -r .conclusion run.json)" = success
+          test "$(jq -r .head_branch run.json)" = main
+          test "$(jq -r .path run.json)" = .github/workflows/build.yml
+          echo "sha=$(jq -r .head_sha run.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.build.outputs.sha }}
+      - name: Download verified packages
+        run: |
+          mkdir -p release-assets
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name Moye-windows-x64 --dir release-assets
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name Moye-macos-universal --dir release-assets
+      - name: Publish all assets together
+        env:
+          BUILD_SHA: ${{ steps.build.outputs.sha }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          tag="v$version"
+          notes="$PWD/docs/release-$tag.md"
+          test -f "$notes"
+          cd release-assets
+          files=("Moye-Setup-$version-windows-x64.exe" "Moye-$version-windows-x64.zip" "Moye-$version-macos-universal.dmg" "Moye-$version-macos-universal.zip")
+          for file in "${files[@]}"; do test -s "$file"; done
+          sha256sum "${files[@]}" > "SHA256SUMS-$tag.txt"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft > existing.json 2>/dev/null; then
+            test "$(jq -r .isDraft existing.json)" = true
+          else
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$BUILD_SHA" --title "墨页 Moye $tag" --notes-file "$notes" --draft
+          fi
+          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" "${files[@]}" "SHA256SUMS-$tag.txt" --clobber
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url,isDraft,isPrerelease,assets
