@@ -6,8 +6,12 @@ final class PdfExporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
     private var completion: ((Error?) -> Void)?
     private var target: URL!
     private var timeout: DispatchWorkItem?
+    private weak var owner: NSWindow?
+    private var temporary: URL?
+    private var operation: NSPrintOperation?
     func export(html: String, folder: URL?, to target: URL, owner: NSWindow, completion: @escaping (Error?) -> Void) {
         self.target = target; self.completion = completion
+        self.owner = owner
         let config = WKWebViewConfiguration()
         let scheme = AppScheme(root: folder ?? FileManager.default.temporaryDirectory); scheme.documentFolder = folder
         config.setURLSchemeHandler(scheme, forURLScheme: "moye")
@@ -32,9 +36,9 @@ final class PdfExporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
         DispatchQueue.main.async { [weak self] in self?.printDocument() }
     }
     private func printDocument() {
-        guard completion != nil, let target = target else { return }
+        guard completion != nil, let target = target, let owner = owner else { return }
         let temporary = target.deletingLastPathComponent().appendingPathComponent(".moye-\(UUID().uuidString).pdf")
-        defer { try? FileManager.default.removeItem(at: temporary) }
+        self.temporary = temporary
         let info = NSPrintInfo()
         info.paperSize = NSSize(width: 595.28, height: 841.89)
         info.topMargin = 43.2; info.bottomMargin = 43.2; info.leftMargin = 43.2; info.rightMargin = 43.2
@@ -43,8 +47,14 @@ final class PdfExporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
         info.jobDisposition = .save
         info.dictionary()[NSPrintInfo.AttributeKey.jobSavingURL] = temporary
         let operation = web.printOperation(with: info)
+        self.operation = operation
         operation.showsPrintPanel = false; operation.showsProgressPanel = false
-        guard operation.run() else { finish(Store.failure("PDF 打印失败。")); return }
+        // WebKit needs the main event loop while collecting printable page data.
+        operation.runModal(for: owner, delegate: self, didRun: #selector(printFinished(_:success:contextInfo:)), contextInfo: nil)
+    }
+    @objc private func printFinished(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
+        guard completion != nil, let temporary = temporary, let target = target else { return }
+        guard success else { finish(Store.failure("PDF 打印失败。")); return }
         do {
             let data = try Data(contentsOf: temporary)
             guard data.starts(with: Data("%PDF-".utf8)) else { throw Store.failure("未生成有效 PDF。") }
@@ -57,6 +67,8 @@ final class PdfExporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
         completion = nil; timeout?.cancel()
         web?.configuration.userContentController.removeScriptMessageHandler(forName: "printReady")
         web?.removeFromSuperview(); web = nil
+        if let temporary = temporary { try? FileManager.default.removeItem(at: temporary) }
+        operation = nil; temporary = nil
         callback(error)
     }
 }

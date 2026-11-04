@@ -1,120 +1,151 @@
+<div align="center">
+
+<img src="public/moye.svg" width="76" height="76" alt="墨页图标">
+
 # 墨页 Moye
 
-一个轻量、离线优先的 Windows Markdown 编辑器。参考 Typora 的即时排版体验，专门照顾中文写作、公式与代码。
+**写中文，敲公式，记下一页好想法。**
 
-![墨页多标签与保存格式菜单](docs/tabs-save.png)
+一个离线优先的 Markdown 编辑器，为 Windows 与 macOS 打造。
 
-## 使用
+[![Release](https://img.shields.io/github/v/release/SakuraEdge/moye-markdown?color=28765d&label=Download)](https://github.com/SakuraEdge/moye-markdown/releases/latest)
+[![Build](https://github.com/SakuraEdge/moye-markdown/actions/workflows/build.yml/badge.svg)](https://github.com/SakuraEdge/moye-markdown/actions/workflows/build.yml)
+[![License](https://img.shields.io/badge/license-MIT-4f729a)](LICENSE)
 
-在本项目的 Releases 下载 `Moye-0.2.0-windows-x64.zip`，完整解压后运行 `Moye.exe`。不要只移动 exe；同目录的运行库和 `wwwroot` 都是程序的一部分。
+[下载 Windows 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.0/Moye-Setup-1.0.0-windows-x64.exe) · [下载 macOS 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.0/Moye-1.0.0-macos-universal.dmg) · [全部版本](https://github.com/SakuraEdge/moye-markdown/releases)
 
-- Windows 10/11 x64。发布包内置 .NET 运行时，无需安装 Node.js 或 .NET SDK。
-- 需要 Microsoft Edge WebView2 Evergreen Runtime；程序会在缺少运行时时给出提示。
-- 不联网也能编辑、渲染公式和高亮代码；没有账号、云同步或遥测。
-- 可用 `Moye.exe "笔记.md"` 打开文件。重复启动会把请求交给已运行的窗口。
+</div>
 
-## 编辑
+![墨页：多文档标签、即时公式与保存格式菜单](docs/tabs-save.png)
 
-**即时**：标题、强调、引用、代码、块级公式和表格直接在编辑区排版；光标进入公式或表格时恢复源文本。
+## 从 `/公式` 开始
 
-**源码**：行号、代码折叠、语法高亮。**阅读**：完整 Markdown 预览，包括任务列表、图片与行内公式。
+在空白行输入 `/公式`，按回车，光标就落在公式块中间。
+写下 `a^2+b^2=c^2`，离开这一行，公式立即排版。
 
-在空白行输入 `/` 打开中文命令菜单。支持中文、拼音和英文前缀；回车、Tab 或点击确认，Esc 关闭。中文输入法的选词回车不会直接执行命令。
+不用记住每一种 Markdown 符号。`/代码`、`/表格`、`/待办`、`/引用` 都有中文提示，也支持拼音与英文前缀。中文输入法选词时，不会把确认回车当成插入命令。
 
-| 命令 | 插入内容 |
+| 写作时需要的事 | 墨页如何完成 |
 | --- | --- |
-| `/公式`、`/gongshi`、`/math` | `$$` 块级公式，光标位于中间空行 |
-| `/行内公式` | `$ $`，光标位于定界符内 |
-| `/代码` | C++ 代码围栏，可修改语言名称 |
+| 把注意力留在内容上 | 即时排版、专注模式、明暗主题与可调字号 |
+| 公式和代码清晰可读 | KaTeX 数学公式、代码语法高亮、源码视图 |
+| 同时整理几份笔记 | 多标签、独立撤销、未保存提示、整组草稿恢复 |
+| 把成果分享出去 | 保存 `.md`，导出 A4 PDF 或独立 HTML |
+| 留在自己的电脑里 | 原生文件读写，无账号、云同步或遥测 |
+| 跟上新的正式版本 | GitHub 更新检测，大版本提醒可关闭 |
+
+## 下载与安装
+
+| 系统 | 推荐下载 | 其他方式 |
+| --- | --- | --- |
+| Windows 10 / 11，x64 | [安装程序 `.exe`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.0/Moye-Setup-1.0.0-windows-x64.exe) | [便携版 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.0/Moye-1.0.0-windows-x64.zip) |
+| macOS 13 Ventura 或更新版本 | [通用版 `.dmg`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.0/Moye-1.0.0-macos-universal.dmg) | [应用包 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.0/Moye-1.0.0-macos-universal.zip) |
+
+macOS 通用版同时包含 **Apple Silicon 与 Intel** 两种架构。校验和见 [SHA256SUMS](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.0/SHA256SUMS-v1.0.0.txt)。
+
+### Windows
+
+运行安装程序，按提示完成安装。可以勾选 **“将墨页设为 .md 默认应用”**；安装完成后会打开 Windows 默认应用设置，由你确认关联。安装器不会绕过系统保护或强行改写其他应用的默认关联。
+
+便携版请完整解压，再运行 `Moye.exe`，不要只移动 exe。发布包已包含 .NET 运行时，需要系统具备 Microsoft Edge WebView2 Runtime。
+
+### macOS
+
+打开 DMG，将 `Moye.app` 拖到 Applications。需要关联 Markdown 时，在 Finder 选中 `.md` 文件，使用“显示简介 → 打开方式 → Moye → 全部更改”。
+
+**签名说明：** 当前开源发行包尚未使用 Windows 代码签名证书，也未完成 Apple Developer ID 签名与公证。系统可能在首次运行时要求你确认来源；请核对本仓库发布页和 SHA-256。macOS 使用本地临时签名以支持应用运行，不等于 Apple 身份认证。无需关闭系统安全保护。
+
+## 三种视图，一份文件
+
+- **即时**：标题、强调、引用、代码、块级公式和表格在编辑区排版，进入公式或表格时恢复源码。
+- **源码**：行号、折叠与语法高亮，方便精确修改。
+- **阅读**：完整预览，包括行内公式、图片和任务列表。
+
+新建、打开文档都会增加一个标签。切换时保留正文、光标、滚动位置和本次运行的撤销记录；关闭未保存文档前会询问。
+
+### 常用中文命令
+
+| 输入 | 得到 |
+| --- | --- |
+| `/公式` / `/gongshi` / `/math` | `$$` 公式块，光标位于中间 |
+| `/行内公式` | `$ $` |
+| `/代码` | 代码围栏，默认 C++ |
 | `/表格` | 两列表格 |
-| `/待办` | `- [ ] ` |
-| `/引用` | `> ` |
-| `/一级标题`、`/二级标题` | 对应标题 |
+| `/待办` | 任务列表 |
+| `/引用` | 引用块 |
+| `/一级标题`、`/二级标题` | 对应层级标题 |
 | `/分割线` | 分割线 |
 
-路径、URL、普通段落和代码围栏内不会触发命令菜单。
+输入 `/` 查看菜单；回车、Tab 或点击确认，Esc 关闭。路径、URL、普通段落和代码围栏内不会触发菜单。
 
-## 多标签与保存
+## 保存和导出
 
-新建和打开文档会在顶部增加标签页，原文档的内容、未保存状态、撤销记录、光标和滚动位置都会保留。点击标签切换，点击标签上的关闭按钮只关闭该文档；有未保存修改时会先询问。重复打开同一文件会定位到已有标签页。
+点击右上角保存图标，选择 **Markdown** 或 **PDF**。已有 Markdown 文件使用 `Ctrl+S` / `⌘S` 直接保存；另存为可选择文件名与格式。
 
-点击保存图标，可选择 **保存 Markdown (.md)** 或 **保存为 PDF (.pdf)**。新文档的保存对话框及“另存为”也提供 MD / PDF 格式选择。已有 Markdown 文件按 Ctrl+S 仍然直接保存。
+PDF 保留可选择的中文文字、数学公式、代码高亮、表格和本地相对图片，以 A4 页面排版。导出时切换标签，不会改变已提交的导出内容。
 
-PDF 使用 A4 页面输出排版结果，保留可选择的中文文字、数学公式、代码高亮、表格和本地相对图片。导出在独立排版页面中完成，不会包含编辑器侧栏、工具栏或标签页；导出期间切换文档不会改变导出的内容。
+**PDF 是阅读副本。** 导出后，Markdown 源文档仍需单独保存；未保存提示不会消失。
 
-**PDF 是阅读副本，不会代替 Markdown 源文件保存。** 导出 PDF 后，未保存的 Markdown 仍标记为未保存，关闭时仍会提示。
+“更多”菜单还可以导出独立 HTML，内嵌公式字体。相对图片保持原路径，分享时需同时携带图片文件。
 
-## 文件与快捷键
+## 更新与本地数据
 
-原生打开、保存、另存为和关闭确认；保存采用同目录临时文件替换，保留 UTF-8 BOM 和 LF/CRLF，发现外部修改后询问是否覆盖。标签及自动草稿位于 `%LOCALAPPDATA%/Moye/session-v2.json`，不会自动覆盖原始文件。v0.1 的 `draft.json` 会自动迁移，旧文件保留为备份。
+“更多 → 检测更新”可随时检查 GitHub 正式版本。自动检查在编辑器就绪后后台进行，每天最多一次；网络失败不会打断写作。
 
-草稿在停止输入后约 820 ms 写入；崩溃时可能丢失最后这个时间窗口内的输入。切换、新建和关闭标签会先同步最后的输入。正常退出会逐一询问未保存文档，取消退出时不丢弃其他标签；下次启动恢复整组标签。撤销历史仅在本次运行内保留。单实例机制避免多个窗口争抢同一份草稿。
+主版本号变化才自动弹窗，例如 **`1.x → 2.x`**。同一主版本不会重复提醒，勾选“不再弹出大版本更新提醒”后会记住选择，手动检测仍然有效。更新只打开发布页，由你选择下载和安装。
 
-| 操作 | 快捷键 |
-| --- | --- |
-| 新建 / 打开 / 保存 | Ctrl+N / Ctrl+O / Ctrl+S |
-| 另存为 | Ctrl+Shift+S |
-| 撤销 / 重做 | Ctrl+Z / Ctrl+Y |
-| 加粗 / 斜体 / 链接 | Ctrl+B / Ctrl+I / Ctrl+K |
-| 查找与替换 | Ctrl+F |
-| 专注模式 | Ctrl+Shift+F |
-| 显示侧栏 | Ctrl+\ |
-| 即时与源码切换 | Ctrl+/ |
-| 切换标签 | Ctrl+Tab / Ctrl+Shift+Tab |
-| 关闭当前标签 | Ctrl+W |
+编辑与导出可离线进行；只有更新检测会主动请求 GitHub，也可以关闭自动检测。不会上传文档内容。
 
-更多菜单可导出独立 HTML，包含公式 CSS 与内嵌字体。文档中的相对图片路径保持原样；移动导出文件时应一起携带图片目录。
+| 数据 | Windows | macOS |
+| --- | --- | --- |
+| 标签与草稿 | `%LOCALAPPDATA%\Moye\session-v2.json` | `~/Library/Application Support/Moye/session-mac-v1.json` |
+| 旧版迁移 | 自动迁移 v0.1 草稿，保留旧文件 | 首次发布，无旧版数据 |
 
-## 性能
+草稿在停止输入后约 820 ms 备份，不会自动覆盖源文件；切换和关闭会同步最后输入。原生保存采用原子写入，保留 UTF-8 BOM、LF/CRLF，检测外部修改。崩溃仍可能丢失备份时间窗口内的输入，请定期保存重要文件。
 
-Windows 原生 WinForms 窗口 + 系统 WebView2，不打包 Electron/Chromium。前端使用 TypeScript 和 CodeMirror 6，无 UI 框架；语言解析器按需加载。
+## 快捷键
 
-实测数据、测量口径和复现命令见 [性能记录](docs/performance.md)。启动速度依赖机器、磁盘、杀毒扫描和 WebView2 状态，不承诺所有机器都在 1 秒内。
+| 操作 | Windows | macOS |
+| --- | --- | --- |
+| 新建 / 打开 / 保存 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` | `⌘N` / `⌘O` / `⌘S` |
+| 另存为 | `Ctrl+Shift+S` | `⌘⇧S` |
+| 撤销 / 重做 | `Ctrl+Z` / `Ctrl+Y` | `⌘Z` / `⌘⇧Z` |
+| 加粗 / 斜体 / 链接 | `Ctrl+B` / `Ctrl+I` / `Ctrl+K` | `⌘B` / `⌘I` / `⌘K` |
+| 查找 | `Ctrl+F` | `⌘F` |
+| 关闭标签 | `Ctrl+W` | `⌘W` |
+| 切换标签 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | `Control+Tab` / `Control+Shift+Tab` |
 
-## 本地开发
+## 轻量，但不夸大
 
-需要 Node.js 24、.NET 8 SDK 和 WebView2 Runtime。
+Windows 使用 WinForms + 系统 WebView2，macOS 使用 AppKit + 系统 WebKit。前端为 TypeScript + CodeMirror 6，不打包 Electron 或额外 Chromium。
 
-```powershell
+**目前仍未完成稳定 1 秒内冷启动验收。** 实测口径、已有结果和下一步优化见 [性能记录](docs/performance.md)。不以窗口出现代替可编辑状态，也不承诺所有机器都能“秒开”。
+
+目前仅支持 UTF-8 文本，打开上限 20 MB；网络图片默认不加载。即时模式中的行内公式与图片在阅读视图完整显示。暂不包含文件夹管理、Mermaid、插件或云同步。
+
+## 开发与验证
+
+```bash
 npm ci
 npm run dev
-```
-
-浏览器开发地址为 `http://127.0.0.1:4173`。浏览器模式保存为下载文件，不能覆盖原文件；它与桌面版的原生文件操作不同。
-
-```powershell
-npm run build
-npm run desktop
-npm run package:win
-```
-
-构建输出为 `release/Moye`。所有依赖版本记录于 `package-lock.json`。
-
-## 验证
-
-```powershell
 npm test
 npm run test:e2e
-npm run test:native
 ```
 
-浏览器端测试使用 Microsoft Edge。测试涵盖中文命令、模拟 IME 事件顺序、转义与 XSS、多标签恢复、撤销隔离、快速切换、关闭取消、PDF 菜单、主题和窄窗口布局。存储测试覆盖中文路径、BOM、换行、外部修改、损坏草稿、旧会话迁移和原子替换。
+Windows 需 Node.js 24、.NET 8 SDK 和 WebView2；执行 `npm run package:win` 生成便携目录，安装器源码在 `installer/`。
 
-模拟 IME 事件不是所有真实输入法的兼容性认证。发布前应继续检查微软拼音、搜狗等实际输入法。
+macOS 需 Node.js 24 与 Xcode Command Line Tools：
 
-## 范围
+```bash
+npm run build
+npx playwright install chromium
+bash scripts/package-mac.sh
+```
 
-这是 v0.2：目前提供 Windows x64 桌面版；浏览器模式用于开发预览，其 PDF 选项会打开浏览器打印对话框，可选择“另存为 PDF”。尚未提供文件夹管理、Mermaid、插件或云同步。即时模式的行内公式和图片在阅读视图中完整渲染。
+GitHub Actions 分别构建两个平台。macOS 原生检查会实际启动 WKWebView，检查多标签、公式、本地保存和多页 PDF；Windows 覆盖存储、更新协议与界面回归。详细记录见 [验证记录](docs/validation.md)。
 
-文件采用严格 UTF-8，打开上限 20 MB。网络图片在桌面版默认不加载；本地相对图片只作为图片资源访问，不能通过预览脚本读取同目录文本文件。
+发现问题？欢迎 [提交 Issue](https://github.com/SakuraEdge/moye-markdown/issues)，附上操作系统、版本与复现步骤。分享文档前请移除个人信息。
 
-## 结构
+---
 
-- `src/`：编辑器、中文命令、渲染、界面与宿主协议。
-- `native/`：Windows 窗口、文件与草稿存储、单实例 IPC。
-- `tests/`：Playwright 交互测试。
-- `native-tests/`：独立存储检查。
-- `native-pdf-tests/`：使用真实 WebView2 打印引擎生成 PDF 的验证程序。
-- `scripts/benchmark.ps1`：隔离草稿目录的启动计时。
-
-MIT License。编辑体验受 Typora 启发，本项目使用独立实现、独立名称与图标。
+MIT License · 编辑体验受 Typora 启发，名称、图标与实现均独立。
