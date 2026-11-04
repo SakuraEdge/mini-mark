@@ -19,10 +19,16 @@ $capability = Get-ItemProperty 'HKCU:\Software\Moye\Capabilities\FileAssociation
 if($capability.'.md' -ne 'Moye.Markdown') { throw 'MD capability was not registered' }
 if((Read-Choice) -ne $before) { throw 'Installer changed protected default choice' }
 $shell = New-Object -ComObject WScript.Shell
+function Normalize-ShortcutPath([string]$path) {
+  if([string]::IsNullOrWhiteSpace($path)) { return '' }
+  return [IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($path)).TrimEnd('\','/')
+}
 foreach($link in @((Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) '墨页 Moye.lnk'), (Join-Path ([Environment]::GetFolderPath('Programs')) '墨页 Moye/墨页 Moye.lnk'))) {
   if(-not (Test-Path -LiteralPath $link)) { throw "Missing shortcut: $link" }
   $shortcut = $shell.CreateShortcut($link)
-  if($shortcut.TargetPath -ne (Join-Path $target 'Moye.exe') -or $shortcut.WorkingDirectory -ne $target) { throw 'Shortcut points outside installation' }
+  if((Normalize-ShortcutPath $shortcut.TargetPath) -ne (Normalize-ShortcutPath (Join-Path $target 'Moye.exe')) -or (Normalize-ShortcutPath $shortcut.WorkingDirectory) -ne (Normalize-ShortcutPath $target)) {
+    throw "Shortcut points outside installation: target=$($shortcut.TargetPath); working=$($shortcut.WorkingDirectory); expected=$target"
+  }
 }
 # Model an older release, a user-modified file, and malicious manifest entries.
 $owned = Join-Path $target 'installed-files.txt'

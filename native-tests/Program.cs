@@ -63,4 +63,3 @@ try {
     }
     Console.WriteLine($"PASS {count} native storage and update checks");
 } finally { Directory.Delete(folder, true); }
-
