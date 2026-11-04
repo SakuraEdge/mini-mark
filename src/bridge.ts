@@ -1,94 +1,116 @@
 import { sample } from './sample';
+import { BrowserWorkspace, type DocumentData, type TabData } from './workspace';
+export type { DocumentData, TabData } from './workspace';
 
-export interface DocumentData {
-  text: string;
-  name: string;
-  path?: string;
-  saved?: boolean;
-  recovered?: boolean;
-  baseline?: string;
-}
 export type HostMessage =
-  | { type: 'document'; document: DocumentData }
-  | { type: 'saved'; name: string; path?: string; text: string }
-  | { type: 'requestClosingText' }
+  | { type: 'workspace'; tabs: TabData[]; document: DocumentData; recovered?: boolean }
+  | { type: 'saved'; documentId: string; name: string; path?: string; text: string }
+  | { type: 'requestClosingText'; requestId: string }
+  | { type: 'requestExportPdf'; requestId: string; documentId: string; text: string; name: string }
+  | { type: 'operationComplete' }
   | { type: 'error' | 'notice'; message: string };
 
 const native = window.chrome?.webview;
-let documentId: string | undefined;
 export const isDesktop = Boolean(native);
 let onMessage: (message: HostMessage) => void = () => {};
-let browserName = '未命名.md';
-let browserBaseline = '';
-let browserText = '';
+let workspace = new BrowserWorkspace();
 let fileInput: HTMLInputElement | undefined;
-const DRAFT_KEY = 'moye.draft.v1';
+const SESSION_KEY = 'moye.session.v2';
 
+function persist() {
+  try { localStorage.setItem(SESSION_KEY, workspace.serialize()); }
+  catch { onMessage({ type: 'error', message: '浏览器草稿空间已满，请保存到文件。' }); }
+}
+function publish(recovered = false) {
+  persist();
+  onMessage({ type: 'workspace', tabs: workspace.tabs, document: { ...workspace.active }, recovered });
+}
 function download(name: string, content: string, mime: string) {
   const url = URL.createObjectURL(new Blob([content], { type: mime }));
-  const a = document.createElement('a');
-  a.href = url; a.download = name; a.click();
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function browserDocument(text: string, name: string, saved: boolean) {
-  browserText = text; browserName = name; browserBaseline = saved ? text : '';
-  onMessage({ type: 'document', document: { text, name, saved, baseline: browserBaseline } });
-  localStorage.setItem(DRAFT_KEY, JSON.stringify({ text, name, baseline: browserBaseline }));
 }
 
 export function connect(callback: typeof onMessage) {
   onMessage = callback;
   if (native) {
-    native.addEventListener('message', (event) => {
-      if (event.data.type === 'document') documentId = event.data.documentId;
-      else if (event.data.documentId && event.data.documentId !== documentId) return;
-      callback(event.data);
-    });
+    native.addEventListener('message', event => callback(event.data));
     native.postMessage({ type: 'ready' });
-  } else {
-    let draft: { text: string; name: string; baseline: string } | null = null;
-    try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null'); } catch { /* Ignore a malformed browser draft. */ }
-    if (draft && typeof draft.text === 'string') {
-      browserText = draft.text; browserName = draft.name; browserBaseline = draft.baseline ?? '';
-      callback({ type: 'document', document: { text: draft.text, name: draft.name, baseline: browserBaseline, saved: draft.text === browserBaseline, recovered: draft.text !== browserBaseline } });
-    } else browserDocument(sample, '随手记.md', true);
+    return;
   }
+  const restored = BrowserWorkspace.restore(localStorage.getItem(SESSION_KEY));
+  if (restored) workspace = restored;
+  else {
+    try {
+      const legacy = JSON.parse(localStorage.getItem('moye.draft.v1') ?? 'null');
+      if (legacy && typeof legacy.text === 'string') workspace.add(legacy.text, legacy.name, legacy.baseline ?? '');
+    } catch { /* Preserve an unreadable legacy entry for manual recovery. */ }
+    if (!workspace.documents.length) workspace.add(sample, '随手记.md', sample);
+  }
+  publish(workspace.documents.some(document => document.text !== document.baseline));
 }
 
 export function send(type: string, payload: Record<string, unknown> = {}) {
-  if (native) { native.postMessage({ type, documentId, ...payload }); return; }
-  const text = typeof payload.text === 'string' ? payload.text : browserText;
-  if (type === 'edit') {
-    browserText = text;
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ text, name: browserName, baseline: browserBaseline })); }
-    catch { onMessage({ type: 'error', message: '浏览器草稿空间已满，请保存到文件。' }); }
+  if (native) { native.postMessage({ type, ...payload }); return; }
+  const id = typeof payload.documentId === 'string' ? payload.documentId : workspace.activeId;
+  if (typeof payload.text === 'string' && typeof payload.revision === 'number') workspace.update(id, payload.text, payload.revision);
+  const doc = workspace.documents.find(item => item.id === id);
+  if (type === 'edit') { persist(); return; }
+  if (type === 'new') { workspace.add(String(payload.initialText ?? ''), typeof payload.name === 'string' ? payload.name : undefined); publish(); }
+  if (type === 'activate') { workspace.activate(String(payload.targetId)); publish(); }
+  if (type === 'closeTab') {
+    const target = workspace.documents.find(item => item.id === payload.targetId);
+    if (!target || target.text === target.baseline || confirm(`“${target.name}”尚未保存。确定关闭并丢弃修改吗？`)) {
+      workspace.remove(String(payload.targetId)); publish();
+    }
+    onMessage({ type: 'operationComplete' });
   }
-  if (type === 'new' || type === 'open') {
-    if (browserText !== browserBaseline && !window.confirm('当前内容尚未保存，仍要切换文档吗？')) return;
-    if (type === 'new') browserDocument('', '未命名.md', false);
-    else {
-      fileInput ??= Object.assign(document.createElement('input'), { type: 'file', accept: '.md,.markdown,.txt,text/plain,text/markdown' });
-      fileInput.onchange = async () => {
-        const file = fileInput?.files?.[0];
-        if (file) browserDocument((await file.text()).replace(/\r\n/g, '\n'), file.name, true);
-        if (fileInput) fileInput.value = '';
-      };
-      fileInput.click();
+  if (type === 'open') {
+    fileInput ??= Object.assign(document.createElement('input'), { type: 'file', accept: '.md,.markdown,.txt,text/plain,text/markdown', multiple: true });
+    fileInput.onchange = async () => {
+      try {
+        for (const file of Array.from(fileInput?.files ?? [])) {
+          const text = (await file.text()).replace(/\r\n/g, '\n');
+          workspace.add(text, file.name, text);
+        }
+        publish();
+      } finally { if (fileInput) fileInput.value = ''; onMessage({ type: 'operationComplete' }); }
+    };
+    fileInput.oncancel = () => onMessage({ type: 'operationComplete' });
+    fileInput.click();
+  }
+  if ((type === 'save' || type === 'saveAs') && doc) {
+    const name = type === 'saveAs' ? prompt('Markdown 文件名', doc.name) : doc.name;
+    if (name) {
+      download(name.toLowerCase().endsWith('.md') ? name : `${name}.md`, doc.text, 'text/markdown;charset=utf-8');
+      onMessage({ type: 'notice', message: '已发起 Markdown 下载；草稿仍保留。' });
     }
   }
-  if (type === 'save' || type === 'saveAs') {
-    const name = type === 'saveAs' ? window.prompt('文件名', browserName) : browserName;
-    if (!name) return;
-    browserName = name.endsWith('.md') ? name : `${name}.md`;
-    download(browserName, text, 'text/markdown;charset=utf-8');
-    // Browsers cannot verify that a download was accepted or persisted.
-    onMessage({ type: 'notice', message: '已发起 Markdown 下载；草稿仍保留。' });
+  if (type === 'exportHtml') {
+    download(String(payload.name ?? doc?.name ?? '未命名').replace(/\.[^.]+$/, '') + '.html', String(payload.html), 'text/html;charset=utf-8');
+    onMessage({ type: 'operationComplete' });
   }
-  if (type === 'exportHtml') download(browserName.replace(/\.[^.]+$/, '') + '.html', String(payload.html), 'text/html;charset=utf-8');
+  if (type === 'exportPdf' && doc) onMessage({ type: 'requestExportPdf', requestId: crypto.randomUUID(), documentId: doc.id, text: doc.text, name: doc.name });
+  if (type === 'pdfHtml') {
+    const iframe = document.createElement('iframe');
+    iframe.className = 'print-frame'; iframe.title = 'PDF 打印文档';
+    iframe.srcdoc = String(payload.html);
+    iframe.onload = async () => {
+      try {
+        const child = iframe.contentWindow!;
+        await child.document.fonts.ready;
+        await Promise.all(Array.from(child.document.images, image => image.decode().catch(() => {})));
+        child.addEventListener('afterprint', () => iframe.remove(), { once: true });
+        child.focus(); child.print();
+      } catch { iframe.remove(); onMessage({ type: 'error', message: '无法打开打印窗口，请使用桌面版保存 PDF。' }); }
+    };
+    document.body.append(iframe);
+  }
+  if (type === 'pdfError') onMessage({ type: 'error', message: String(payload.message ?? 'PDF 导出失败') });
+  if (['save', 'saveAs', 'exportPdf'].includes(type)) onMessage({ type: 'operationComplete' });
   if (type === 'openExternal' && typeof payload.url === 'string' && /^https?:\/\//i.test(payload.url)) window.open(payload.url, '_blank', 'noopener,noreferrer');
 }
 
-window.addEventListener('beforeunload', (event) => {
-  if (!native && browserText !== browserBaseline) { event.preventDefault(); event.returnValue = ''; }
+window.addEventListener('beforeunload', event => {
+  if (!native && workspace.documents.some(document => document.text !== document.baseline)) { event.preventDefault(); event.returnValue = ''; }
 });

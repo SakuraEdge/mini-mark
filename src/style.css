@@ -72,6 +72,18 @@ svg { width: 17px; height: 17px; flex-shrink: 0; }
 .workspace { min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .topbar { height: 58px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 22px; border-bottom: 1px solid var(--line); gap: 12px; }
 .document-heading, .topbar-actions { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.document-tabs { display: flex; align-items: center; gap: 5px; min-height: 38px; flex-shrink: 0; border-bottom: 1px solid var(--line); padding: 0 13px; background: var(--sidebar); }
+#tabs { display: flex; overflow-x: auto; min-width: 0; scrollbar-width: thin; }
+.document-tab { display: flex; align-items: center; flex: 0 0 auto; height: 38px; min-width: 130px; max-width: 230px; border-right: 1px solid var(--line); border-bottom: 2px solid transparent; padding: 0 6px; gap: 4px; }
+.document-tab.active { background: var(--bg); border-bottom-color: var(--accent); }
+.tab-select { text-align: left; font-size: 12px; flex: 1; padding: 10px 6px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab-close.icon-button { width: 23px; height: 23px; }
+.tab-close svg { width: 12px; height: 12px; }
+.tab-dirty { height: 5px; width: 5px; flex-shrink: 0; border-radius: 50%; background: var(--accent); visibility: hidden; }
+.dirty .tab-dirty { visibility: visible; }
+.print-frame { position: fixed; left: -10000px; width: 900px; height: 1200px; border: 0; }
+.transition-pending .format-tools { pointer-events: none; opacity: .5; }
+.save-menu { right: 125px; }
 .document-name { margin-left: 6px; font-size: 12px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .save-state { font-size: 10px; color: var(--muted); margin-left: 8px; white-space: nowrap; }
 .icon-button { width: 31px; height: 31px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; flex-shrink: 0; color: var(--soft); padding: 0; }
@@ -165,6 +177,7 @@ svg { width: 17px; height: 17px; flex-shrink: 0; }
 .sidebar-hidden, #app.focus-mode { grid-template-columns: minmax(0,1fr); }
 .sidebar-hidden .sidebar, .focus-mode .sidebar { display: none; }
 .focus-mode .toolbar { display: none; }
+.focus-mode .document-tabs { display: none; }
 .focus-mode .topbar { border-bottom-color: transparent; }
 .focus-mode .cm-content { max-width: 780px; padding-top: 62px !important; }
 [data-theme="dark"] .syntax-keyword, [data-theme="dark"] .hljs-keyword { color: #cd9cdb; }
@@ -198,6 +211,7 @@ svg { width: 17px; height: 17px; flex-shrink: 0; }
   .markdown-badge { display: none; }
 }
 @media (max-width: 520px) {
+  .save-menu { right: 10px; }
   .toolbar { padding: 7px 10px; }
   .format-tools { order: 2; flex-basis: 100%; justify-content: space-between; }
   .toolbar > .view-switch { margin-right: auto; }

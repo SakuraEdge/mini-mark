@@ -12,6 +12,7 @@ import { renderMarkdown, renderMath } from './markdown';
 export type EditorMode = 'live' | 'source' | 'read';
 export const modeCompartment = new Compartment();
 const fontCompartment = new Compartment();
+const editableCompartment = new Compartment();
 
 const colors = HighlightStyle.define([
   { tag: tags.heading1, class: 'syntax-h1' },
@@ -264,6 +265,7 @@ function makeState(doc: string, onChange: (update: ViewUpdate) => void, mode: Ed
         modeCompartment.of(modeExtensions(mode)),
         fontCompartment.of(EditorView.theme({ '.cm-content': { fontSize: '16px' } })),
         EditorView.updateListener.of(onChange),
+        editableCompartment.of(EditorView.editable.of(true)),
       ],
   });
 }
@@ -280,6 +282,10 @@ export function replaceDocument(view: EditorView, text: string, mode: EditorMode
 
 export function setEditorFont(view: EditorView, size: number) {
   view.dispatch({ effects: fontCompartment.reconfigure(EditorView.theme({ '.cm-content': { fontSize: `${size}px` } })) });
+}
+
+export function setEditorEditable(view: EditorView, editable: boolean) {
+  view.dispatch({ effects: editableCompartment.reconfigure(EditorView.editable.of(editable)) });
 }
 
 export function surround(view: EditorView, before: string, after = before) {

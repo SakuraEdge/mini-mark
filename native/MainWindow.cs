@@ -1,9 +1,8 @@
-using System.ComponentModel;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Text.Json;
-using System.Drawing;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -12,69 +11,56 @@ namespace Moye;
 
 public sealed class MainWindow : Form {
     private readonly WebView2 browser = new();
-    private readonly string root = System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot");
+    private readonly string root = Path.Combine(AppContext.BaseDirectory, "wwwroot");
     private readonly string dataRoot;
-    private readonly string draftFile;
+    private readonly string sessionFile;
     private readonly string[] args;
     private readonly System.Windows.Forms.Timer draftTimer = new() { Interval = 700 };
-    private string text = "";
-    private string baseline = "";
-    private string? path;
-    private string? fingerprint;
-    private string newline = "\n";
-    private bool bom;
-    private bool initialized;
-    private bool closingConfirmed;
-    private bool closePending;
-    private bool busy;
-    private bool recovered;
-    private bool draftErrorShown;
-    private bool discardConfirmed;
-    private string documentId = Guid.NewGuid().ToString("N");
+    private readonly Queue<Action> actions = new();
     private readonly Queue<string[]> pendingOpen = new();
     private readonly Dictionary<string, double> timings = new();
+    private DocumentWorkspace workspace = new();
+    private CoreWebView2Environment? environment;
+    private bool initialized, closingConfirmed, busy, persistenceBlocked, draftErrorShown, startupRecorded;
+    private string? closingRequest;
+    private PdfRequest? pdfRequest;
+    private sealed record PdfRequest(string Id, string DocumentId, string Name, string Text, string? SourceFolder, string Target, TaskCompletionSource<string> Html);
 
     public MainWindow(string[] arguments) {
         args = arguments;
-        dataRoot = Environment.GetEnvironmentVariable("MOYE_DATA_DIR") ?? System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Moye");
+        dataRoot = Environment.GetEnvironmentVariable("MOYE_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Moye");
         Directory.CreateDirectory(dataRoot);
-        draftFile = System.IO.Path.Combine(dataRoot, "draft.json");
+        sessionFile = Path.Combine(dataRoot, "session-v2.json");
         Text = "墨页 Moye";
         Width = 1180; Height = 840; MinimumSize = new Size(720, 520);
-        StartPosition = FormStartPosition.CenterScreen;
-        BackColor = Color.White;
+        StartPosition = FormStartPosition.CenterScreen; BackColor = Color.White;
         Icon = Icon.ExtractAssociatedIcon(Environment.ProcessPath!);
-        browser.DefaultBackgroundColor = System.Drawing.Color.White;
-        browser.Dock = DockStyle.Fill;
-        Controls.Add(browser);
+        browser.DefaultBackgroundColor = Color.White; browser.Dock = DockStyle.Fill; Controls.Add(browser);
         Shown += async (_, _) => {
             var scale = DeviceDpi / 96.0;
             var area = Screen.FromHandle(Handle).WorkingArea;
             Size = new Size(Math.Min((int)(1180 * scale), area.Width - 48), Math.Min((int)(840 * scale), area.Height - 48));
             MinimumSize = new Size((int)(720 * scale), (int)(520 * scale));
-            CenterToScreen();
-            await Initialize();
+            CenterToScreen(); await Initialize();
         };
         FormClosing += OnClosing;
         FormClosed += (_, _) => { draftTimer.Stop(); draftTimer.Dispose(); browser.Dispose(); };
-        draftTimer.Tick += (_, _) => { draftTimer.Stop(); PersistDraft(); };
+        draftTimer.Tick += (_, _) => { draftTimer.Stop(); Persist(); };
     }
 
     private async Task Initialize() {
         try {
             timings["windowLoaded"] = Program.Startup.Elapsed.TotalMilliseconds;
-            if (!File.Exists(System.IO.Path.Combine(root, "index.html"))) throw new IOException("找不到编辑器资源。请保留 Moye.exe 和 wwwroot 文件夹在同一目录。");
-            var environment = await CoreWebView2Environment.CreateAsync(null, System.IO.Path.Combine(dataRoot, "WebView2"));
+            if (!File.Exists(Path.Combine(root, "index.html"))) throw new IOException("找不到编辑器资源。请保留 Moye.exe 和 wwwroot 文件夹在同一目录。");
+            environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(dataRoot, "WebView2"));
             timings["environmentCreated"] = Program.Startup.Elapsed.TotalMilliseconds;
             await browser.EnsureCoreWebView2Async(environment);
             timings["webViewInitialized"] = Program.Startup.Elapsed.TotalMilliseconds;
             var core = browser.CoreWebView2;
             core.SetVirtualHostNameToFolderMapping("moye.local", root, CoreWebView2HostResourceAccessKind.DenyCors);
-            core.Settings.IsStatusBarEnabled = false;
-            core.Settings.AreDefaultContextMenusEnabled = false;
-            core.Settings.IsZoomControlEnabled = false;
+            core.Settings.IsStatusBarEnabled = false; core.Settings.AreDefaultContextMenusEnabled = false;
+            core.Settings.IsZoomControlEnabled = false; core.Settings.AreBrowserAcceleratorKeysEnabled = false;
             core.Settings.AreDevToolsEnabled = Environment.GetEnvironmentVariable("MOYE_DEVTOOLS") == "1";
-            core.Settings.AreBrowserAcceleratorKeysEnabled = false;
             core.PermissionRequested += (_, e) => e.State = CoreWebView2PermissionState.Deny;
             core.NewWindowRequested += (_, e) => e.Handled = true;
             core.NavigationStarting += (_, e) => {
@@ -82,24 +68,19 @@ public sealed class MainWindow : Form {
             };
             core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
             core.WebResourceRequested += (_, e) => {
-                if (Uri.TryCreate(e.Request.Uri, UriKind.Absolute, out var uri) &&
-                    ((uri.Scheme is "https" or "http" && !(uri.Scheme == "https" && uri.Host is "moye.local" or "document.moye.local")) ||
-                    (uri.Host == "document.moye.local" && e.ResourceContext != CoreWebView2WebResourceContext.Image))) {
+                if (!Uri.TryCreate(e.Request.Uri, UriKind.Absolute, out var uri)) return;
+                var allowed = uri.Scheme == "https" && (uri.Host == "moye.local" || uri.Host == "document.moye.local");
+                if (((uri.Scheme == "https" || uri.Scheme == "http") && !allowed) ||
+                    (uri.Host == "document.moye.local" && e.ResourceContext != CoreWebView2WebResourceContext.Image))
                     e.Response = environment.CreateWebResourceResponse(Stream.Null, 403, "Offline document", "Content-Type: text/plain");
-                }
             };
             core.WebMessageReceived += Receive;
             browser.Source = new Uri("https://moye.local/index.html");
-        } catch (WebView2RuntimeNotFoundException) {
-            ShowError("需要 Microsoft Edge WebView2 Runtime。\n请从 Microsoft 官网安装 Evergreen Runtime 后重新打开墨页。");
         } catch (Exception exception) {
-            ShowError(exception.Message);
+            Controls.Clear();
+            var message = exception is WebView2RuntimeNotFoundException ? "需要 Microsoft Edge WebView2 Runtime，请安装后重新打开墨页。" : exception.Message;
+            Controls.Add(new Label { Text = message, Dock = DockStyle.Fill, Padding = new Padding(48), Font = new Font("Microsoft YaHei UI", 14) });
         }
-    }
-
-    private void ShowError(string message) {
-        Controls.Clear();
-        Controls.Add(new Label { Text = message, Dock = DockStyle.Fill, Padding = new Padding(48), Font = new Font("Microsoft YaHei UI", 14) });
     }
 
     private void Receive(object? sender, CoreWebView2WebMessageReceivedEventArgs e) {
@@ -108,187 +89,242 @@ public sealed class MainWindow : Form {
             using var json = JsonDocument.Parse(e.WebMessageAsJson);
             var message = json.RootElement;
             var type = message.GetProperty("type").GetString();
-            if (type != "ready" && (!message.TryGetProperty("documentId", out var id) || id.GetString() != documentId)) return;
-            if (busy || (closePending && type != "closingText") || (type == "closingText" && !closePending)) return;
-            if (type is "edit" or "save" or "saveAs" or "new" or "open" or "closingText") {
-                if (!message.TryGetProperty("text", out var value) || value.ValueKind != JsonValueKind.String) return;
-                text = value.GetString()!;
+            if (type == "ready") {
+                if (initialized) return;
+                initialized = true; timings["rendererConnected"] = Program.Startup.Elapsed.TotalMilliseconds;
+                Restore(); Publish(workspace.Documents.Any(document => document.Dirty));
+                while (pendingOpen.TryDequeue(out var request)) OpenFromArguments(request);
+                return;
             }
+            if (!initialized) return;
+            if (type is "pdfHtml" or "pdfError") {
+                var pending = pdfRequest;
+                if (pending is null || message.GetProperty("requestId").GetString() != pending.Id || message.GetProperty("documentId").GetString() != pending.DocumentId) return;
+                if (type == "pdfHtml") pending.Html.TrySetResult(message.GetProperty("html").GetString()!);
+                else pending.Html.TrySetException(new IOException(message.GetProperty("message").GetString()));
+                return;
+            }
+            if (type == "openExternal") { OpenExternal(message.GetProperty("url").GetString()); return; }
+            if (type == "rendered") { RecordStartup(message); return; }
+            if (type == "closingText" && (closingRequest is null || message.GetProperty("requestId").GetString() != closingRequest)) return;
+            if (!message.TryGetProperty("documentId", out var id)) return;
+            var document = workspace.Find(id.GetString());
+            if (document is null) { Post(new { type = "operationComplete" }); return; }
+            if (message.TryGetProperty("text", out var value) && message.TryGetProperty("revision", out var revision)) {
+                if (!document.Update(value.GetString()!, revision.GetInt64())) { Publish(); return; }
+            }
+            if (type == "edit") { UpdateTitle(); draftTimer.Stop(); draftTimer.Start(); return; }
             switch (type) {
-                case "ready":
-                    if (initialized) return;
-                    initialized = true;
-                    timings["rendererConnected"] = Program.Startup.Elapsed.TotalMilliseconds;
-                    try { Restore(); }
-                    catch (Exception exception) { ResetDocument(); Post(new { type = "error", message = exception.Message }); }
-                    PublishDocument();
-                    break;
-                case "rendered":
-                    RecordStartup(message);
-                    break;
-                case "edit":
-                    Text = $"{(text != baseline ? "• " : "")}{DisplayName} · 墨页";
-                    draftTimer.Stop(); draftTimer.Start();
-                    break;
-                case "save": RunOnce(() => Save(false)); break;
-                case "saveAs": RunOnce(() => Save(true)); break;
-                case "new": RunOnce(() => { if (ConfirmDiscard()) { ResetDocument(); PublishDocument(); PersistDraft(); } }); break;
-                case "open": RunOnce(Open); break;
+                case "new":
+                    var initial = message.TryGetProperty("initialText", out var initialValue) ? initialValue.GetString()! : "";
+                    var initialName = message.TryGetProperty("name", out var nameValue) ? nameValue.GetString() : null;
+                    RunAction(() => { workspace.AddNew(initial, initialName); Publish(); Persist(); }); break;
+                case "activate":
+                    var target = message.GetProperty("targetId").GetString()!;
+                    RunAction(() => { workspace.Activate(target); Publish(); Persist(); }); break;
+                case "closeTab":
+                    var closeId = message.GetProperty("targetId").GetString()!;
+                    RunAction(() => CloseTab(closeId)); break;
+                case "open": RunAction(Open); break;
+                case "save": RunAction(() => Save(document, false, true)); break;
+                case "saveAs": RunAction(() => Save(document, true, true)); break;
+                case "exportPdf": RunAction(() => ChoosePdf(document)); break;
                 case "exportHtml":
                     var html = message.GetProperty("html").GetString()!;
-                    RunOnce(() => ExportHtml(html));
-                    break;
-                case "openExternal": OpenExternal(message.GetProperty("url").GetString()); break;
-                case "closingText":
-                    RunOnce(() => {
-                        closePending = false;
-                        if (ConfirmDiscard()) { if (discardConfirmed) text = baseline; closingConfirmed = true; PersistDraft(); Close(); }
-                    });
-                    break;
+                    var exportName = message.TryGetProperty("name", out var htmlName) ? htmlName.GetString()! : document.Name;
+                    RunAction(() => ExportHtml(html, exportName)); break;
+                case "closingText": RunAction(FinishClose); break;
             }
-        } catch (Exception exception) { Post(new { type = "error", message = exception.Message }); }
+        } catch (Exception exception) { Post(new { type = "error", message = exception.Message }); Post(new { type = "operationComplete" }); }
     }
 
-    private void RunOnce(Action action) {
-        if (busy) return;
+    private void RunAction(Action action) {
+        actions.Enqueue(action);
+        DrainActions();
+    }
+    private void DrainActions() {
+        if (busy || actions.Count == 0 || IsDisposed) return;
         busy = true;
-        // Native modal dialogs must run after the WebView2 callback returns.
+        // Leave WebView2's callback before entering a native modal message loop.
         BeginInvoke(() => {
-            try { action(); }
-            catch (Exception exception) { if (!IsDisposed) Post(new { type = "error", message = exception.Message }); }
+            try { actions.Dequeue()(); }
+            catch (Exception exception) { closingRequest = null; if (!IsDisposed) Post(new { type = "error", message = exception.Message }); }
             finally {
                 busy = false;
-                if (!IsDisposed && pendingOpen.TryDequeue(out var arguments)) BeginInvoke(() => OpenFromArguments(arguments));
+                if (!IsDisposed) {
+                    Post(new { type = "operationComplete" });
+                    DrainActions();
+                }
             }
         });
     }
 
     public void OpenFromArguments(string[] arguments) {
-        if (!initialized || busy || closePending) {
-            pendingOpen.Enqueue(arguments);
-            if (!initialized) {
-                var retry = new System.Windows.Forms.Timer { Interval = 250 };
-                retry.Tick += (_, _) => { if (initialized) { retry.Stop(); retry.Dispose(); if (pendingOpen.TryDequeue(out var next)) OpenFromArguments(next); } };
-                retry.Start();
-            }
-            return;
-        }
+        if (!initialized) { pendingOpen.Enqueue(arguments); return; }
         if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
         Show(); Activate();
-        var file = arguments.FirstOrDefault(argument => !argument.StartsWith("--", StringComparison.Ordinal));
-        if (file is null) return;
-        RunOnce(() => {
-            try { if (ConfirmDiscard()) { LoadFile(file); PublishDocument(); PersistDraft(); } }
-            catch (Exception exception) { Post(new { type = "error", message = exception.Message }); }
+        RunAction(() => {
+            foreach (var file in arguments.Where(argument => !argument.StartsWith("--", StringComparison.Ordinal))) workspace.Open(file);
+            Publish(); Persist();
         });
     }
 
     private void Restore() {
-        var requested = args.FirstOrDefault(argument => !argument.StartsWith("--", StringComparison.Ordinal));
-        var draft = DocumentStore.ReadDraft(draftFile);
-        if (draft is not null && draft.Text != draft.Baseline) {
-            path = draft.Path; text = draft.Text; baseline = draft.Baseline; fingerprint = draft.Fingerprint; bom = draft.Bom; newline = draft.Newline; recovered = true;
-            if (requested is not null) Post(new { type = "notice", message = "已优先恢复未保存草稿，请保存后再打开其他文件。" });
-            return;
+        try { workspace = DocumentWorkspace.Restore(sessionFile, Path.Combine(dataRoot, "draft.json")); }
+        catch (Exception exception) {
+            persistenceBlocked = true;
+            Post(new { type = "error", message = $"无法读取旧会话，原文件将保留；请手动保存当前文档。{exception.Message}" });
         }
-        if (requested is not null) { LoadFile(requested); return; }
-        if (draft?.Path is string previous && File.Exists(previous)) { LoadFile(previous); return; }
-        text = File.ReadAllText(System.IO.Path.Combine(root, "welcome.md"));
-        baseline = text;
+        foreach (var requested in args.Where(argument => !argument.StartsWith("--", StringComparison.Ordinal))) {
+            try { workspace.Open(requested); } catch (Exception exception) { Post(new { type = "error", message = exception.Message }); }
+        }
+        if (workspace.Documents.Count == 0) {
+            var sample = File.ReadAllText(Path.Combine(root, "welcome.md"));
+            workspace.AddNew(sample, "随手记.md", sample);
+        }
+        Persist();
     }
 
-    private void ResetDocument() { text = baseline = ""; path = fingerprint = null; bom = false; newline = "\n"; }
-
-    private void LoadFile(string file) {
-        var loaded = DocumentStore.Read(file);
-        path = loaded.Path; text = baseline = loaded.Text; fingerprint = loaded.Fingerprint; bom = loaded.Bom; newline = loaded.Newline;
+    private void Publish(bool recovered = false) {
+        var document = workspace.Active;
+        browser.CoreWebView2.ClearVirtualHostNameToFolderMapping("document.moye.local");
+        if (document.Path is not null) browser.CoreWebView2.SetVirtualHostNameToFolderMapping("document.moye.local", Path.GetDirectoryName(document.Path)!, CoreWebView2HostResourceAccessKind.DenyCors);
+        Post(new {
+            type = "workspace", recovered,
+            tabs = workspace.Documents.Select(item => new { id = item.Id, name = item.Name, path = item.Path, dirty = item.Dirty, revision = item.Revision }),
+            document = new { id = document.Id, text = document.Text, baseline = document.Baseline, name = document.Name, path = document.Path, revision = document.Revision }
+        });
+        UpdateTitle();
     }
-
-    private string DisplayName => path is null ? "未命名.md" : System.IO.Path.GetFileName(path);
-
-    private void PublishDocument() {
-        documentId = Guid.NewGuid().ToString("N");
-        var core = browser.CoreWebView2;
-        core.ClearVirtualHostNameToFolderMapping("document.moye.local");
-        if (path is not null) core.SetVirtualHostNameToFolderMapping("document.moye.local", System.IO.Path.GetDirectoryName(path)!, CoreWebView2HostResourceAccessKind.DenyCors);
-        Post(new { type = "document", documentId, document = new { text, baseline, name = DisplayName, path, saved = text == baseline, recovered } });
-        recovered = false;
-        Text = $"{(text != baseline ? "• " : "")}{DisplayName} · 墨页";
-    }
-
+    private void UpdateTitle() { var document = workspace.Active; Text = $"{(document.Dirty ? "• " : "")}{document.Name} · 墨页"; }
     private void Open() {
-        if (!ConfirmDiscard()) return;
-        var dialog = new OpenFileDialog { Filter = "Markdown 文档|*.md;*.markdown;*.mdown;*.txt|所有文件|*.*", CheckFileExists = true };
+        using var dialog = new OpenFileDialog { Filter = "Markdown 文档|*.md;*.markdown;*.mdown;*.txt|所有文件|*.*", CheckFileExists = true, Multiselect = true };
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        LoadFile(dialog.FileName); PublishDocument(); PersistDraft();
+        foreach (var file in dialog.FileNames) workspace.Open(file);
+        Publish(); Persist();
     }
 
-    private bool Save(bool saveAs) {
-        var target = path;
+    private bool Save(OpenDocument document, bool saveAs, bool allowPdf) {
+        var target = document.Path;
         if (target is null || saveAs) {
-            var dialog = new SaveFileDialog { Filter = "Markdown 文档|*.md|文本文件|*.txt", DefaultExt = ".md", FileName = DisplayName, AddExtension = true };
+            using var dialog = new SaveFileDialog {
+                Filter = allowPdf ? "Markdown 文档 (*.md)|*.md|PDF 文档 (*.pdf)|*.pdf" : "Markdown 文档 (*.md)|*.md",
+                DefaultExt = "md", FileName = document.Name, AddExtension = true, OverwritePrompt = true
+            };
             if (dialog.ShowDialog(this) != DialogResult.OK) return false;
             target = dialog.FileName;
-        } else if (DocumentStore.HasConflict(target, fingerprint)) {
-            var answer = MessageBox.Show(this, "文件已被其他程序修改或删除。\n是：覆盖磁盘文件；否：另存为；取消：继续编辑。", "文件发生变化", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+            if (allowPdf && dialog.FilterIndex == 2) {
+                var pdfTarget = ConfirmPdfTarget(target);
+                if (pdfTarget is not null) BeginPdf(document, pdfTarget);
+                return false;
+            }
+            if (Path.GetExtension(target).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) throw new IOException("当前选择的是 Markdown 格式；保存 PDF 请在文件类型中选择 PDF。");
+        } else if (DocumentStore.HasConflict(target, document.Fingerprint)) {
+            var answer = MessageBox.Show(this, "文件已被其他程序修改或删除。\n是：覆盖；否：另存为；取消：继续编辑。", "文件发生变化", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
             if (answer == DialogResult.Cancel) return false;
-            if (answer == DialogResult.No) return Save(true);
+            if (answer == DialogResult.No) return Save(document, true, allowPdf);
         }
-        var savedText = text;
-        fingerprint = DocumentStore.Write(target, savedText, bom, newline);
-        path = target; baseline = savedText;
-        browser.CoreWebView2.ClearVirtualHostNameToFolderMapping("document.moye.local");
-        browser.CoreWebView2.SetVirtualHostNameToFolderMapping("document.moye.local", System.IO.Path.GetDirectoryName(path)!, CoreWebView2HostResourceAccessKind.DenyCors);
-        PersistDraft();
-        Post(new { type = "saved", documentId, name = DisplayName, path, text = savedText });
-        Text = $"{DisplayName} · 墨页";
-        return true;
+        if (workspace.PathOwnedByAnother(target, document.Id)) throw new IOException("该文件已在另一个标签页打开，请选择其他文件名。");
+        var saved = document.Text;
+        document.Fingerprint = DocumentStore.Write(target, saved, document.Bom, document.Newline);
+        document.Path = target; document.Baseline = saved;
+        Persist();
+        Post(new { type = "saved", documentId = document.Id, name = document.Name, path = document.Path, text = saved });
+        if (document.Id == workspace.ActiveId) {
+            browser.CoreWebView2.ClearVirtualHostNameToFolderMapping("document.moye.local");
+            browser.CoreWebView2.SetVirtualHostNameToFolderMapping("document.moye.local", Path.GetDirectoryName(target)!, CoreWebView2HostResourceAccessKind.DenyCors);
+        }
+        UpdateTitle(); return true;
     }
 
-    private bool ConfirmDiscard() {
-        discardConfirmed = false;
-        if (text == baseline) return true;
-        var answer = MessageBox.Show(this, $"是否保存对“{DisplayName}”的修改？", "墨页", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
-        if (answer == DialogResult.Yes) return Save(false);
-        if (answer == DialogResult.Cancel) return false;
-        discardConfirmed = true;
-        return true;
+    private void CloseTab(string id) {
+        var document = workspace.Find(id);
+        if (document is null) return;
+        if (document.Dirty) {
+            var answer = AskSave(document);
+            if (answer == DialogResult.Cancel || (answer == DialogResult.Yes && !Save(document, false, false))) return;
+        }
+        workspace.Remove(id); Publish(); Persist();
     }
+    private DialogResult AskSave(OpenDocument document) => MessageBox.Show(this, $"是否保存对“{document.Name}”的修改？", "墨页", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
 
-    private void PersistDraft() {
-        if (!initialized) return;
-        try { DocumentStore.SaveDraft(draftFile, new Draft(path, text, baseline, fingerprint, bom, newline)); }
+    private void OnClosing(object? sender, FormClosingEventArgs e) {
+        if (closingConfirmed || !initialized) return;
+        e.Cancel = true;
+        if (pdfRequest is not null) { Post(new { type = "notice", message = "PDF 正在导出，请稍候再退出。" }); return; }
+        if (closingRequest is not null || busy) return;
+        closingRequest = Guid.NewGuid().ToString("N");
+        Post(new { type = "requestClosingText", requestId = closingRequest });
+    }
+    private void FinishClose() {
+        var decisions = new List<(OpenDocument Document, DialogResult Decision)>();
+        foreach (var document in workspace.Documents.Where(item => item.Dirty)) {
+            var answer = AskSave(document);
+            if (answer == DialogResult.Cancel) { closingRequest = null; return; }
+            decisions.Add((document, answer));
+        }
+        foreach (var (document, decision) in decisions) {
+            if (decision == DialogResult.Yes && !Save(document, false, false)) { closingRequest = null; return; }
+        }
+        foreach (var (document, decision) in decisions) {
+            if (decision != DialogResult.No) continue;
+            if (document.Path is null) workspace.Remove(document.Id);
+            else document.Text = document.Baseline;
+        }
+        Persist(); closingConfirmed = true; Close();
+    }
+    private void Persist() {
+        if (!initialized || persistenceBlocked) return;
+        try { workspace.SaveSession(sessionFile); }
         catch (Exception exception) {
             if (!draftErrorShown) { Post(new { type = "error", message = $"草稿备份失败，请手动保存：{exception.Message}" }); draftErrorShown = true; }
         }
     }
 
-    private void OnClosing(object? sender, FormClosingEventArgs e) {
-        if (closingConfirmed || !initialized) return;
-        e.Cancel = true;
-        if (closePending || busy) return;
-        closePending = true;
-        // Ask the renderer for its current text, including the last debounce interval.
-        Post(new { type = "requestClosingText" });
+    private void ChoosePdf(OpenDocument document) {
+        if (pdfRequest is not null) { Post(new { type = "notice", message = "上一份 PDF 正在导出，请稍候。" }); return; }
+        using var dialog = new SaveFileDialog { Filter = "PDF 文档 (*.pdf)|*.pdf", DefaultExt = "pdf", FileName = Path.GetFileNameWithoutExtension(document.Name) + ".pdf", AddExtension = true };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        var target = ConfirmPdfTarget(dialog.FileName);
+        if (target is not null) BeginPdf(document, target);
     }
-
-    private void ExportHtml(string html) {
-        var dialog = new SaveFileDialog { Filter = "HTML 文档|*.html", DefaultExt = ".html", FileName = System.IO.Path.GetFileNameWithoutExtension(DisplayName) + ".html" };
+    private string? ConfirmPdfTarget(string selectedPath) {
+        var target = Path.ChangeExtension(selectedPath, ".pdf");
+        if (!DocumentWorkspace.SamePath(target, selectedPath) && File.Exists(target) &&
+            MessageBox.Show(this, $"“{Path.GetFileName(target)}”已存在，是否替换？", "保存 PDF", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return null;
+        return target;
+    }
+    private void BeginPdf(OpenDocument document, string target) {
+        if (pdfRequest is not null) { Post(new { type = "notice", message = "上一份 PDF 正在导出，请稍候。" }); return; }
+        if (workspace.Documents.Any(item => item.Path is not null && DocumentWorkspace.SamePath(target, item.Path))) throw new IOException("PDF 不能覆盖打开的 Markdown 源文件。");
+        var request = new PdfRequest(Guid.NewGuid().ToString("N"), document.Id, document.Name, document.Text, document.Path is null ? null : Path.GetDirectoryName(document.Path), target, new(TaskCreationOptions.RunContinuationsAsynchronously));
+        pdfRequest = request;
+        Post(new { type = "requestExportPdf", requestId = request.Id, documentId = request.DocumentId, name = request.Name, text = request.Text });
+        _ = CompletePdf(request);
+    }
+    private async Task CompletePdf(PdfRequest request) {
+        try {
+            var html = await request.Html.Task.WaitAsync(TimeSpan.FromSeconds(45));
+            await PdfExporter.Export(this, environment!, html, request.SourceFolder, request.Target);
+            Post(new { type = "notice", message = $"PDF 已保存：{Path.GetFileName(request.Target)}" });
+        } catch (Exception exception) { if (!IsDisposed) Post(new { type = "error", message = $"PDF 导出失败：{exception.Message}" }); }
+        finally { pdfRequest = null; }
+    }
+    private void ExportHtml(string html, string name) {
+        using var dialog = new SaveFileDialog { Filter = "HTML 文档|*.html", DefaultExt = "html", FileName = Path.GetFileNameWithoutExtension(name) + ".html" };
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
         DocumentStore.AtomicWrite(dialog.FileName, new UTF8Encoding(false).GetBytes(html));
         Post(new { type = "notice", message = "HTML 已导出（公式字体已内嵌）" });
     }
-
     private static void OpenExternal(string? value) {
         if (Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https") Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
     }
-
     private void RecordStartup(JsonElement message) {
         var file = Environment.GetEnvironmentVariable("MOYE_DIAGNOSTICS_PATH");
-        if (file is null) return;
+        if (file is null || startupRecorded) return;
+        startupRecorded = true;
         File.WriteAllText(file, JsonSerializer.Serialize(new { startupMilliseconds = Program.Startup.Elapsed.TotalMilliseconds, rendererMilliseconds = message.GetProperty("elapsed").GetDouble(), browserProcessId = browser.CoreWebView2.BrowserProcessId, timings, utc = DateTime.UtcNow }));
         if (args.Contains("--benchmark")) { closingConfirmed = true; BeginInvoke(Close); }
     }
-
     private void Post(object message) => browser.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(message));
 }

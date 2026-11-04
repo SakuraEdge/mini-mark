@@ -78,6 +78,9 @@ test('new document has isolated undo history; draft survives reload', async ({ p
   await editor.click(); await page.keyboard.press('Control+z');
   await expect(editor).not.toContainText('草稿');
   await expect(editor.locator('.cm-placeholder')).toBeVisible();
+  await expect(page.getByRole('tab')).toHaveCount(2);
+  await page.getByRole('tab', { name: '随手记.md', exact: true }).click();
+  await expect(editor).toContainText('测试中文内容');
 });
 
 test('untrusted Markdown cannot execute HTML or javascript links', async ({ page }) => {
@@ -122,7 +125,7 @@ test('native close flushes current text and stale save acknowledgements stay dir
       addEventListener: (_: string, callback: typeof listener) => { listener = callback; },
       postMessage: (message: Record<string, unknown>) => {
         messages.push(message);
-        if (message.type === 'ready') queueMicrotask(() => listener({ data: { type: 'document', documentId: 'test-document', document: { text: '# Native', baseline: '# Native', name: 'native.md', path: 'C:/native.md', saved: true } } }));
+        if (message.type === 'ready') queueMicrotask(() => listener({ data: { type: 'workspace', tabs: [{ id: 'test-document', name: 'native.md', dirty: false, revision: 0 }], document: { id: 'test-document', text: '# Native', baseline: '# Native', name: 'native.md', path: 'C:/native.md', revision: 0 } } }));
       },
     };
     Object.defineProperty(window, 'chrome', { configurable: true, value: { webview: host } });
@@ -132,7 +135,68 @@ test('native close flushes current text and stale save acknowledgements stay dir
   await replace(page, '# Latest unsaved text');
   await page.evaluate(() => (window as any).__sendHost({ type: 'saved', documentId: 'test-document', name: 'native.md', text: '# Native' }));
   await expect(page.locator('#save-state')).toHaveText('未保存');
-  await page.evaluate(() => (window as any).__sendHost({ type: 'requestClosingText' }));
+  await page.evaluate(() => (window as any).__sendHost({ type: 'requestClosingText', requestId: 'close-test' }));
   const messages = await page.evaluate(() => (window as any).__testMessages);
-  expect(messages.at(-1)).toEqual({ type: 'closingText', documentId: 'test-document', text: '# Latest unsaved text' });
+  expect(messages.at(-1)).toMatchObject({ type: 'closingText', documentId: 'test-document', text: '# Latest unsaved text', requestId: 'close-test' });
+  expect(messages.at(-1).revision).toBeGreaterThan(0);
+});
+
+test('new tabs keep last keystrokes, independent undo, and restore together', async ({ page }) => {
+  page.on('dialog', dialog => dialog.accept());
+  const editor = await replace(page, '文档甲');
+  await page.getByRole('button', { name: '新建文档', exact: true }).click();
+  await expect(page.getByRole('tab')).toHaveCount(2);
+  await editor.click(); await page.keyboard.insertText('文档乙');
+  await page.getByRole('tab', { name: '随手记.md', exact: true }).click();
+  await expect(editor).toHaveText('文档甲');
+  await page.keyboard.press('End'); await page.keyboard.insertText('追加');
+  await page.getByRole('tab', { name: '未命名 1.md', exact: true }).click();
+  await expect(editor).toHaveText('文档乙');
+  await page.keyboard.press('Control+z');
+  await expect(editor).not.toContainText('文档乙');
+  await page.keyboard.insertText('乙的最终版本');
+  await page.getByRole('tab', { name: '随手记.md', exact: true }).click();
+  await expect(editor).toHaveText('文档甲追加');
+  await page.waitForTimeout(180);
+  await page.reload();
+  await expect(page.getByRole('tab')).toHaveCount(2);
+  await expect(editor).toContainText('文档甲追加');
+  await page.getByRole('tab', { name: '未命名 1.md', exact: true }).click();
+  await expect(editor).toContainText('乙的最终版本');
+});
+
+test('cancel closing dirty tab preserves both documents', async ({ page }) => {
+  await replace(page, '保留甲');
+  await page.getByRole('button', { name: '新建文档', exact: true }).click();
+  const editor = page.getByRole('textbox', { name: 'Markdown 编辑器' });
+  await editor.click(); await page.keyboard.insertText('保留乙');
+  page.once('dialog', dialog => dialog.dismiss());
+  await page.getByRole('button', { name: '关闭 随手记.md', exact: true }).click();
+  await expect(page.getByRole('tab')).toHaveCount(2);
+  await expect(editor).toHaveText('保留乙');
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: '关闭 随手记.md', exact: true }).click();
+  await expect(page.getByRole('tab')).toHaveCount(1);
+  await expect(editor).toHaveText('保留乙');
+});
+
+test('save menu offers Markdown and PDF; PDF never clears source dirty state', async ({ page }) => {
+  await page.addInitScript(() => { window.print = () => {}; });
+  await replace(page, '# 中文公式\n\n$$\nx^2 + y^2 = z^2\n$$');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: /保存 Markdown/ })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: /保存为 PDF/ })).toBeVisible();
+  await page.evaluate(() => {
+    (window as any).__printed = false;
+    const observer = new MutationObserver(() => {
+      const frame = document.querySelector<HTMLIFrameElement>('.print-frame');
+      if (frame?.contentWindow) frame.contentWindow.print = () => { (window as any).__printed = true; };
+    });
+    observer.observe(document.body, { childList: true });
+  });
+  await page.getByRole('menuitem', { name: /保存为 PDF/ }).click();
+  await expect(page.locator('.print-frame')).toHaveCount(1);
+  await expect(page.frameLocator('.print-frame').locator('h1')).toHaveText('中文公式');
+  await expect(page.frameLocator('.print-frame').locator('.katex')).toBeVisible();
+  await expect(page.locator('#save-state')).toHaveText('未保存');
 });

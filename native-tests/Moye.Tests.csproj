@@ -5,5 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
-  <ItemGroup><Compile Include="../native/DocumentStore.cs" Link="DocumentStore.cs" /></ItemGroup>
+  <ItemGroup>
+    <Compile Include="../native/DocumentStore.cs" Link="DocumentStore.cs" />
+    <Compile Include="../native/DocumentWorkspace.cs" Link="DocumentWorkspace.cs" />
+  </ItemGroup>
 </Project>
