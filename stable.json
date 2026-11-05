@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "1.0.4",
+  "version": "1.0.5",
   "windows": {
-    "url": "https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.4/Moye-Setup-1.0.4-windows-x64.exe",
-    "sha256": "0f50ea4511a35d0df544eb1492bb4b13a68145081528cf7515003d8844d90912",
-    "size": 54239707
+    "url": "https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/Moye-Setup-1.0.5-windows-x64.exe",
+    "sha256": "26a87864b8e5a3a963fb3506576c89df9c8709165e0d965f785abed027b76579",
+    "size": 54245354
   }
 }
