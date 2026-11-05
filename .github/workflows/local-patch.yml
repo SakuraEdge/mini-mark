@@ -9,12 +9,12 @@ on:
       target_version:
         description: Target release version
         required: true
-        default: '1.0.4'
+        default: '1.0.5'
         type: string
       base_version:
         description: Installed base release version
         required: true
-        default: '1.0.3'
+        default: '1.0.4'
         type: string
 permissions:
   actions: read

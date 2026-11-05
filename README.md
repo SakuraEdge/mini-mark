@@ -12,7 +12,7 @@
 [![Build](https://github.com/SakuraEdge/moye-markdown/actions/workflows/build.yml/badge.svg)](https://github.com/SakuraEdge/moye-markdown/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-MIT-4f729a)](LICENSE)
 
-[下载 Windows 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.4/Moye-Setup-1.0.4-windows-x64.exe) · [下载 macOS 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.4/Moye-1.0.4-macos-universal.dmg) · [全部版本](https://github.com/SakuraEdge/moye-markdown/releases)
+[下载 Windows 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/Moye-Setup-1.0.5-windows-x64.exe) · [下载 macOS 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/Moye-1.0.5-macos-universal.dmg) · [全部版本](https://github.com/SakuraEdge/moye-markdown/releases)
 
 </div>
 
@@ -40,10 +40,10 @@
 
 | 系统 | 推荐下载 | 其他方式 |
 | --- | --- | --- |
-| Windows 10 / 11，x64 | [安装程序 `.exe`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.4/Moye-Setup-1.0.4-windows-x64.exe) | [便携版 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.4/Moye-1.0.4-windows-x64.zip) |
-| macOS 13 Ventura 或更新版本 | [通用版 `.dmg`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.4/Moye-1.0.4-macos-universal.dmg) | [应用包 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.4/Moye-1.0.4-macos-universal.zip) |
+| Windows 10 / 11，x64 | [安装程序 `.exe`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/Moye-Setup-1.0.5-windows-x64.exe) | [便携版 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/Moye-1.0.5-windows-x64.zip) |
+| macOS 13 Ventura 或更新版本 | [通用版 `.dmg`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/Moye-1.0.5-macos-universal.dmg) | [应用包 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/Moye-1.0.5-macos-universal.zip) |
 
-macOS 通用版同时包含 **Apple Silicon 与 Intel** 两种架构。校验和见 [SHA256SUMS](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.4/SHA256SUMS-v1.0.4.txt)。
+macOS 通用版同时包含 **Apple Silicon 与 Intel** 两种架构。校验和见 [SHA256SUMS](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/SHA256SUMS-v1.0.5.txt)。
 
 ### Windows
 

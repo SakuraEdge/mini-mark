@@ -149,10 +149,10 @@ svg { width: 17px; height: 17px; flex-shrink: 0; }
 .statusbar button { color: var(--muted); font-size: 10px; padding: 3px 4px; border-radius: 3px; }
 .markdown-badge { color: var(--soft); }
 .reading-view { height: 100%; overflow: auto; padding: 37px max(60px, calc((100% - 850px)/2)) 180px; font-size: var(--editor-size); }
-.document-surface[data-mode="split"] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.document-surface[data-mode="split"] #editor { min-width: 0; border-right: 1px solid var(--line); }
+.document-surface[data-mode="split"] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-width: 0; min-height: 0; }
+.document-surface[data-mode="split"] #editor { min-width: 0; min-height: 0; height: 100%; overflow: hidden; border-right: 1px solid var(--line); }
 .document-surface[data-mode="split"] .cm-content { max-width: none; width: calc(100% - 64px); }
-.document-surface[data-mode="split"] .reading-view { display: block; min-width: 0; padding: 32px 34px 140px; border-left: 1px solid var(--line); }
+.document-surface[data-mode="split"] .reading-view { display: block; min-width: 0; min-height: 0; height: auto; overflow: auto; padding: 32px 34px 140px; border-left: 1px solid var(--line); }
 .markdown-body { color: var(--text); line-height: 1.95; overflow-wrap: anywhere; }
 .markdown-body h1 { font-size: 29px; line-height: 1.65; margin: 0 0 22px; }
 .markdown-body h2 { font-size: 21px; line-height: 1.8; margin: 28px 0 14px; }
@@ -202,7 +202,7 @@ svg { width: 17px; height: 17px; flex-shrink: 0; }
 @media (prefers-reduced-motion: reduce) {
   .document-tab, .tab-indicator.positioned, .tab-close.icon-button, .view-switch button { transition: none; }
 }
-.sidebar-hidden, #app.focus-mode { grid-template-columns: minmax(0,1fr); }
+#app.sidebar-hidden, #app.focus-mode { grid-template-columns: minmax(0,1fr); }
 .sidebar-hidden .sidebar, .focus-mode .sidebar { display: none; }
 .focus-mode .toolbar { display: none; }
 .focus-mode .document-tabs { display: none; }

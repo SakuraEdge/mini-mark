@@ -219,6 +219,14 @@ function refreshPreview() {
   }
 }
 
+function toggleSidebar() {
+  app.classList.toggle('sidebar-hidden');
+  requestAnimationFrame(() => {
+    view.requestMeasure();
+    positionTabIndicator();
+  });
+}
+
 function nativeAction(type: string, payload: Record<string, unknown> = {}) {
   if (!activeId || transitionPending) return;
   clearTimeout(persistTimer);
@@ -237,7 +245,7 @@ on('save-markdown', () => { document.querySelector<HTMLElement>('#save-menu')!.h
 on('save-pdf', () => { document.querySelector<HTMLElement>('#save-menu')!.hidden = true; nativeAction('exportPdf'); });
 on('save-markdown-as', () => { document.querySelector<HTMLElement>('#save-menu')!.hidden = true; nativeAction('saveAs'); });
 on('save-as', () => { nativeAction('saveAs'); document.querySelector<HTMLElement>('#more-menu')!.hidden = true; });
-on('toggle-sidebar', () => app.classList.toggle('sidebar-hidden'));
+on('toggle-sidebar', toggleSidebar);
 on('current-file', () => { if (mode === 'read') setMode('live'); view.focus(); });
 on('focus-mode', () => app.classList.toggle('focus-mode'));
 on('bold', () => surround(view, '**'));
@@ -308,7 +316,7 @@ document.addEventListener('keydown', (event) => {
     b: () => { if (mode !== 'read') surround(view, '**'); },
     i: () => { if (mode !== 'read') surround(view, '*'); },
     k: () => { if (mode !== 'read') surround(view, '[', '](https://)'); },
-    '\\': () => app.classList.toggle('sidebar-hidden'),
+    '\\': toggleSidebar,
     '/': () => setMode(mode === 'source' ? 'live' : 'source'),
   };
   if (key === 'f' && event.shiftKey) { event.preventDefault(); event.stopPropagation(); app.classList.toggle('focus-mode'); return; }

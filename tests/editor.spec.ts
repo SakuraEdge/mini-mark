@@ -98,6 +98,28 @@ test('source and reading split updates the preview without leaving source editin
   await expect(editor).toContainText('实时更新');
 });
 
+test('split panes scroll independently and resize when the sidebar is hidden', async ({ page }) => {
+  const longText = ['# 长文档', ...Array.from({ length: 90 }, (_, index) => `## 第 ${index + 1} 节\n用于检查分屏滚动的正文内容。`)].join('\n');
+  await replace(page, longText);
+  await page.getByRole('button', { name: '分屏', exact: true }).click();
+  const reading = page.locator('#reading-view');
+  const scroller = page.locator('.cm-scroller');
+  await expect.poll(() => reading.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+  await expect.poll(() => scroller.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+  await reading.hover();
+  await page.mouse.wheel(0, 1400);
+  await expect.poll(() => reading.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await scroller.hover();
+  await page.mouse.wheel(0, 1400);
+  await expect.poll(() => scroller.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await page.getByRole('button', { name: '切换侧栏', exact: true }).click();
+  await expect.poll(() => page.locator('#surface').evaluate(element => {
+    const surface = element.getBoundingClientRect();
+    const workspace = element.closest('.workspace')!.getBoundingClientRect();
+    return surface.x === 0 && surface.width === workspace.width && workspace.width > 1200;
+  })).toBe(true);
+});
+
 test('new document has isolated undo history; draft survives reload', async ({ page }) => {
   page.on('dialog', (dialog) => dialog.accept());
   await replace(page, '# 草稿\n测试中文内容');
