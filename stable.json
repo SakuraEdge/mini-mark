@@ -1,9 +1,14 @@
 {
   "schemaVersion": 1,
-  "version": "1.1.0",
+  "version": "2.0.0",
   "windows": {
-    "url": "https://github.com/SakuraEdge/moye-markdown/releases/download/v1.1.0/Moye-Setup-1.1.0-windows-x64.exe",
-    "sha256": "1e808f3cfcfef29ab682de0fda16fb536006531ce18074114e6cc8edceac7bf5",
-    "size": 54244109
+    "url": "https://github.com/SakuraEdge/moye-markdown/releases/download/v2.0.0/Moye-Setup-2.0.0-windows-x64.exe",
+    "sha256": "4209d50507b3af3e5a5d054ab35b4ed6cf3303fe1d3999529321eca3235755ba",
+    "size": 54528776
+  },
+  "windowsV2": {
+    "url": "https://github.com/SakuraEdge/mini-mark/releases/download/v2.0.0/MiniMark-Setup-2.0.0-windows-x64.exe",
+    "sha256": "4209d50507b3af3e5a5d054ab35b4ed6cf3303fe1d3999529321eca3235755ba",
+    "size": 54528776
   }
 }
