@@ -206,18 +206,21 @@ public sealed class MainWindow : Form {
     }
     private void UpdateTitle() { var document = workspace.Active; Text = $"{(document.Dirty ? "• " : "")}{document.Name} · 墨页"; }
     private void Open() {
-        using var dialog = new OpenFileDialog { Filter = "Markdown 文档|*.md;*.markdown;*.mdown;*.txt|所有文件|*.*", CheckFileExists = true, Multiselect = true };
+        using var dialog = new OpenFileDialog { Filter = "Markdown / YAML 文档|*.md;*.markdown;*.mdown;*.txt;*.yaml;*.yml|所有文件|*.*", CheckFileExists = true, Multiselect = true };
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
         foreach (var file in dialog.FileNames) workspace.Open(file);
         Publish(); Persist();
     }
 
+    private static bool IsYaml(string name) => Path.GetExtension(name).Equals(".yaml", StringComparison.OrdinalIgnoreCase) || Path.GetExtension(name).Equals(".yml", StringComparison.OrdinalIgnoreCase);
+    private static string PreferredExtension(string name) => Path.GetExtension(name).Equals(".yml", StringComparison.OrdinalIgnoreCase) ? ".yml" : IsYaml(name) ? ".yaml" : ".md";
+
     private bool Save(OpenDocument document, bool saveAs, bool allowPdf) {
         var target = document.Path;
         if (target is null || saveAs) {
             using var dialog = new SaveFileDialog {
-                Filter = allowPdf ? "Markdown 文档 (*.md)|*.md|PDF 文档 (*.pdf)|*.pdf" : "Markdown 文档 (*.md)|*.md",
-                DefaultExt = "md", FileName = document.Name, AddExtension = true, OverwritePrompt = true
+                Filter = allowPdf ? "Markdown / YAML 文档 (*.md;*.markdown;*.mdown;*.yaml;*.yml)|*.md;*.markdown;*.mdown;*.yaml;*.yml|PDF 文档 (*.pdf)|*.pdf" : "Markdown / YAML 文档 (*.md;*.markdown;*.mdown;*.yaml;*.yml)|*.md;*.markdown;*.mdown;*.yaml;*.yml",
+                DefaultExt = PreferredExtension(document.Name).TrimStart('.'), FileName = document.Name, AddExtension = true, OverwritePrompt = true
             };
             if (dialog.ShowDialog(this) != DialogResult.OK) return false;
             target = dialog.FileName;
@@ -226,7 +229,7 @@ public sealed class MainWindow : Form {
                 if (pdfTarget is not null) BeginPdf(document, pdfTarget);
                 return false;
             }
-            if (Path.GetExtension(target).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) throw new IOException("当前选择的是 Markdown 格式；保存 PDF 请在文件类型中选择 PDF。");
+            if (Path.GetExtension(target).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) throw new IOException("当前选择的是 Markdown/YAML 格式；保存 PDF 请在文件类型中选择 PDF。");
         } else if (DocumentStore.HasConflict(target, document.Fingerprint)) {
             var answer = MessageBox.Show(this, "文件已被其他程序修改或删除。\n是：覆盖；否：另存为；取消：继续编辑。", "文件发生变化", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
             if (answer == DialogResult.Cancel) return false;

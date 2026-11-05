@@ -98,6 +98,54 @@ test('source and reading split updates the preview without leaving source editin
   await expect(editor).toContainText('实时更新');
 });
 
+test('Ctrl+number changes heading level atomically and preserves code fences', async ({ page }) => {
+  const editor = await replace(page, ['普通段落', '第二行', '```yaml', 'key: value', '```'].join('\n'));
+  await editor.click();
+  await page.keyboard.press('Control+Home');
+  await page.keyboard.press('Control+2');
+  await expect(editor.locator('.cm-line').nth(0)).toHaveText('## 普通段落');
+  await page.keyboard.press('Control+z');
+  await expect(editor.locator('.cm-line').nth(0)).toHaveText('普通段落');
+  await page.keyboard.press('Control+End');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Control+3');
+  await expect(editor.locator('.cm-line').nth(3)).toHaveText('key: value');
+});
+
+test('Ctrl+number applies to every selected source line', async ({ page }) => {
+  const editor = await replace(page, '第一行\n第二行\n第三行');
+  await editor.click();
+  await page.keyboard.press('Control+Home');
+  await page.keyboard.down('Shift');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.up('Shift');
+  await page.keyboard.press('Control+1');
+  await expect(editor.locator('.cm-line').nth(0)).toHaveText('# 第一行');
+  await expect(editor.locator('.cm-line').nth(1)).toHaveText('# 第二行');
+  await expect(editor.locator('.cm-line').nth(2)).toHaveText('第三行');
+});
+
+test('opens YAML with syntax highlighting, source/read modes, and YAML download naming', async ({ page }) => {
+  const chooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: '打开', exact: true }).click();
+  const chooser = await chooserPromise;
+  await chooser.setFiles({ name: 'config.yml', mimeType: 'text/yaml', buffer: Buffer.from('# app settings\nname: 墨页\nitems:\n  - one\n  - two\n') });
+  const editor = page.getByRole('textbox', { name: 'Markdown 编辑器' });
+  await expect(editor).toContainText('name: 墨页');
+  await expect(page.locator('#document-format')).toHaveText('YAML');
+  await expect(page.getByRole('button', { name: '即时', exact: true })).toBeDisabled();
+  await expect(page.getByRole('listbox')).toBeHidden();
+  await page.getByRole('button', { name: '阅读', exact: true }).click();
+  await expect(page.locator('#reading-view .yaml-preview')).toContainText('items:');
+  await page.getByRole('button', { name: '源码', exact: true }).click();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: /保存 YAML/ })).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('menuitem', { name: /保存 YAML/ }).click();
+  await expect(downloadPromise).resolves.toBeTruthy();
+});
+
 test('split panes scroll independently and resize when the sidebar is hidden', async ({ page }) => {
   const longText = ['# 长文档', ...Array.from({ length: 90 }, (_, index) => `## 第 ${index + 1} 节\n用于检查分屏滚动的正文内容。`)].join('\n');
   await replace(page, longText);

@@ -3,10 +3,11 @@ import { mountApp, icon } from '../ui/layout';
 import { undo, redo } from '@codemirror/commands';
 import { openSearchPanel } from '@codemirror/search';
 import type { EditorState } from '@codemirror/state';
-import { createEditor, insertCommand, modeCompartment, modeExtensions, replaceDocument, setEditorFont, setEditorEditable, surround, type EditorMode } from '../editor/editor';
+import { createEditor, insertCommand, modeCompartment, modeExtensions, replaceDocument, setEditorFont, setEditorEditable, setEditorLanguage, setHeadingLevel, surround, type EditorMode } from '../editor/editor';
 import { connect, isDesktop, send, type DocumentData, type TabData } from '../platform/bridge';
-import { headings, renderMarkdown, wordCount } from '../markdown/render';
+import { headings, renderMarkdown, renderYaml, wordCount } from '../markdown/render';
 import { sample } from '../documents/sample';
+import { documentLanguage, type DocumentLanguage } from '../documents/formats';
 import { normalizeText } from '../documents/workspace';
 import { APP_VERSION, initializeUpdates, openUpdates, scheduleUpdateCheck, handleUpdateMessage } from '../features/updates/updates';
 import '../styles/app.css';
@@ -16,6 +17,7 @@ initializeUpdates();
 
 let mode: EditorMode = 'live';
 let name = '未命名.md';
+let language: DocumentLanguage = 'markdown';
 let baseline = '';
 let fileOnDisk = false;
 let loading = false;
@@ -23,7 +25,7 @@ let activeId = '';
 let revision = 0;
 let tabs: TabData[] = [];
 let transitionPending = false;
-interface CachedDocument { document: DocumentData; state: EditorState; mode: EditorMode; editorScroll: number; readingScroll: number }
+interface CachedDocument { document: DocumentData; state: EditorState; mode: EditorMode; language: DocumentLanguage; editorScroll: number; readingScroll: number }
 const documents = new Map<string, CachedDocument>();
 let renderedTabsKey = '';
 const tabElements = new Map<string, HTMLElement>();
@@ -90,6 +92,7 @@ function cacheCurrent() {
     document: { id: activeId, name, text: view.state.doc.toString(), baseline, revision, path: previous?.document.path },
     state: view.state,
     mode,
+    language,
     editorScroll: view.scrollDOM.scrollTop,
     readingScroll: document.querySelector<HTMLElement>('#reading-view')!.scrollTop,
   });
@@ -155,6 +158,10 @@ function animateDocumentSwitch() {
 function updateOutline() {
   const outline = document.querySelector('#outline')!;
   outline.replaceChildren();
+  if (language === 'yaml') {
+    const empty = document.createElement('span'); empty.className = 'outline-empty'; empty.textContent = '暂无标题'; outline.append(empty);
+    return;
+  }
   for (const heading of headings(view.state.doc.toString())) {
     const button = document.createElement('button');
     button.textContent = heading.text;
@@ -185,13 +192,31 @@ function showToast(message: string) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { toast.hidden = true; }, 4500);
 }
 
+function updateDocumentFormatUi() {
+  const isYaml = language === 'yaml';
+  const format = document.querySelector<HTMLElement>('#document-format');
+  if (format) format.textContent = isYaml ? 'YAML' : 'Markdown';
+  const saveLabel = document.querySelector<HTMLElement>('#save-format-label');
+  if (saveLabel) saveLabel.textContent = isYaml ? '保存 YAML (.yaml)' : '保存 Markdown (.md)';
+  const liveButton = document.querySelector<HTMLButtonElement>('.view-switch button[data-mode="live"]');
+  if (liveButton) {
+    liveButton.disabled = isYaml;
+    liveButton.title = isYaml ? 'YAML 使用源码模式编辑' : '即时排版';
+  }
+  document.querySelectorAll<HTMLButtonElement>('#format-tools button').forEach((button) => {
+    const markdownOnly = !['undo', 'redo'].includes(button.id);
+    button.disabled = mode === 'read' || (isYaml && markdownOnly);
+  });
+}
+
 function setMode(next: EditorMode) {
+  if (language === 'yaml' && next === 'live') next = 'source';
   const changed = mode !== next;
   mode = next;
   document.querySelector('#editor')!.toggleAttribute('hidden', next === 'read');
   const reading = document.querySelector<HTMLElement>('#reading-view')!;
   reading.hidden = next !== 'read' && next !== 'split';
-  if (next === 'read' || next === 'split') reading.innerHTML = renderMarkdown(view.state.doc.toString());
+  if (next === 'read' || next === 'split') reading.innerHTML = renderDocument(view.state.doc.toString());
   else {
     view.dispatch({ effects: modeCompartment.reconfigure(modeExtensions(next)) });
     view.focus();
@@ -200,11 +225,11 @@ function setMode(next: EditorMode) {
     view.dispatch({ effects: modeCompartment.reconfigure(modeExtensions('source')) });
     view.focus();
   }
-  document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) => {
+  document.querySelectorAll<HTMLButtonElement>('.view-switch button[data-mode]').forEach((button) => {
     button.classList.toggle('active', button.dataset.mode === next);
     button.setAttribute('aria-pressed', String(button.dataset.mode === next));
   });
-  document.querySelectorAll<HTMLButtonElement>('#format-tools button').forEach((button) => { button.disabled = next === 'read'; });
+  updateDocumentFormatUi();
   document.querySelector('#surface')!.setAttribute('data-mode', next);
   cacheCurrent();
   if (changed) animateDocumentSwitch();
@@ -214,9 +239,13 @@ function refreshPreview() {
   if (mode === 'read' || mode === 'split') {
     const reading = document.querySelector<HTMLElement>('#reading-view')!;
     const scroll = reading.scrollTop;
-    reading.innerHTML = renderMarkdown(view.state.doc.toString());
+    reading.innerHTML = renderDocument(view.state.doc.toString());
     reading.scrollTop = scroll;
   }
+}
+
+function renderDocument(text: string) {
+  return language === 'yaml' ? renderYaml(text) : renderMarkdown(text);
 }
 
 function toggleSidebar() {
@@ -297,7 +326,7 @@ on('export-html', async () => {
     send('exportHtml', { html, documentId: snapshot.documentId, name: snapshot.name });
   } catch (error) { setTransitionPending(false); showToast(error instanceof Error ? error.message : '导出失败'); }
 });
-document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) => button.addEventListener('click', () => setMode(button.dataset.mode as EditorMode)));
+document.querySelectorAll<HTMLButtonElement>('.view-switch button[data-mode]').forEach((button) => button.addEventListener('click', () => setMode(button.dataset.mode as EditorMode)));
 document.addEventListener('keydown', (event) => {
   if (document.querySelector('dialog[open]')) return;
   if (event.isComposing || event.keyCode === 229 || !(event.ctrlKey || event.metaKey)) return;
@@ -313,13 +342,21 @@ document.addEventListener('keydown', (event) => {
     s: () => nativeAction(event.shiftKey ? 'saveAs' : 'save'),
     o: () => nativeAction('open'), n: () => nativeAction('new'),
     w: () => nativeAction('closeTab', { targetId: activeId }),
-    b: () => { if (mode !== 'read') surround(view, '**'); },
-    i: () => { if (mode !== 'read') surround(view, '*'); },
-    k: () => { if (mode !== 'read') surround(view, '[', '](https://)'); },
+    b: () => { if (mode !== 'read' && language === 'markdown') surround(view, '**'); },
+    i: () => { if (mode !== 'read' && language === 'markdown') surround(view, '*'); },
+    k: () => { if (mode !== 'read' && language === 'markdown') surround(view, '[', '](https://)'); },
     '\\': toggleSidebar,
     '/': () => setMode(mode === 'source' ? 'live' : 'source'),
   };
   if (key === 'f' && event.shiftKey) { event.preventDefault(); event.stopPropagation(); app.classList.toggle('focus-mode'); return; }
+  if (/^[1-6]$/.test(key)) {
+    const target = event.target as Element | null;
+    const editorFocused = view.hasFocus && !target?.closest('input,textarea,select,[role="searchbox"]');
+    if (editorFocused && !event.shiftKey && !event.altKey && mode !== 'read' && language === 'markdown') {
+      event.preventDefault(); event.stopPropagation(); setHeadingLevel(view, Number(key));
+    }
+    return;
+  }
   if (actions[key]) { event.preventDefault(); actions[key](); }
 }, true);
 document.addEventListener('visibilitychange', () => { if (document.hidden && activeId) send('edit', snapshotCurrent()); });
@@ -349,13 +386,19 @@ connect((message) => {
     baseline = doc.baseline;
     revision = current.revision;
     loading = true;
-    mode = cached?.mode ?? mode;
-    if (cached && cached.document.text === current.text) view.setState(cached.state);
-    else replaceDocument(view, current.text, mode);
+    const nextLanguage = documentLanguage(doc.name);
+    mode = cached?.mode ?? (nextLanguage === 'yaml' ? 'source' : mode);
+    if (nextLanguage === 'yaml' && mode === 'live') mode = 'source';
+    language = nextLanguage;
+    if (cached && cached.document.text === current.text) {
+      view.setState(cached.state);
+      if (cached.language !== language) setEditorLanguage(view, language);
+    } else replaceDocument(view, current.text, mode, language);
     documents.set(doc.id, {
-      document: { ...current, baseline },
+      document: { ...current, name: doc.name, path: doc.path, baseline },
       state: view.state,
       mode,
+      language,
       editorScroll: cached?.editorScroll ?? 0,
       readingScroll: cached?.readingScroll ?? 0,
     });
@@ -394,6 +437,18 @@ connect((message) => {
     if (tab) Object.assign(tab, { name: message.name, path: message.path, dirty: cached ? cached.document.text !== message.text : false });
     if (message.documentId === activeId) {
       name = message.name; baseline = message.text; fileOnDisk = true;
+      const nextLanguage = documentLanguage(name);
+      if (nextLanguage !== language) {
+        language = nextLanguage;
+        if (language === 'yaml' && mode === 'live') mode = 'source';
+        setEditorLanguage(view, language);
+        if (cached) {
+          cached.state = view.state;
+          cached.mode = mode;
+          cached.language = language;
+        }
+        setMode(mode);
+      }
       document.querySelector('#document-name')!.textContent = name;
       document.querySelector('#sidebar-filename')!.textContent = name;
       document.querySelector('#current-file')!.setAttribute('title', message.path || name);

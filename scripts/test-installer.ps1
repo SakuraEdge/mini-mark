@@ -2,14 +2,19 @@ $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
 $target = Join-Path $env:RUNNER_TEMP 'Moye-install-test'
-$choice = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\UserChoice'
-function Read-Choice {
-  if(Test-Path $choice) { return (Get-ItemProperty $choice | Select-Object ProgId,Hash | ConvertTo-Json -Compress) }
-  return ''
+$choices = @(
+  'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\UserChoice',
+  'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.yaml\UserChoice',
+  'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.yml\UserChoice'
+)
+function Read-Choices {
+  return ($choices | ForEach-Object {
+    if(Test-Path $_) { (Get-ItemProperty $_ | Select-Object ProgId,Hash | ConvertTo-Json -Compress) } else { '' }
+  }) -join "`n"
 }
-$before = Read-Choice
+$before = Read-Choices
 $installer = (Resolve-Path "release/Moye-Setup-$version-windows-x64.exe").Path
-$arguments = @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/TASKS=defaultmd,desktopicon',("/DIR=`"$target`""))
+$arguments = @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/TASKS=defaultmd,defaultyaml,desktopicon',("/DIR=`"$target`""))
 $process = Start-Process -FilePath $installer -ArgumentList $arguments -WindowStyle Hidden -PassThru -Wait
 if($process.ExitCode -ne 0) { throw "Installer exited $($process.ExitCode)" }
 if(-not (Test-Path -LiteralPath (Join-Path $target 'Moye.exe'))) { throw 'Installed application missing' }
@@ -17,7 +22,10 @@ $command = (Get-Item 'HKCU:\Software\Classes\Moye.Markdown\shell\open\command').
 if($command -ne ('"' + (Join-Path $target 'Moye.exe') + '" "%1"')) { throw 'Open command does not quote paths correctly' }
 $capability = Get-ItemProperty 'HKCU:\Software\Moye\Capabilities\FileAssociations'
 if($capability.'.md' -ne 'Moye.Markdown') { throw 'MD capability was not registered' }
-if((Read-Choice) -ne $before) { throw 'Installer changed protected default choice' }
+if($capability.'.yaml' -ne 'Moye.Yaml' -or $capability.'.yml' -ne 'Moye.Yaml') { throw 'YAML capability was not registered' }
+if((Read-Choices) -ne $before) { throw 'Installer changed protected default choice' }
+$yamlCommand = (Get-Item 'HKCU:\Software\Classes\Moye.Yaml\shell\open\command').GetValue('')
+if($yamlCommand -ne ('"' + (Join-Path $target 'Moye.exe') + '" "%1"')) { throw 'YAML open command does not quote paths correctly' }
 $shell = New-Object -ComObject WScript.Shell
 function Normalize-ShortcutPath([string]$path) {
   if([string]::IsNullOrWhiteSpace($path)) { return '' }
@@ -64,11 +72,12 @@ foreach($file in @('Data/session-v2.json','Source/notes.md','Backups/notes.md'))
   if(-not (Test-Path -LiteralPath (Join-Path $target $file))) { throw "Protected data removed: $file" }
 }
 if((Get-FileHash -LiteralPath $outsideFile).Hash -ne $outsideHash) { throw 'Upgrade followed a junction or traversal' }
-if((Read-Choice) -ne $before) { throw 'Upgrade changed protected default choice' }
+if((Read-Choices) -ne $before) { throw 'Upgrade changed protected default choice' }
 $uninstaller = Join-Path $target 'unins000.exe'
 $process = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -WindowStyle Hidden -PassThru -Wait
 if($process.ExitCode -ne 0) { throw "Uninstaller exited $($process.ExitCode)" }
 if(Test-Path 'HKCU:\Software\Classes\Moye.Markdown') { throw 'Owned ProgID was not removed' }
-if((Read-Choice) -ne $before) { throw 'Uninstaller changed protected default choice' }
+if(Test-Path 'HKCU:\Software\Classes\Moye.Yaml') { throw 'YAML ProgID was not removed' }
+if((Read-Choices) -ne $before) { throw 'Uninstaller changed protected default choice' }
 if(-not (Test-Path -LiteralPath (Join-Path $target 'Data/session-v2.json'))) { throw 'Uninstall removed user data' }
 Write-Output 'PASS Windows install, in-place upgrade, obsolete-file cleanup, data/junction protection, shortcuts, default choice and uninstall'

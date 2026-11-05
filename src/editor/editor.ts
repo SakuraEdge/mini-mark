@@ -3,14 +3,17 @@ import { Decoration, EditorView, ViewPlugin, WidgetType, drawSelection, highligh
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { HighlightStyle, bracketMatching, foldGutter, indentOnInput, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { markdown, markdownLanguage, markdownKeymap } from '@codemirror/lang-markdown';
+import { yamlLanguage } from '@codemirror/lang-yaml';
 import { languages } from '@codemirror/language-data';
 import { search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { tags } from '@lezer/highlight';
 import { commands, imeBlocksCommand, matchingCommands, slashQuery, type SlashCommand } from './commands';
 import { renderMarkdown, renderMath } from '../markdown/render';
+import type { DocumentLanguage } from '../documents/formats';
 
 export type EditorMode = 'live' | 'source' | 'read' | 'split';
 export const modeCompartment = new Compartment();
+const languageCompartment = new Compartment();
 const fontCompartment = new Compartment();
 const editableCompartment = new Compartment();
 
@@ -248,16 +251,28 @@ export function modeExtensions(mode: EditorMode): Extension {
 
 const listeners = new WeakMap<EditorView, (update: ViewUpdate) => void>();
 
-function makeState(doc: string, onChange: (update: ViewUpdate) => void, mode: EditorMode) {
+function languageExtensions(language: DocumentLanguage): Extension {
+  const parser = language === 'yaml'
+    ? yamlLanguage
+    : markdown({ base: markdownLanguage, codeLanguages: languages });
+  if (language === 'yaml') {
+    return [parser, keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab])];
+  }
+  return [
+    parser,
+    Prec.highest(slashPlugin),
+    keymap.of([...markdownKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
+  ];
+}
+
+function makeState(doc: string, onChange: (update: ViewUpdate) => void, mode: EditorMode, language: DocumentLanguage) {
   return EditorState.create({
       doc,
       extensions: [
         history(), drawSelection(), indentOnInput(), bracketMatching(), highlightSelectionMatches(),
-        markdown({ base: markdownLanguage, codeLanguages: languages }),
+        languageCompartment.of(languageExtensions(language)),
         syntaxHighlighting(colors),
         search({ top: true }),
-        Prec.highest(slashPlugin),
-        keymap.of([...markdownKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
         placeholder('写点什么…'),
         EditorView.lineWrapping,
         EditorState.tabSize.of(4),
@@ -271,13 +286,52 @@ function makeState(doc: string, onChange: (update: ViewUpdate) => void, mode: Ed
 }
 
 export function createEditor(parent: HTMLElement, onChange: (update: ViewUpdate) => void) {
-  const view = new EditorView({ parent, state: makeState('', onChange, 'live') });
+  const view = new EditorView({ parent, state: makeState('', onChange, 'live', 'markdown') });
   listeners.set(view, onChange);
   return view;
 }
 
-export function replaceDocument(view: EditorView, text: string, mode: EditorMode) {
-  view.setState(makeState(text, listeners.get(view)!, mode));
+export function replaceDocument(view: EditorView, text: string, mode: EditorMode, language: DocumentLanguage = 'markdown') {
+  view.setState(makeState(text, listeners.get(view)!, mode, language));
+}
+
+export function setEditorLanguage(view: EditorView, language: DocumentLanguage) {
+  view.dispatch({ effects: languageCompartment.reconfigure(languageExtensions(language)) });
+}
+
+export function setHeadingLevel(view: EditorView, level: number): boolean {
+  if (level < 1 || level > 6 || !view.hasFocus || view.composing) return false;
+  const state = view.state;
+  const lines = new Set<number>();
+  for (const range of state.selection.ranges) {
+    const start = state.doc.lineAt(range.from).number;
+    const endPosition = range.empty ? range.to : Math.max(range.from, range.to - 1);
+    const end = state.doc.lineAt(endPosition).number;
+    for (let number = start; number <= end; number++) lines.add(number);
+  }
+  const changes: { from: number; to: number; insert: string }[] = [];
+  for (const number of [...lines].sort((a, b) => a - b)) {
+    const line = state.doc.line(number);
+    if (!line.text.trim() || inCode(state, line.from)) continue;
+    const match = /^([ \t]{0,3})(#{1,6})(?:[ \t]+|$)(.*)$/.exec(line.text);
+    if (match) {
+      const indentLength = match[1].length;
+      const content = match[3];
+      const contentStart = line.from + match[0].length - content.length;
+      const prefix = `${'#'.repeat(level)}${content ? ' ' : ''}`;
+      const prefixFrom = line.from + indentLength;
+      if (state.sliceDoc(prefixFrom, contentStart) !== prefix) changes.push({ from: prefixFrom, to: contentStart, insert: prefix });
+      continue;
+    }
+    const leading = /^[ \t]*/.exec(line.text)?.[0] ?? '';
+    if (leading.length > 3) continue;
+    const content = line.text.slice(leading.length);
+    changes.push({ from: line.from + leading.length, to: line.from + leading.length, insert: `${'#'.repeat(level)}${content ? ' ' : ''}` });
+  }
+  if (!changes.length || view.composing) return false;
+  view.dispatch({ changes, userEvent: 'input' });
+  view.focus();
+  return true;
 }
 
 export function setEditorFont(view: EditorView, size: number) {

@@ -1,5 +1,14 @@
 # 验证记录
 
+## v1.1.0
+
+2026-11-05。
+
+- `npm run build` 与 20 项前端单元测试通过。
+- 27 项 Microsoft Edge 界面测试通过，新增 YAML 文件选择、语法高亮、阅读模式、YAML 下载命名，以及 `Ctrl+1` … `Ctrl+6` 标题快捷键回归。
+- YAML 切换不会触发 Markdown 斜杠菜单；阅读和分屏保留原始注释、缩进和长文档滚动。
+- Windows 与 macOS 原生打开/保存筛选器、HTML/PDF 排版和 Windows 安装器文件关联配置已同步更新；原生与跨平台构建由 GitHub Actions 验证。
+
 ## v1.0.5
 
 2026-11-05。

@@ -173,6 +173,8 @@ svg { width: 17px; height: 17px; flex-shrink: 0; }
 .markdown-body .task-list-item { list-style: none; }
 .markdown-body .task-list-item input { margin-right: 10px; accent-color: var(--accent); }
 .markdown-body eqn { display: block; overflow-x: auto; padding: 8px 0; }
+.markdown-body .yaml-preview { margin: 0; padding: 22px 26px; border-radius: 5px; background: var(--code); overflow: auto; font: 14px/1.85 Consolas, "Cascadia Code", "Microsoft YaHei UI", monospace; white-space: pre; }
+.markdown-body .yaml-preview code { color: var(--text); background: none; padding: 0; }
 .slash-menu { position: fixed; width: 324px; max-width: calc(100vw - 16px); max-height: 360px; overflow-y: auto; border: 1px solid var(--line); border-radius: 7px; background: var(--raised); box-shadow: var(--shadow); padding: 6px; z-index: 20; }
 .slash-title { color: var(--muted); font-size: 10px; padding: 7px 10px; }
 .slash-option { width: 100%; display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 4px; text-align: left; }

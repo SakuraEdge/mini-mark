@@ -11,9 +11,10 @@ import json from 'highlight.js/lib/languages/json';
 import bash from 'highlight.js/lib/languages/bash';
 import css from 'highlight.js/lib/languages/css';
 import xml from 'highlight.js/lib/languages/xml';
+import yaml from 'highlight.js/lib/languages/yaml';
 import 'katex/dist/katex.min.css';
 
-for (const [name, language] of Object.entries({ cpp, javascript, python, json, bash, css, xml })) hljs.registerLanguage(name, language);
+for (const [name, language] of Object.entries({ cpp, javascript, python, json, bash, css, xml, yaml })) hljs.registerLanguage(name, language);
 hljs.registerAliases(['c', 'c++'], { languageName: 'cpp' });
 hljs.registerAliases(['js', 'ts', 'typescript'], { languageName: 'javascript' });
 hljs.registerAliases(['html'], { languageName: 'xml' });
@@ -42,6 +43,13 @@ export function renderMarkdown(text: string, resolveLocalImages = true): string 
 
 export function renderMath(text: string, displayMode = true): string {
   return katex.renderToString(text, { displayMode, throwOnError: false, trust: false, strict: 'ignore', output: 'html' });
+}
+
+export function renderYaml(text: string): string {
+  const highlighted = hljs.highlight(text, { language: 'yaml', ignoreIllegals: true }).value;
+  return DOMPurify.sanitize(`<pre class="yaml-preview"><code class="hljs language-yaml">${highlighted}</code></pre>`, {
+    FORBID_TAGS: ['style', 'iframe', 'object', 'embed'],
+  });
 }
 
 export interface Heading { level: number; text: string; from: number }

@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Moye</AssemblyName>
-    <Version>1.0.5</Version>
+    <Version>1.1.0</Version>
     <Product>墨页 Moye</Product>
     <Description>Local-first Markdown editor</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>

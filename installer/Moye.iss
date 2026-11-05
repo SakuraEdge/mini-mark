@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "1.0.5"
+  #define AppVersion "1.1.0"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\release\Moye"
@@ -40,6 +40,7 @@ Name: "chinesesimplified"; MessagesFile: "ChineseSimplified.isl"
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
 Name: "defaultmd"; Description: "将墨页设为 .md 默认应用（安装后在 Windows 设置中确认）"; GroupDescription: "文件关联："; Flags: unchecked
+Name: "defaultyaml"; Description: "将墨页设为 .yaml/.yml 默认应用（安装后在 Windows 设置中确认）"; GroupDescription: "文件关联："; Flags: unchecked
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -58,14 +59,23 @@ Root: HKCU; Subkey: "Software\Classes\Moye.Markdown\DefaultIcon"; ValueType: str
 Root: HKCU; Subkey: "Software\Classes\Moye.Markdown\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Moye.exe"" ""%1"""
 Root: HKCU; Subkey: "Software\Classes\.md\OpenWithProgids"; ValueType: none; ValueName: "Moye.Markdown"; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.markdown\OpenWithProgids"; ValueType: none; ValueName: "Moye.Markdown"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.mdown\OpenWithProgids"; ValueType: none; ValueName: "Moye.Markdown"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\Moye.Yaml"; ValueType: string; ValueName: ""; ValueData: "YAML 文档"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Moye.Yaml\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Moye.exe,0"
+Root: HKCU; Subkey: "Software\Classes\Moye.Yaml\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Moye.exe"" ""%1"""
+Root: HKCU; Subkey: "Software\Classes\.yaml\OpenWithProgids"; ValueType: none; ValueName: "Moye.Yaml"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.yml\OpenWithProgids"; ValueType: none; ValueName: "Moye.Yaml"; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Moye\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "墨页 Moye"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Moye\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "Markdown 编辑器"
+Root: HKCU; Subkey: "Software\Moye\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "Markdown / YAML 编辑器"
 Root: HKCU; Subkey: "Software\Moye\Capabilities\FileAssociations"; ValueType: string; ValueName: ".md"; ValueData: "Moye.Markdown"
 Root: HKCU; Subkey: "Software\Moye\Capabilities\FileAssociations"; ValueType: string; ValueName: ".markdown"; ValueData: "Moye.Markdown"
+Root: HKCU; Subkey: "Software\Moye\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mdown"; ValueData: "Moye.Markdown"
+Root: HKCU; Subkey: "Software\Moye\Capabilities\FileAssociations"; ValueType: string; ValueName: ".yaml"; ValueData: "Moye.Yaml"
+Root: HKCU; Subkey: "Software\Moye\Capabilities\FileAssociations"; ValueType: string; ValueName: ".yml"; ValueData: "Moye.Yaml"
 Root: HKCU; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "Moye"; ValueData: "Software\Moye\Capabilities"; Flags: uninsdeletevalue
 
 [Run]
-Filename: "ms-settings:defaultapps?registeredAppUser=Moye"; Flags: shellexec nowait skipifsilent; Tasks: defaultmd; Description: "设置 .md 默认应用"
+Filename: "ms-settings:defaultapps?registeredAppUser=Moye"; Flags: shellexec nowait skipifsilent; Tasks: defaultmd or defaultyaml; Description: "设置 Markdown/YAML 默认应用"
 Filename: "{app}\Moye.exe"; Description: "启动墨页 Moye"; Flags: nowait postinstall skipifsilent unchecked
 
 [Code]

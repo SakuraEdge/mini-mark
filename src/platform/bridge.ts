@@ -1,5 +1,6 @@
 import { sample } from '../documents/sample';
 import { BrowserWorkspace, type DocumentData, type TabData } from '../documents/workspace';
+import { documentLanguage } from '../documents/formats';
 export type { DocumentData, TabData } from '../documents/workspace';
 
 export type HostMessage =
@@ -31,6 +32,13 @@ function download(name: string, content: string, mime: string) {
   const url = URL.createObjectURL(new Blob([content], { type: mime }));
   const a = document.createElement('a'); a.href = url; a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function documentFileName(value: string, sourceName: string) {
+  const name = value.trim();
+  if (/\.(?:md|markdown|mdown|yaml|yml)$/i.test(name)) return name;
+  const yaml = documentLanguage(sourceName) === 'yaml';
+  const extension = /\.yml$/i.test(sourceName) ? '.yml' : yaml ? '.yaml' : '.md';
+  return `${name || '未命名'}${extension}`;
 }
 
 export function connect(callback: typeof onMessage) {
@@ -68,7 +76,7 @@ export function send(type: string, payload: Record<string, unknown> = {}) {
     onMessage({ type: 'operationComplete' });
   }
   if (type === 'open') {
-    fileInput ??= Object.assign(document.createElement('input'), { type: 'file', accept: '.md,.markdown,.txt,text/plain,text/markdown', multiple: true });
+    fileInput ??= Object.assign(document.createElement('input'), { type: 'file', accept: '.md,.markdown,.mdown,.txt,.yaml,.yml,text/plain,text/markdown,text/yaml', multiple: true });
     fileInput.onchange = async () => {
       try {
         for (const file of Array.from(fileInput?.files ?? [])) {
@@ -82,10 +90,12 @@ export function send(type: string, payload: Record<string, unknown> = {}) {
     fileInput.click();
   }
   if ((type === 'save' || type === 'saveAs') && doc) {
-    const name = type === 'saveAs' ? prompt('Markdown 文件名', doc.name) : doc.name;
+    const name = type === 'saveAs' ? prompt(documentLanguage(doc.name) === 'yaml' ? 'YAML 文件名' : 'Markdown 文件名', doc.name) : doc.name;
     if (name) {
-      download(name.toLowerCase().endsWith('.md') ? name : `${name}.md`, doc.text, 'text/markdown;charset=utf-8');
-      onMessage({ type: 'notice', message: '已发起 Markdown 下载；草稿仍保留。' });
+      const fileName = documentFileName(name, doc.name);
+      const mime = documentLanguage(fileName) === 'yaml' ? 'application/yaml;charset=utf-8' : 'text/markdown;charset=utf-8';
+      download(fileName, doc.text, mime);
+      onMessage({ type: 'notice', message: `已发起 ${documentLanguage(fileName) === 'yaml' ? 'YAML' : 'Markdown'} 下载；草稿仍保留。` });
     }
   }
   if (type === 'exportHtml') {

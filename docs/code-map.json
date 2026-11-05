@@ -35,6 +35,7 @@
       "path": "src/documents",
       "purpose": "文档模型与示例",
       "files": [
+        "src/documents/formats.ts",
         "src/documents/sample.ts",
         "src/documents/workspace.test.ts",
         "src/documents/workspace.ts"
@@ -241,6 +242,7 @@
         "docs/release-v1.0.3.md",
         "docs/release-v1.0.4.md",
         "docs/release-v1.0.5.md",
+        "docs/release-v1.1.0.md",
         "docs/slash-commands.png",
         "docs/tabs-save.png",
         "docs/updates.png",

@@ -137,12 +137,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
                 if try confirmSave(i) { remove(target); publish(); persist() }
             }
         case "open":
-            let panel = NSOpenPanel(); panel.allowedContentTypes = [.plainText, .text]; panel.allowsMultipleSelection = true
+            let panel = NSOpenPanel(); panel.allowedContentTypes = [.plainText, .text, UTType(filenameExtension: "md") ?? .plainText, UTType(filenameExtension: "markdown") ?? .plainText, UTType(filenameExtension: "mdown") ?? .plainText, UTType(filenameExtension: "yaml") ?? .plainText, UTType(filenameExtension: "yml") ?? .plainText]; panel.allowsMultipleSelection = true
             if panel.runModal() == .OK { for url in panel.urls { try openPath(url.path) }; publish(); persist() }
         case "save", "saveAs": _ = try save(index, saveAs: type == "saveAs", allowPdf: true)
         case "exportPdf": try choosePdf(session.documents[index])
         case "exportHtml":
-            let panel = NSSavePanel(); panel.allowedContentTypes = [.html]; panel.nameFieldStringValue = (body["name"] as? String ?? "文档").replacingOccurrences(of: ".md", with: "") + ".html"
+            let panel = NSSavePanel(); panel.allowedContentTypes = [.html]; panel.nameFieldStringValue = URL(fileURLWithPath: body["name"] as? String ?? "文档").deletingPathExtension().lastPathComponent + ".html"
             if panel.runModal() == .OK, let url = panel.url, let html = body["html"] as? String { try Data(html.utf8).write(to: url, options: .atomic); notice("HTML 已导出") }
         case "closingText": try finishClose()
         default: break
@@ -175,19 +175,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         if persistenceBlocked { return }
         do { try Store.saveSession(session, sessionFile) } catch { notice("草稿备份失败，请手动保存文档。", error: true) }
     }
+    func documentExtension(_ name: String) -> String {
+        let ext = URL(fileURLWithPath: name).pathExtension.lowercased()
+        return ["yaml", "yml"].contains(ext) ? ext : "md"
+    }
+    func documentType(_ name: String) -> UTType {
+        UTType(filenameExtension: documentExtension(name)) ?? .plainText
+    }
     func save(_ index: Int, saveAs: Bool, allowPdf: Bool) throws -> Bool {
         var doc = session.documents[index], path = doc.path
         if path == nil || saveAs {
-            let panel = NSSavePanel(); panel.nameFieldStringValue = doc.name; panel.allowedContentTypes = [.init(filenameExtension: "md")!]
+            let panel = NSSavePanel(); panel.nameFieldStringValue = doc.name; panel.allowedContentTypes = [documentType(doc.name)]
             let formats = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 240, height: 28))
             if allowPdf {
-                formats.addItems(withTitles: ["Markdown (.md)", "PDF (.pdf)"])
+                formats.addItems(withTitles: ["Markdown (.md)", "YAML (.yaml)", "PDF (.pdf)"])
+                formats.selectItem(at: documentExtension(doc.name) == "md" ? 0 : 1)
                 panel.accessoryView = formats
                 formats.target = panel; formats.action = #selector(NSSavePanel.moyeFormatChanged(_:))
             }
             if panel.runModal() != .OK { return false }
             guard let selected = panel.url else { return false }
-            if allowPdf && formats.indexOfSelectedItem == 1 { try beginPdf(doc, selected); return false }
+            if allowPdf && formats.indexOfSelectedItem == 2 { try beginPdf(doc, selected); return false }
             path = selected.path
         } else if Store.conflict(doc) {
             let alert = NSAlert(); alert.messageText = "文件已被其他程序修改"; alert.informativeText = "是否覆盖磁盘上的文件？"
@@ -270,8 +278,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
 
 extension NSSavePanel {
     @objc func moyeFormatChanged(_ sender: NSPopUpButton) {
-        let ext = sender.indexOfSelectedItem == 1 ? "pdf" : "md"
-        allowedContentTypes = [.init(filenameExtension: ext)!]
+        let ext = ["md", "yaml", "pdf"][max(0, min(sender.indexOfSelectedItem, 2))]
+        allowedContentTypes = [UTType(filenameExtension: ext) ?? .plainText]
         nameFieldStringValue = URL(fileURLWithPath: nameFieldStringValue).deletingPathExtension().lastPathComponent + "." + ext
     }
 }

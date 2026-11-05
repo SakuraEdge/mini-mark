@@ -34,7 +34,7 @@ export function mountApp(isDesktop: boolean, version: string) {
         ${tool('search', '查找与替换', 'search', 'Ctrl+F')}
       </div>
       <div class="document-surface" id="surface"><div id="editor"></div><article class="markdown-body reading-view" id="reading-view" hidden></article></div>
-      <footer class="statusbar"><span id="word-count">0 字</span><span id="line-count">1 行</span><span class="status-spacer"></span><span id="cursor-position">第 1 行，第 1 列</span><span class="status-separator"></span><span>UTF-8</span><button id="font-size" title="切换字号" aria-label="切换字号">16 px</button><span class="markdown-badge">Markdown</span></footer>
+    <footer class="statusbar"><span id="word-count">0 字</span><span id="line-count">1 行</span><span class="status-spacer"></span><span id="cursor-position">第 1 行，第 1 列</span><span class="status-separator"></span><span>UTF-8</span><button id="font-size" title="切换字号" aria-label="切换字号">16 px</button><span class="markdown-badge" id="document-format">Markdown</span></footer>
     </main>
     <div id="more-menu" class="popup-menu" hidden>
       <button id="save-as">${icon('save')}<span>另存为</span><kbd>Ctrl Shift S</kbd></button>
@@ -43,7 +43,7 @@ export function mountApp(isDesktop: boolean, version: string) {
       <button id="check-updates">${icon('download')}<span>检测更新</span></button>
     </div>
     <div id="save-menu" class="popup-menu save-menu" role="menu" aria-label="保存格式" hidden>
-      <button id="save-markdown" role="menuitem">${icon('file-code-2')}<span>保存 Markdown (.md)</span><kbd>Ctrl S</kbd></button>
+      <button id="save-markdown" role="menuitem">${icon('file-code-2')}<span id="save-format-label">保存 Markdown (.md)</span><kbd>Ctrl S</kbd></button>
       <button id="save-pdf" role="menuitem">${icon('download')}<span>保存为 PDF (.pdf)</span></button>
       <button id="save-markdown-as" role="menuitem">${icon('save')}<span>另存为…</span><kbd>Ctrl Shift S</kbd></button>
     </div>

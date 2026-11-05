@@ -47,7 +47,7 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 | 新建、标签切换、脏状态 | `src/app/main.ts`、`src/documents/workspace.ts` |
 | 文档打开与保存 | `src/platform/bridge.ts`、`native/Host/MainWindow.cs`、`native/Documents/` |
 | 中文命令与输入法 | `src/editor/commands.ts`、`src/editor/editor.ts` |
-| Markdown、公式、代码高亮 | `src/markdown/render.ts`、`src/editor/editor.ts` |
+| Markdown、YAML、公式、代码高亮 | `src/markdown/render.ts`、`src/editor/editor.ts`、`src/documents/formats.ts` |
 | PDF、HTML 导出 | `src/markdown/export.ts`、两平台的 `Export/` |
 | 主题、字号、标签动画 | `src/styles/app.css`、`src/app/main.ts` |
 | 更新、提醒、下载 | `src/features/updates/`、两平台的 `Updates/` |
@@ -59,9 +59,11 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 
 `src/ui/layout.ts` 只生成界面，`src/app/main.ts` 绑定行为；文件系统和安装程序由原生宿主操作。消息类型集中在 `src/platform/bridge.ts`。
 
-文档进入内存时，正文和保存基线都统一为 LF。磁盘原有的 BOM、LF/CRLF 单独作为元数据保存，写回文件时恢复。恢复旧会话、新建示例和收到消息时都必须遵循这个约定。
+文档进入内存时，正文和保存基线都统一为 LF。磁盘原有的 BOM、LF/CRLF 单独作为元数据保存，写回文件时恢复。恢复旧会话、新建示例和收到消息时都必须遵循这个约定。`.yaml` 与 `.yml` 通过 `src/documents/formats.ts` 识别，YAML 阅读视图只做安全高亮，不执行或重排配置内容。
 
 `revision` 只在真实编辑时增长。新建、切换、保存等请求已经携带当前正文；收到 `workspace` 时不得无条件发回 `edit`，否则会在冲突时形成消息循环。接收后的较新本地编辑仍保留在缓存中。
+
+标题快捷键由 `src/editor/editor.ts` 以单次 CodeMirror 事务处理，当前行或选中行一起变更，并跳过代码围栏；YAML 文档和阅读模式不会响应。
 
 实际数据目录由 `MOYE_DATA_DIR`（开发覆盖）、当前用户注册表 `Software\Moye\DataDirectory` 或默认 AppData 决定。测试必须使用隔离目录，不改写实际用户会话。
 

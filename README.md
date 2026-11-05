@@ -12,7 +12,7 @@
 [![Build](https://github.com/SakuraEdge/moye-markdown/actions/workflows/build.yml/badge.svg)](https://github.com/SakuraEdge/moye-markdown/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-MIT-4f729a)](LICENSE)
 
-[下载 Windows 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/Moye-Setup-1.0.5-windows-x64.exe) · [下载 macOS 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/Moye-1.0.5-macos-universal.dmg) · [全部版本](https://github.com/SakuraEdge/moye-markdown/releases)
+[下载 Windows 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.1.0/Moye-Setup-1.1.0-windows-x64.exe) · [下载 macOS 版](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.1.0/Moye-1.1.0-macos-universal.dmg) · [全部版本](https://github.com/SakuraEdge/moye-markdown/releases)
 
 </div>
 
@@ -32,7 +32,8 @@
 | 把注意力留在内容上 | 即时排版、专注模式、明暗主题与可调字号 |
 | 公式和代码清晰可读 | KaTeX 数学公式、代码语法高亮、源码视图 |
 | 同时整理几份笔记 | 多标签、独立撤销、未保存提示、整组草稿恢复 |
-| 把成果分享出去 | 保存 `.md`，导出 A4 PDF 或独立 HTML |
+| 把成果分享出去 | 保存 `.md` / `.yaml`，导出 A4 PDF 或独立 HTML |
+| 读配置和数据文件 | `.yaml` / `.yml` 语法高亮、保留注释与缩进的阅读模式 |
 | 留在自己的电脑里 | 原生文件读写，无账号、云同步或遥测 |
 | 跟上新的正式版本 | 免登录检测，Windows 覆盖更新，大版本提醒可关闭 |
 
@@ -40,14 +41,14 @@
 
 | 系统 | 推荐下载 | 其他方式 |
 | --- | --- | --- |
-| Windows 10 / 11，x64 | [安装程序 `.exe`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/Moye-Setup-1.0.5-windows-x64.exe) | [便携版 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/Moye-1.0.5-windows-x64.zip) |
-| macOS 13 Ventura 或更新版本 | [通用版 `.dmg`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/Moye-1.0.5-macos-universal.dmg) | [应用包 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/Moye-1.0.5-macos-universal.zip) |
+| Windows 10 / 11，x64 | [安装程序 `.exe`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.1.0/Moye-Setup-1.1.0-windows-x64.exe) | [便携版 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.1.0/Moye-1.1.0-windows-x64.zip) |
+| macOS 13 Ventura 或更新版本 | [通用版 `.dmg`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.1.0/Moye-1.1.0-macos-universal.dmg) | [应用包 `.zip`](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.1.0/Moye-1.1.0-macos-universal.zip) |
 
-macOS 通用版同时包含 **Apple Silicon 与 Intel** 两种架构。校验和见 [SHA256SUMS](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.0.5/SHA256SUMS-v1.0.5.txt)。
+macOS 通用版同时包含 **Apple Silicon 与 Intel** 两种架构。校验和见 [SHA256SUMS](https://github.com/SakuraEdge/moye-markdown/releases/download/v1.1.0/SHA256SUMS-v1.1.0.txt)。
 
 ### Windows
 
-运行安装程序，按提示完成安装。可以勾选 **“将墨页设为 .md 默认应用”**；安装完成后会打开 Windows 默认应用设置，由你确认关联。安装器不会绕过系统保护或强行改写其他应用的默认关联。
+运行安装程序，按提示完成安装。可以分别勾选 **“将墨页设为 .md 默认应用”** 或 **“将墨页设为 .yaml/.yml 默认应用”**；安装完成后会打开 Windows 默认应用设置，由你确认关联。安装器不会绕过系统保护或强行改写其他应用的默认关联。
 
 便携版请完整解压，再运行 `Moye.exe`，不要只移动 exe。发布包已包含 .NET 运行时，需要系统具备 Microsoft Edge WebView2 Runtime。
 
@@ -61,7 +62,7 @@ macOS 通用版同时包含 **Apple Silicon 与 Intel** 两种架构。校验和
 
 - **即时**：标题、强调、引用、代码、块级公式和表格在编辑区排版，进入公式或表格时恢复源码。
 - **源码**：行号、折叠与语法高亮，方便精确修改。
-- **阅读**：完整预览，包括行内公式、图片和任务列表。
+- **阅读**：完整预览，包括行内公式、图片、任务列表，以及 YAML 的注释、缩进和多文档内容。
 - **分屏**：左侧源码、右侧阅读，输入后实时更新，适合边改边校对。
 
 新建、打开文档都会增加一个标签。切换时保留正文、光标、滚动位置和本次运行的撤销记录；关闭未保存文档前会询问。
@@ -85,7 +86,7 @@ v1.0.1 优化了标签悬停样式，选中指示条平滑滑动，正文轻量�
 
 ## 保存和导出
 
-点击右上角保存图标，选择 **Markdown** 或 **PDF**。已有 Markdown 文件使用 `Ctrl+S` / `⌘S` 直接保存；另存为可选择文件名与格式。
+点击右上角保存图标，选择 **Markdown/YAML** 或 **PDF**。已有文档使用 `Ctrl+S` / `⌘S` 直接保存并保留扩展名；另存为可选择文件名与格式。
 
 PDF 保留可选择的中文文字、数学公式、代码高亮、表格和本地相对图片，以 A4 页面排版。导出时切换标签，不会改变已提交的导出内容。
 
@@ -130,6 +131,7 @@ Windows 可以将程序安装到其他磁盘。需要同时迁移草稿与 WebVi
 | 撤销 / 重做 | `Ctrl+Z` / `Ctrl+Y` | `⌘Z` / `⌘⇧Z` |
 | 加粗 / 斜体 / 链接 | `Ctrl+B` / `Ctrl+I` / `Ctrl+K` | `⌘B` / `⌘I` / `⌘K` |
 | 查找 | `Ctrl+F` | `⌘F` |
+| 当前行/选中行设为标题 1–6 级 | `Ctrl+1` … `Ctrl+6` | `⌘1` … `⌘6` |
 | 关闭标签 | `Ctrl+W` | `⌘W` |
 | 切换标签 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | `Control+Tab` / `Control+Shift+Tab` |
 
