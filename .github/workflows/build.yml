@@ -32,10 +32,10 @@ jobs:
       - run: ./scripts/test-installer.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: Moye-windows-x64
+          name: MiniMark-windows-x64
           path: |
-            release/Moye-*.exe
-            release/Moye-*.zip
+            release/MiniMark-*.exe
+            release/MiniMark-*.zip
   macos:
     runs-on: macos-14
     steps:
@@ -50,27 +50,27 @@ jobs:
       - run: npx playwright install chromium
       - run: bash scripts/package-mac.sh
       - name: Validate native macOS storage
-        run: release/mac/Moye.app/Contents/MacOS/Moye --self-test
+        run: '"release/mac/Mini Mark.app/Contents/MacOS/MiniMark" --self-test'
       - name: Validate actual WKWebView and PDF
         run: |
           set +e
-          MOYE_DATA_DIR="$RUNNER_TEMP/moye-smoke-profile" release/mac/Moye.app/Contents/MacOS/Moye --smoke "$RUNNER_TEMP/moye-smoke"
+          MOYE_DATA_DIR="$RUNNER_TEMP/moye-smoke-profile" "release/mac/Mini Mark.app/Contents/MacOS/MiniMark" --smoke "$RUNNER_TEMP/moye-smoke"
           result=$?
           if [ "$result" -ne 0 ]; then
             mkdir -p "$RUNNER_TEMP/moye-smoke/diagnostics"
             sleep 3
-            find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -name 'Moye*' -exec cp {} "$RUNNER_TEMP/moye-smoke/diagnostics/" \;
+            find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -name 'MiniMark*' -exec cp {} "$RUNNER_TEMP/moye-smoke/diagnostics/" \;
           fi
           exit "$result"
         timeout-minutes: 3
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Moye-macos-smoke
+          name: MiniMark-macos-smoke
           path: ${{ runner.temp }}/moye-smoke/
       - uses: actions/upload-artifact@v4
         with:
-          name: Moye-macos-universal
+          name: MiniMark-macos-universal
           path: |
-            release/Moye-*.zip
-            release/Moye-*.dmg
+            release/MiniMark-*.zip
+            release/MiniMark-*.dmg

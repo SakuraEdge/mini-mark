@@ -26,7 +26,7 @@ final class PdfExporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
         web = WKWebView(frame: NSRect(x: -12000, y: 0, width: 794, height: 1123), configuration: config)
         web.navigationDelegate = self
         owner.contentView?.addSubview(web)
-        let htmlWithBase = html.replacingOccurrences(of: "<head>", with: "<head><base href=\"moye://document/\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data: moye:;\">")
+        let htmlWithBase = html.replacingOccurrences(of: "<head>", with: "<head><base href=\"moye://document/\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data: moye: https:;\">")
         web.loadHTMLString(htmlWithBase, baseURL: URL(string: "moye://document/"))
         let timeout = DispatchWorkItem { [weak self] in self?.finish(Store.failure("PDF 排版超时。")) }
         self.timeout = timeout; DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: timeout)

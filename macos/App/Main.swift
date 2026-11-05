@@ -30,7 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 800), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        window.title = "墨页 Moye"; window.minSize = NSSize(width: 720, height: 520); window.center(); window.delegate = self
+        window.title = "Mini Mark"; window.minSize = NSSize(width: 720, height: 520); window.center(); window.delegate = self
         let config = WKWebViewConfiguration()
         scheme = AppScheme(root: root); config.setURLSchemeHandler(scheme, forURLScheme: "moye")
         config.userContentController.add(self, name: "bridge")
@@ -45,10 +45,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
     func buildMenu() {
         let menu = NSMenu(), appItem = NSMenuItem(), appMenu = NSMenu()
-        appMenu.addItem(withTitle: "关于墨页", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: "关于 Mini Mark", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(withTitle: "检测更新…", action: #selector(checkUpdateMenu), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "退出墨页", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "退出 Mini Mark", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu; menu.addItem(appItem)
         let file = NSMenuItem(), fileMenu = NSMenu(title: "文件")
         for (title, selector, key) in [("新建", #selector(newMenu), "n"), ("打开…", #selector(openMenu), "o"), ("保存", #selector(saveMenu), "s"), ("关闭文档", #selector(closeMenu), "w")] {
@@ -105,6 +105,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             }; return
         }
         if type == "openExternal", let value = body["url"] as? String, let url = URL(string: value), ["https", "http"].contains(url.scheme ?? "") { NSWorkspace.shared.open(url); return }
+        if type == "exportPlugin", let source = body["source"] as? String, source.utf8.count <= 800000 {
+            let panel = NSSavePanel(); panel.allowedContentTypes = [UTType(filenameExtension: "js") ?? .plainText]
+            panel.nameFieldStringValue = URL(fileURLWithPath: body["name"] as? String ?? "plugin.js").lastPathComponent
+            if panel.runModal() == .OK, let url = panel.url { try Data(source.utf8).write(to: url, options: .atomic) }
+            return
+        }
+        if type == "importImages", let requestId = body["requestId"] as? String {
+            do {
+                guard let id = body["documentId"] as? String, let doc = session.documents.first(where: { $0.id == id }),
+                      let images = body["images"] as? [[String: Any]], !images.isEmpty, images.count <= 10 else { throw Store.failure("无效的图片导入请求。") }
+                let sources = try images.map { image -> String in
+                    guard let data = image["dataUrl"] as? String else { throw Store.failure("图片数据缺失。") }
+                    return try ImageAssets.importImage(data, documentPath: doc.path)
+                }
+                post(["type": "imagesImported", "requestId": requestId, "sources": sources])
+            } catch { post(["type": "imagesImported", "requestId": requestId, "error": error.localizedDescription]) }
+            return
+        }
         if type == "pdfHtml" || type == "pdfError" {
             guard let request = pdfRequest, body["requestId"] as? String == request.id, body["documentId"] as? String == request.documentId else { return }
             if type == "pdfError" { pdfRequest = nil; notice("PDF 排版失败。", error: true); return }
@@ -148,8 +166,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         default: break
         }
     }
+    func nextUntitledName() -> String {
+        var number = 1
+        while session.documents.contains(where: { $0.name.lowercased() == "未命名 \(number).md".lowercased() }) { number += 1 }
+        session.nextUntitled = number + 1
+        return "未命名 \(number).md"
+    }
     func add(_ text: String = "", _ name: String? = nil, baseline: String = "") {
-        let name = name ?? "未命名 \(session.nextUntitled).md"; session.nextUntitled += 1
+        let name = name ?? nextUntitledName()
         let doc = Document(untitledName: name, text: Store.normalize(text), baseline: Store.normalize(baseline))
         session.documents.append(doc); session.activeId = doc.id
     }
@@ -170,7 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
               "document": ["id": doc.id, "name": doc.name, "path": doc.path as Any? ?? NSNull(), "text": doc.text, "baseline": doc.baseline, "revision": doc.revision]])
         title()
     }
-    func title() { if !session.documents.isEmpty { let doc = session.documents[activeIndex]; window.title = "\(doc.dirty ? "• " : "")\(doc.name) · 墨页" } }
+    func title() { if !session.documents.isEmpty { let doc = session.documents[activeIndex]; window.title = "\(doc.dirty ? "• " : "")\(doc.name) · Mini Mark" } }
     func persist() {
         if persistenceBlocked { return }
         do { try Store.saveSession(session, sessionFile) } catch { notice("草稿备份失败，请手动保存文档。", error: true) }
@@ -206,6 +230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         }
         guard let target = path else { return false }
         if session.documents.contains(where: { $0.id != doc.id && ($0.path.map { Store.samePath($0, target) } ?? false) }) { throw Store.failure("该文件已在另一个标签打开，请选择其他文件名。") }
+        try ImageAssets.copyForSaveAs(doc.text, previousPath: doc.path, targetPath: target)
         doc.fingerprint = try Store.write(doc, to: target); doc.path = target; doc.baseline = doc.text; session.documents[index] = doc
         persist(); post(["type": "saved", "documentId": doc.id, "name": doc.name, "path": target, "text": doc.text])
         if doc.id == session.activeId { scheme.documentFolder = URL(fileURLWithPath: target).deletingLastPathComponent() }; title(); return true

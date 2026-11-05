@@ -31,8 +31,8 @@ jobs:
       - name: Download verified packages
         run: |
           mkdir -p release-assets
-          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name Moye-windows-x64 --dir release-assets
-          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name Moye-macos-universal --dir release-assets
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name MiniMark-windows-x64 --dir release-assets
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name MiniMark-macos-universal --dir release-assets
       - name: Publish all assets together
         env:
           BUILD_SHA: ${{ steps.build.outputs.sha }}
@@ -44,7 +44,7 @@ jobs:
           test -f "$notes"
           node scripts/update-manifest.mjs "$version" release-assets
           cd release-assets
-          files=("Moye-Setup-$version-windows-x64.exe" "Moye-$version-windows-x64.zip" "Moye-$version-macos-universal.dmg" "Moye-$version-macos-universal.zip")
+          files=("MiniMark-Setup-$version-windows-x64.exe" "MiniMark-$version-windows-x64.zip" "MiniMark-$version-macos-universal.dmg" "MiniMark-$version-macos-universal.zip" "Moye-Setup-$version-windows-x64.exe")
           for file in "${files[@]}"; do test -s "$file"; done
           sha256sum "${files[@]}" > "SHA256SUMS-$tag.txt"
           already_published=false
@@ -59,7 +59,7 @@ jobs:
               done
             fi
           else
-            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$BUILD_SHA" --title "墨页 Moye $tag" --notes-file "$notes" --draft
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$BUILD_SHA" --title "Mini Mark $tag" --notes-file "$notes" --draft
           fi
           if test "$already_published" = false; then
             gh release upload "$tag" --repo "$GITHUB_REPOSITORY" "${files[@]}" "SHA256SUMS-$tag.txt" update.json --clobber

@@ -1,6 +1,6 @@
-import { createIcons, PanelLeft, FilePlus2, FolderOpen, Save, ChevronDown, Bold, Italic, Link2, Code2, Sigma, Table2, Quote, Undo2, Redo2, Search, Sun, Moon, Focus, MoreHorizontal, FileCode2, Download, X, Check, Circle, List, PencilLine, Columns2 } from 'lucide';
+import { createIcons, PanelLeft, FilePlus2, FolderOpen, Save, ChevronDown, Bold, Italic, Link2, Code2, Sigma, Table2, Quote, Undo2, Redo2, Search, Sun, Moon, Focus, MoreHorizontal, FileCode2, Download, X, Check, Circle, List, PencilLine, Columns2, ImagePlus, Puzzle } from 'lucide';
 
-const icons = { PanelLeft, FilePlus2, FolderOpen, Save, ChevronDown, Bold, Italic, Link2, Code2, Sigma, Table2, Quote, Undo2, Redo2, Search, Sun, Moon, Focus, MoreHorizontal, FileCode2, Download, X, Check, Circle, List, PencilLine, Columns2 };
+const icons = { PanelLeft, FilePlus2, FolderOpen, Save, ChevronDown, Bold, Italic, Link2, Code2, Sigma, Table2, Quote, Undo2, Redo2, Search, Sun, Moon, Focus, MoreHorizontal, FileCode2, Download, X, Check, Circle, List, PencilLine, Columns2, ImagePlus, Puzzle };
 export function icon(name: string) { return `<i data-lucide="${name}"></i>`; }
 function tool(id: string, label: string, glyph: string, shortcut = '') {
   return `<button class="icon-button" id="${id}" aria-label="${label}" title="${label}${shortcut ? ` · ${shortcut}` : ''}">${icon(glyph)}</button>`;
@@ -10,7 +10,7 @@ export function mountApp(isDesktop: boolean, version: string) {
   const app = document.querySelector<HTMLDivElement>('#app')!;
   app.innerHTML = `
     <aside class="sidebar" id="sidebar">
-      <div class="brand"><img src="./moye.svg" alt="" width="29" height="29"><span>墨页<span class="brand-en">MOYE</span></span></div>
+      <div class="brand"><img src="./mini-mark.svg" alt="" width="34" height="34"><span>Mini Mark</span></div>
       <div class="file-actions"><button id="new-file">${icon('file-plus-2')}<span>新建</span></button><button id="open-file">${icon('folder-open')}<span>打开</span></button></div>
       <div class="section-label">当前文档</div>
       <button class="current-file" id="current-file">${icon('file-code-2')}<span id="sidebar-filename">未命名.md</span><span class="dirty-dot" id="sidebar-dirty"></span></button>
@@ -28,7 +28,7 @@ export function mountApp(isDesktop: boolean, version: string) {
         <div class="format-tools" id="format-tools">
           ${tool('undo', '撤销', 'undo-2', 'Ctrl+Z')}${tool('redo', '重做', 'redo-2', 'Ctrl+Y')}<span class="divider"></span>
           ${tool('bold', '加粗', 'bold', 'Ctrl+B')}${tool('italic', '斜体', 'italic', 'Ctrl+I')}${tool('link', '链接', 'link-2', 'Ctrl+K')}<span class="divider"></span>
-          ${tool('code', '代码块', 'code-2')}${tool('math', '公式', 'sigma')}${tool('table', '表格', 'table-2')}${tool('quote', '引用', 'quote')}
+          ${tool('code', '代码块', 'code-2')}${tool('math', '公式', 'sigma')}${tool('table', '表格', 'table-2')}${tool('quote', '引用', 'quote')}${tool('image', '插入图片', 'image-plus')}
         </div>
         <div class="view-switch" role="group" aria-label="编辑视图"><button data-mode="live" class="active" aria-pressed="true">即时</button><button data-mode="source" aria-pressed="false">源码</button><button data-mode="read" aria-pressed="false">阅读</button><button data-mode="split" aria-pressed="false" title="左侧源码，右侧阅读">${icon('columns-2')}<span>分屏</span></button></div>
         ${tool('search', '查找与替换', 'search', 'Ctrl+F')}
@@ -40,6 +40,7 @@ export function mountApp(isDesktop: boolean, version: string) {
       <button id="save-as">${icon('save')}<span>另存为</span><kbd>Ctrl Shift S</kbd></button>
       <button id="export-html">${icon('download')}<span>导出 HTML</span></button>
       <button id="sample">${icon('file-code-2')}<span>示例文档</span></button>
+      <button id="manage-plugins">${icon('puzzle')}<span>插件</span></button>
       <button id="check-updates">${icon('download')}<span>检测更新</span></button>
     </div>
     <div id="save-menu" class="popup-menu save-menu" role="menu" aria-label="保存格式" hidden>

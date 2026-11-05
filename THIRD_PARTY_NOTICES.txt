@@ -1,4 +1,4 @@
-THIRD-PARTY NOTICES - MOYE MARKDOWN
+THIRD-PARTY NOTICES - MINI MARK
 
 Runtime npm dependencies and their distributed license texts.
 .NET and WebView2 redistribution notices are also included in the Windows package.

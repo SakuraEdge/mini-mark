@@ -22,10 +22,40 @@ func runStoreTests() throws {
     try Store.saveSession(Session(documents: [windows], activeId: windows.id), file)
     let normalized = try Store.restore(file).documents[0]
     guard normalized.text == "# Windows\nbody\n", !normalized.dirty, normalized.newline == "\r\n" else { throw Store.failure("CRLF recovery normalization failed") }
+    let image = Data([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3])
+    let dataUrl = "data:" + "image/png;base64," + image.base64EncodedString()
+    let relative = try ImageAssets.importImage(dataUrl, documentPath: path)
+    guard relative.hasPrefix("assets/mini-mark-"), try Data(contentsOf: folder.appendingPathComponent(relative)) == image else { throw Store.failure("Image import failed") }
+    guard try ImageAssets.importImage(dataUrl, documentPath: nil) == dataUrl else { throw Store.failure("Draft image changed") }
+    let moved = folder.appendingPathComponent("moved/note.md")
+    try ImageAssets.copyForSaveAs("![](\(relative))", previousPath: path, targetPath: moved.path)
+    guard try Data(contentsOf: moved.deletingLastPathComponent().appendingPathComponent(relative)) == image else { throw Store.failure("Image Save As failed") }
     print("PASS macOS storage: UTF-8, BOM, CRLF, conflict, two-document recovery")
 }
 
 extension AppDelegate {
+    func checkPluginSmoke(_ completion: @escaping (Error?) -> Void) {
+        web.callAsyncJavaScript("""
+        const wait = async predicate => {
+          for (let i = 0; i < 100; i++) { if (predicate()) return; await new Promise(r => setTimeout(r, 60)); }
+          throw new Error('Plugin timeout: ' + document.getElementById('plugin-status').textContent);
+        };
+        document.getElementById('manage-plugins').click();
+        document.querySelector('#plugins-dialog [data-action=new]').click();
+        document.getElementById('plugin-source').value = "miniMark.register({id:'mac-smoke',name:'Mac test',version:'1',commands:[{id:'check',title:'Check sandbox',async run(){let blocked=false;try{await fetch('https://example.com/probe')}catch{blocked=true}return {message:blocked && typeof chrome === 'undefined' && typeof document === 'undefined' ? 'MAC_PLUGIN_OK' : 'MAC_PLUGIN_FAILED'}}}]});";
+        document.querySelector('#plugins-dialog [data-action=save]').click();
+        await wait(() => document.getElementById('plugin-status').textContent === '已保存');
+        document.querySelector('.plugin-commands button').click();
+        await wait(() => document.getElementById('toast').textContent === 'MAC_PLUGIN_OK');
+        document.querySelector('#plugins-dialog [data-action=close]').click();
+        return true;
+        """, arguments: [:], in: nil, in: .page) { result in
+            switch result {
+            case .success(let value): completion(value as? Bool == true ? nil : Store.failure("Plugin smoke failed"))
+            case .failure(let error): completion(error)
+            }
+        }
+    }
     func runSmoke() {
         guard let output = smokeOutput else { return }
         do {
@@ -45,6 +75,8 @@ extension AppDelegate {
             })()
             """) { result, error in
                 guard error == nil, result as? Bool == true else { self.smokeFinish(error ?? Store.failure("Editor, math, tabs or local storage unavailable")); return }
+                self.checkPluginSmoke { error in
+                if let error = error { self.smokeFinish(error); return }
                 self.web.takeSnapshot(with: nil) { image, error in
                     if let image = image, let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff), let png = bitmap.representation(using: .png, properties: [:]) { try? png.write(to: output.appendingPathComponent("macos-editor.png")) }
                     do {
@@ -56,6 +88,7 @@ extension AppDelegate {
                         try self.beginPdf(self.session.documents[index], output.appendingPathComponent("macos-export.pdf"))
                     } catch { self.smokeFinish(error) }
                 }
+                }
             }
         }
     }
@@ -65,7 +98,7 @@ extension AppDelegate {
         do {
             let data = try Data(contentsOf: root.appendingPathComponent("index.html"))
             guard !data.isEmpty else { throw Store.failure("Missing resources") }
-            try "PASS macOS native editor, math, two tabs, persistence, UTF-8 save, \(pdf.pageCount)-page PDF\n".write(to: output.appendingPathComponent("result.txt"), atomically: true, encoding: .utf8)
+            try "PASS macOS native editor, math, two tabs, persistence, UTF-8 save, image storage, plugin isolation, \(pdf.pageCount)-page PDF\n".write(to: output.appendingPathComponent("result.txt"), atomically: true, encoding: .utf8)
             smokeFinish(nil)
         } catch { smokeFinish(error) }
     }

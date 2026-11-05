@@ -13,8 +13,14 @@ export class BrowserWorkspace {
   get active() { return this.documents.find(document => document.id === this.activeId)!; }
   get tabs(): TabData[] { return this.documents.map(document => ({ id: document.id, name: document.name, path: document.path, dirty: document.text !== document.baseline, revision: document.revision })); }
   add(text = '', name?: string, baseline = '') {
-    const document: DocumentData = { id: crypto.randomUUID(), text: normalizeText(text), name: name ?? `未命名 ${this.nextUntitled++}.md`, baseline: normalizeText(baseline), revision: 0 };
+    const document: DocumentData = { id: crypto.randomUUID(), text: normalizeText(text), name: name ?? this.nextUntitledName(), baseline: normalizeText(baseline), revision: 0 };
     this.documents.push(document); this.activeId = document.id; return document;
+  }
+  private nextUntitledName() {
+    let number = 1;
+    while (this.documents.some(document => document.name.toLowerCase() === `未命名 ${number}.md`)) number++;
+    this.nextUntitled = number + 1;
+    return `未命名 ${number}.md`;
   }
   update(id: string, text: string, revision: number) {
     text = normalizeText(text);
@@ -40,7 +46,8 @@ export class BrowserWorkspace {
       const workspace = new BrowserWorkspace();
       workspace.documents = session.documents.map(document => ({ ...document, text: normalizeText(document.text), baseline: normalizeText(document.baseline) }));
       workspace.activeId = session.documents.some(document => document.id === session.activeId) ? session.activeId : session.documents[0].id;
-      workspace.nextUntitled = Math.max(1, session.nextUntitled || 1);
+      // Untitled numbering is a per-launch convenience, not durable document state.
+      workspace.nextUntitled = 1;
       return workspace;
     } catch { return null; }
   }

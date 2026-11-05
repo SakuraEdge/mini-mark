@@ -7,6 +7,8 @@ const areas = [
   ['src/app', '应用协调和交互'], ['src/ui', '界面布局'], ['src/editor', '编辑器与中文命令'],
   ['src/documents', '文档模型与示例'], ['src/markdown', '排版和导出'], ['src/platform', '宿主通信'],
   ['src/features/updates', '更新界面与版本'], ['src/styles', '视觉样式'],
+  ['src/features/theme', '主题过渡'], ['src/features/images', '图片插入'],
+  ['src/features/plugins', '自定义插件与隔离执行'],
   ['native/Host', 'Windows 宿主'], ['native/Documents', 'Windows 文件与会话'],
   ['native/Infrastructure', 'Windows 路径与进程'], ['native/Export', 'Windows PDF'], ['native/Updates', 'Windows 更新'],
   ['macos/App', 'macOS 应用'], ['macos/Host', 'macOS 资源宿主'], ['macos/Documents', 'macOS 文件与会话'],

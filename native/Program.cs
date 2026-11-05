@@ -13,19 +13,19 @@ public static class Program {
         string dataRoot;
         try { dataRoot = AppPaths.DataRoot; Directory.CreateDirectory(dataRoot); }
         catch (Exception exception) {
-            MessageBox.Show($"无法打开墨页数据目录，请检查磁盘是否可用。\n{exception.Message}", "墨页", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show($"无法打开 Mini Mark 数据目录，请检查磁盘是否可用。\n{exception.Message}", "Mini Mark", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
         using var instance = new SingleInstance(dataRoot);
         if (!instance.IsPrimary) {
             try { instance.Forward(args); }
-            catch (IOException) { MessageBox.Show("墨页正在启动，请稍后重试。", "墨页"); }
-            catch (TimeoutException) { MessageBox.Show("墨页暂时没有响应，请回到已打开的窗口。", "墨页"); }
+            catch (IOException) { MessageBox.Show("Mini Mark 正在启动，请稍后重试。", "Mini Mark"); }
+            catch (TimeoutException) { MessageBox.Show("Mini Mark 暂时没有响应，请回到已打开的窗口。", "Mini Mark"); }
             return;
         }
         ApplicationConfiguration.Initialize();
         Application.ThreadException += (_, e) => {
-            MessageBox.Show(e.Exception.Message, "墨页", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(e.Exception.Message, "Mini Mark", MessageBoxButtons.OK, MessageBoxIcon.Error);
         };
         var window = new MainWindow(args);
         window.HandleCreated += (_, _) => instance.Listen(arguments => window.BeginInvoke(() => window.OpenFromArguments(arguments)));
@@ -38,7 +38,7 @@ public static class Program {
                 start.ArgumentList.Add("/NORESTART");
                 Process.Start(start);
             } catch (Exception exception) {
-                MessageBox.Show($"安装程序未能启动，当前版本仍保留。\n{exception.Message}", "墨页更新", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show($"安装程序未能启动，当前版本仍保留。\n{exception.Message}", "Mini Mark 更新", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
     }

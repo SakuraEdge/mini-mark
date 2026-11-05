@@ -1,15 +1,18 @@
 import { createIcons, X } from 'lucide';
 import { mountApp, icon } from '../ui/layout';
-import { undo, redo } from '@codemirror/commands';
+import { undo, redo, isolateHistory } from '@codemirror/commands';
 import { openSearchPanel } from '@codemirror/search';
 import type { EditorState } from '@codemirror/state';
 import { createEditor, insertCommand, modeCompartment, modeExtensions, replaceDocument, setEditorFont, setEditorEditable, setEditorLanguage, setHeadingLevel, surround, type EditorMode } from '../editor/editor';
 import { connect, isDesktop, send, type DocumentData, type TabData } from '../platform/bridge';
-import { headings, renderMarkdown, renderYaml, wordCount } from '../markdown/render';
+import { headings, renderMarkdown, renderYaml, wordCount, setImageDocument } from '../markdown/render';
 import { sample } from '../documents/sample';
 import { documentLanguage, type DocumentLanguage } from '../documents/formats';
 import { normalizeText } from '../documents/workspace';
 import { APP_VERSION, initializeUpdates, openUpdates, scheduleUpdateCheck, handleUpdateMessage } from '../features/updates/updates';
+import { initializeTheme, toggleTheme } from '../features/theme/theme';
+import { initializeImages, handleImageMessage } from '../features/images/images';
+import { initializePlugins } from '../features/plugins/manager';
 import '../styles/app.css';
 
 const app = mountApp(isDesktop, APP_VERSION);
@@ -44,8 +47,7 @@ let persistTimer: ReturnType<typeof setTimeout>;
 let previewTimer: ReturnType<typeof setTimeout>;
 let toastTimer: ReturnType<typeof setTimeout>;
 let fontSize = Number(localStorage.getItem('moye.font')) || 16;
-let theme = localStorage.getItem('moye.theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-document.documentElement.dataset.theme = theme;
+initializeTheme();
 const view = createEditor(document.querySelector('#editor')!, (update) => {
   const line = update.state.doc.lineAt(update.state.selection.main.head);
   document.querySelector('#cursor-position')!.textContent = `第 ${line.number} 行，第 ${update.state.selection.main.head - line.from + 1} 列`;
@@ -68,12 +70,39 @@ const view = createEditor(document.querySelector('#editor')!, (update) => {
     }
   }
 });
+const imageActions = initializeImages({
+  view, notice: showToast,
+  snapshot: () => ({ documentId: activeId, revision, editable: !transitionPending && mode !== 'read' && language === 'markdown' }),
+});
+const pluginActions = initializePlugins({
+  notice: showToast,
+  snapshot: () => ({
+    documentId: activeId, revision, editable: !transitionPending && mode !== 'read',
+    context: {
+      name, language, text: view.state.doc.toString(),
+      selection: { from: view.state.selection.main.from, to: view.state.selection.main.to },
+      selectedText: view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to),
+    },
+  }),
+  apply: (snapshot, result) => {
+    if (result.replaceSelection === undefined && result.replaceDocument === undefined) return;
+    if (!snapshot.editable || transitionPending || mode === 'read' || view.composing || snapshot.documentId !== activeId || snapshot.revision !== revision) throw new Error('文档已修改或切换，请重新执行插件。');
+    const replaceAll = result.replaceDocument !== undefined;
+    const from = replaceAll ? 0 : snapshot.context.selection.from;
+    const to = replaceAll ? view.state.doc.length : snapshot.context.selection.to;
+    const text = normalizeText(result.replaceDocument ?? result.replaceSelection!);
+    view.dispatch({
+      changes: { from, to, insert: text }, selection: { anchor: from + text.length },
+      annotations: isolateHistory.of('full'), userEvent: 'input',
+    });
+  },
+});
 
 function updateSaved(text = view.state.doc.toString()) {
   const dirty = text !== baseline;
   document.querySelector('#save-state')!.textContent = dirty ? '未保存' : fileOnDisk ? '已保存' : '草稿';
   document.querySelector('#sidebar-dirty')!.classList.toggle('visible', dirty);
-  document.title = `${dirty ? '• ' : ''}${name} · 墨页`;
+  document.title = `${dirty ? '• ' : ''}${name} · Mini Mark`;
   const tab = tabs.find(item => item.id === activeId);
   if (tab) { tab.dirty = dirty; tab.revision = revision; }
   renderTabs();
@@ -280,14 +309,12 @@ on('focus-mode', () => app.classList.toggle('focus-mode'));
 on('bold', () => surround(view, '**'));
 on('italic', () => surround(view, '*'));
 on('link', () => surround(view, '[', '](https://)'));
+on('image', () => imageActions.open());
 on('undo', () => { undo(view); view.focus(); });
 on('redo', () => { redo(view); view.focus(); });
 for (const id of ['code', 'math', 'table', 'quote']) on(id, () => insertCommand(view, id));
 on('search', () => { if (mode === 'read') setMode('source'); openSearchPanel(view); });
-on('theme', () => {
-  theme = theme === 'dark' ? 'light' : 'dark';
-  document.documentElement.dataset.theme = theme; localStorage.setItem('moye.theme', theme);
-});
+on('theme', toggleTheme);
 on('font-size', () => {
   fontSize = fontSize >= 22 ? 14 : fontSize + 2;
   applyFont(); localStorage.setItem('moye.font', String(fontSize));
@@ -301,6 +328,7 @@ function applyFont() {
 applyFont();
 on('more', () => { const menu = document.querySelector<HTMLElement>('#more-menu')!; menu.hidden = !menu.hidden; });
 on('check-updates', () => { document.querySelector<HTMLElement>('#more-menu')!.hidden = true; openUpdates(); });
+on('manage-plugins', () => { document.querySelector<HTMLElement>('#more-menu')!.hidden = true; pluginActions.open(); });
 document.addEventListener('click', (event) => {
   if (!(event.target as Element).closest('#more,#more-menu')) document.querySelector<HTMLElement>('#more-menu')!.hidden = true;
   if (!(event.target as Element).closest('#save-file,#save-menu')) document.querySelector<HTMLElement>('#save-menu')!.hidden = true;
@@ -363,6 +391,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && act
 
 let updateScheduled = false;
 connect((message) => {
+  if (handleImageMessage(message)) return;
   if (handleUpdateMessage(message)) return;
   if (message.type === 'workspace') {
     const doc = { ...message.document, text: normalizeText(message.document.text), baseline: normalizeText(message.document.baseline) };
@@ -381,6 +410,7 @@ connect((message) => {
     const localIsNewer = cached && cached.document.revision > doc.revision;
     const current = localIsNewer ? cached.document : doc;
     activeId = doc.id;
+    setImageDocument(doc.id + ':' + (doc.path ?? ''));
     name = doc.name;
     fileOnDisk = Boolean(doc.path);
     baseline = doc.baseline;
@@ -437,6 +467,7 @@ connect((message) => {
     if (tab) Object.assign(tab, { name: message.name, path: message.path, dirty: cached ? cached.document.text !== message.text : false });
     if (message.documentId === activeId) {
       name = message.name; baseline = message.text; fileOnDisk = true;
+      setImageDocument(activeId + ':' + (message.path ?? ''));
       const nextLanguage = documentLanguage(name);
       if (nextLanguage !== language) {
         language = nextLanguage;
@@ -453,6 +484,8 @@ connect((message) => {
       document.querySelector('#sidebar-filename')!.textContent = name;
       document.querySelector('#current-file')!.setAttribute('title', message.path || name);
       updateSaved();
+      view.dispatch({ effects: modeCompartment.reconfigure(modeExtensions(mode === 'split' ? 'source' : mode)) });
+      refreshPreview();
     } else renderTabs();
     showToast(`已保存：${message.name}`);
   } else if (message.type === 'requestClosingText') {

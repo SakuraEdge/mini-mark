@@ -11,6 +11,7 @@ export type HostMessage =
   | { type: 'operationComplete' }
   | { type: 'updateResult'; requestId: string; releases?: unknown; error?: string; cacheNotice?: string; installSupported?: boolean }
   | { type: 'updateInstallStatus'; message: string; downloading: boolean }
+  | { type: 'imagesImported'; requestId: string; sources?: string[]; error?: string }
   | { type: 'error' | 'notice'; message: string };
 
 const native = window.chrome?.webview;
@@ -62,6 +63,11 @@ export function connect(callback: typeof onMessage) {
 
 export function send(type: string, payload: Record<string, unknown> = {}) {
   if (native) { native.postMessage({ type, ...payload }); return; }
+  if (type === 'importImages') {
+    onMessage({ type: 'imagesImported', requestId: String(payload.requestId), sources: (payload.images as { dataUrl: string }[]).map(image => image.dataUrl) });
+    return;
+  }
+  if (type === 'exportPlugin') { download(String(payload.name), String(payload.source), 'text/javascript;charset=utf-8'); return; }
   const id = typeof payload.documentId === 'string' ? payload.documentId : workspace.activeId;
   if (typeof payload.text === 'string' && typeof payload.revision === 'number') workspace.update(id, payload.text, payload.revision);
   const doc = workspace.documents.find(item => item.id === id);

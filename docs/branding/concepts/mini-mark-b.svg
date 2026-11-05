@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffa66f"/>
+      <stop offset=".32" stop-color="#eb6f9f"/>
+      <stop offset=".67" stop-color="#8c6de5"/>
+      <stop offset="1" stop-color="#45b4de"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fff"/>
+      <stop offset="1" stop-color="#f1f6ff"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#b354a4"/>
+      <stop offset="1" stop-color="#5069bb"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="24" width="976" height="976" rx="224" fill="url(#base)"/>
+  <path d="M318 204h282l182 182v372a74 74 0 0 1-74 74H318a74 74 0 0 1-74-74V278a74 74 0 0 1 74-74z" fill="#512d72" opacity=".12" transform="translate(0 18)"/>
+  <path d="M318 190h282l182 182v372a74 74 0 0 1-74 74H318a74 74 0 0 1-74-74V264a74 74 0 0 1 74-74z" fill="url(#paper)"/>
+  <path d="M600 190v116a66 66 0 0 0 66 66h116z" fill="#d3d9fa"/>
+  <path d="M338 634V384h77l98 137 98-137h77v250h-83V518l-92 125-92-125v116z" fill="url(#ink)"/>
+  <rect x="338" y="687" width="350" height="34" rx="17" fill="#b6c3e8"/>
+</svg>

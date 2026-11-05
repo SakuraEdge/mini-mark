@@ -104,6 +104,10 @@ test('Ctrl+number changes heading level atomically and preserves code fences', a
   await page.keyboard.press('Control+Home');
   await page.keyboard.press('Control+2');
   await expect(editor.locator('.cm-line').nth(0)).toHaveText('## 普通段落');
+  await page.keyboard.press('Control+2');
+  await expect(editor.locator('.cm-line').nth(0)).toHaveText('普通段落');
+  await page.keyboard.press('Control+z');
+  await expect(editor.locator('.cm-line').nth(0)).toHaveText('## 普通段落');
   await page.keyboard.press('Control+z');
   await expect(editor.locator('.cm-line').nth(0)).toHaveText('普通段落');
   await page.keyboard.press('Control+End');
@@ -124,6 +128,52 @@ test('Ctrl+number applies to every selected source line', async ({ page }) => {
   await expect(editor.locator('.cm-line').nth(0)).toHaveText('# 第一行');
   await expect(editor.locator('.cm-line').nth(1)).toHaveText('# 第二行');
   await expect(editor.locator('.cm-line').nth(2)).toHaveText('第三行');
+});
+
+test('heading wrapping expands its line box and search controls stay usable', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 560, height: 800 });
+  const long = '这是一个很长的标题，用来验证窄列中标题放大后会自动换行并为下一行让出空间。'.repeat(3);
+  const editor = await replace(page, `${long}\n下一行`);
+  await page.getByRole('button', { name: '即时', exact: true }).click();
+  await editor.click();
+  await page.keyboard.press('Control+Home');
+  await page.keyboard.press('Control+1');
+  const boxes = await editor.locator('.cm-line').evaluateAll(lines => lines.slice(0, 2).map(line => {
+    const box = line.getBoundingClientRect();
+    const text = document.createRange();
+    text.selectNodeContents(line);
+    return { top: box.top, bottom: box.bottom, height: box.height, textBottom: text.getBoundingClientRect().bottom };
+  }));
+  expect(boxes[0].height).toBeGreaterThan(boxes[1].height);
+  expect(boxes[1].top).toBeGreaterThanOrEqual(boxes[0].bottom - 1);
+  expect(boxes[0].textBottom).toBeLessThanOrEqual(boxes[1].top + 1);
+  await page.getByRole('button', { name: '查找与替换', exact: true }).click();
+  const search = page.locator('.cm-search');
+  await expect(search).toBeVisible();
+  const inputSize = await search.locator('.cm-textfield').first().evaluate(input => {
+    const box = input.getBoundingClientRect();
+    return { width: box.width, height: box.height, fontSize: parseFloat(getComputedStyle(input).fontSize) };
+  });
+  const buttonSize = await search.locator('.cm-button').first().evaluate(button => {
+    const box = button.getBoundingClientRect();
+    return { width: box.width, height: box.height, fontSize: parseFloat(getComputedStyle(button).fontSize) };
+  });
+  expect(inputSize.width).toBeGreaterThanOrEqual(140);
+  expect(inputSize.height).toBeGreaterThanOrEqual(28);
+  expect(buttonSize.width).toBeGreaterThanOrEqual(40);
+  expect(buttonSize.height).toBeGreaterThanOrEqual(28);
+  expect(inputSize.fontSize).toBeGreaterThanOrEqual(13);
+  expect(buttonSize.fontSize).toBeGreaterThanOrEqual(13);
+  const rows = await search.evaluate(panel => ({
+    optionsBottom: Math.max(...[...panel.querySelectorAll('label')].map(label => label.getBoundingClientRect().bottom)),
+    replaceTop: panel.querySelector('input[name="replace"]')!.getBoundingClientRect().top,
+  }));
+  expect(rows.replaceTop).toBeGreaterThanOrEqual(rows.optionsBottom + 4);
+  await page.screenshot({ path: testInfo.outputPath('heading-search-narrow.png') });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByRole('button', { name: '分屏', exact: true }).click();
+  await expect(search).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('heading-search-split.png') });
 });
 
 test('opens YAML with syntax highlighting, source/read modes, and YAML download naming', async ({ page }) => {

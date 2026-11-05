@@ -5,11 +5,17 @@ using System.Text.Json;
 using Moye;
 
 static class UpdateTests {
-    private const string Primary = "https://raw.githubusercontent.com/SakuraEdge/moye-markdown/updates/stable.json";
-    private const string Fallback = "https://github.com/SakuraEdge/moye-markdown/releases/latest/download/update.json";
+    private const string Primary = "https://raw.githubusercontent.com/SakuraEdge/mini-mark/updates/stable.json";
+    private const string Fallback = "https://github.com/SakuraEdge/mini-mark/releases/latest/download/update.json";
     public static async Task Run(string root, Action<bool, string> check) {
         var bytes = Encoding.UTF8.GetBytes("verified installer fixture");
         var manifest = new UpdateManifest(1, "2.0.0", new UpdateAsset("https://github.com/SakuraEdge/moye-markdown/releases/download/v2.0.0/Moye-Setup-2.0.0-windows-x64.exe", Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length));
+        var branded = manifest with { WindowsV2 = manifest.Windows with { Url = "https://github.com/SakuraEdge/mini-mark/releases/download/v2.0.0/MiniMark-Setup-2.0.0-windows-x64.exe" } };
+        branded.Validate();
+        check(branded.DownloadAsset.Url.Contains("/mini-mark/"), "New updater did not select branded installer");
+        check(UpdateManifest.Parse(JsonSerializer.SerializeToUtf8Bytes(manifest, UpdateManifest.JsonOptions)).DownloadAsset == manifest.Windows, "Legacy update feed was rejected");
+        try { (branded with { WindowsV2 = branded.WindowsV2! with { Size = 1 } }).Validate(); throw new Exception("Mismatched compatible assets accepted"); }
+        catch (IOException) { check(true, "Mismatched compatible assets rejected"); }
         HttpResponseMessage Manifest() => new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(manifest, UpdateManifest.JsonOptions)) };
         var handler = new FakeUpdateHandler(_ => Manifest());
         var folder = Path.Combine(root, "updates");

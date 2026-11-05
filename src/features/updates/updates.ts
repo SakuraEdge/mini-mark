@@ -95,7 +95,7 @@ export function initializeUpdates() {
     installing = true; setResult('正在准备更新安装包…');
     send('installUpdate', { version: candidate.tag_name });
   };
-  element('update-release').onclick = () => { if (candidate) send('openExternal', { url: `https://github.com/SakuraEdge/moye-markdown/releases/tag/${encodeURIComponent(candidate.tag_name)}` }); };
+  element('update-release').onclick = () => { if (candidate) send('openExternal', { url: `https://github.com/SakuraEdge/mini-mark/releases/tag/${encodeURIComponent(candidate.tag_name)}` }); };
 }
 export function openUpdates() {
   element('update-title').textContent = '软件更新';

@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Windows.Forms;
+using System.Web;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -36,7 +37,7 @@ public sealed class MainWindow : Form {
         Directory.CreateDirectory(dataRoot);
         sessionFile = Path.Combine(dataRoot, "session-v2.json");
         updates = new GitHubUpdates(dataRoot);
-        Text = "墨页 Moye";
+        Text = "Mini Mark";
         Width = 1180; Height = 840; MinimumSize = new Size(720, 520);
         StartPosition = FormStartPosition.CenterScreen; BackColor = Color.White;
         Icon = Icon.ExtractAssociatedIcon(Environment.ProcessPath!);
@@ -56,7 +57,7 @@ public sealed class MainWindow : Form {
     private async Task Initialize() {
         try {
             timings["windowLoaded"] = Program.Startup.Elapsed.TotalMilliseconds;
-            if (!File.Exists(Path.Combine(root, "index.html"))) throw new IOException("找不到编辑器资源。请保留 Moye.exe 和 wwwroot 文件夹在同一目录。");
+            if (!File.Exists(Path.Combine(root, "index.html"))) throw new IOException("找不到编辑器资源。请保留 MiniMark.exe 和 wwwroot 文件夹在同一目录。");
             environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(dataRoot, "WebView2"));
             timings["environmentCreated"] = Program.Startup.Elapsed.TotalMilliseconds;
             await browser.EnsureCoreWebView2Async(environment);
@@ -74,8 +75,22 @@ public sealed class MainWindow : Form {
             core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
             core.WebResourceRequested += (_, e) => {
                 if (!Uri.TryCreate(e.Request.Uri, UriKind.Absolute, out var uri)) return;
+                if (uri.Scheme == "https" && uri.Host == "document.moye.local") {
+                    try {
+                        if (e.ResourceContext != CoreWebView2WebResourceContext.Image) throw new IOException("Image resource only");
+                        var token = HttpUtility.ParseQueryString(uri.Query)["document"];
+                        var document = token is null ? workspace.Active : workspace.Documents.Find(item => item.Id + ":" + (item.Path ?? "") == token);
+                        if (document?.Path is null) throw new IOException("Document unavailable");
+                        var image = ImageAssets.ReadLocal(Path.GetDirectoryName(document.Path)!, Uri.UnescapeDataString(uri.AbsolutePath).TrimStart('/'));
+                        e.Response = environment.CreateWebResourceResponse(new MemoryStream(image.Data), 200, "OK", $"Content-Type: {image.MimeType}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff");
+                    } catch {
+                        e.Response = environment.CreateWebResourceResponse(Stream.Null, 404, "Image unavailable", "Content-Type: text/plain");
+                    }
+                    return;
+                }
                 var allowed = uri.Scheme == "https" && (uri.Host == "moye.local" || uri.Host == "document.moye.local");
-                if (((uri.Scheme == "https" || uri.Scheme == "http") && !allowed) ||
+                var remoteImage = uri.Scheme == "https" && e.ResourceContext == CoreWebView2WebResourceContext.Image;
+                if (((uri.Scheme == "https" || uri.Scheme == "http") && !allowed && !remoteImage) ||
                     (uri.Host == "document.moye.local" && e.ResourceContext != CoreWebView2WebResourceContext.Image))
                     e.Response = environment.CreateWebResourceResponse(Stream.Null, 403, "Offline document", "Content-Type: text/plain");
             };
@@ -83,13 +98,13 @@ public sealed class MainWindow : Form {
             browser.Source = new Uri("https://moye.local/index.html");
         } catch (Exception exception) {
             Controls.Clear();
-            var message = exception is WebView2RuntimeNotFoundException ? "需要 Microsoft Edge WebView2 Runtime，请安装后重新打开墨页。" : exception.Message;
+            var message = exception is WebView2RuntimeNotFoundException ? "需要 Microsoft Edge WebView2 Runtime，请安装后重新打开 Mini Mark。" : exception.Message;
             Controls.Add(new Label { Text = message, Dock = DockStyle.Fill, Padding = new Padding(48), Font = new Font("Microsoft YaHei UI", 14) });
         }
     }
 
     private void Receive(object? sender, CoreWebView2WebMessageReceivedEventArgs e) {
-        if (!Uri.TryCreate(e.Source, UriKind.Absolute, out var source) || source.Host != "moye.local" || source.Scheme != "https") return;
+        if (!Uri.TryCreate(e.Source, UriKind.Absolute, out var source) || source.Host != "moye.local" || source.Scheme != "https" || source.AbsolutePath != "/index.html") return;
         try {
             using var json = JsonDocument.Parse(e.WebMessageAsJson);
             var message = json.RootElement;
@@ -114,6 +129,27 @@ public sealed class MainWindow : Form {
             if (type == "checkUpdates") { _ = CheckUpdates(message.GetProperty("requestId").GetString()!); return; }
             if (type == "installUpdate") { _ = InstallUpdate(message.GetProperty("version").GetString()!); return; }
             if (type == "cancelUpdate") { updateDownload?.Cancel(); return; }
+            if (type == "exportPlugin") {
+                var code = message.GetProperty("source").GetString()!;
+                var filename = Path.GetFileName(message.GetProperty("name").GetString()!);
+                if (code.Length > 200000) throw new IOException("插件文件过大。");
+                RunAction(() => {
+                    using var dialog = new SaveFileDialog { Filter = "JavaScript 插件 (*.js)|*.js", FileName = filename, DefaultExt = "js", AddExtension = true };
+                    if (dialog.ShowDialog(this) == DialogResult.OK) DocumentStore.AtomicWrite(dialog.FileName, Encoding.UTF8.GetBytes(code));
+                });
+                return;
+            }
+            if (type == "importImages") {
+                var requestId = message.GetProperty("requestId").GetString()!;
+                try {
+                    var target = workspace.Find(message.GetProperty("documentId").GetString()) ?? throw new IOException("文档已关闭。");
+                    var images = message.GetProperty("images").EnumerateArray().ToArray();
+                    if (images.Length is < 1 or > 10) throw new IOException("一次最多插入 10 张图片。");
+                    var sources = images.Select(image => ImageAssets.Import(image.GetProperty("dataUrl").GetString()!, target.Path)).ToArray();
+                    Post(new { type = "imagesImported", requestId, sources });
+                } catch (Exception error) { Post(new { type = "imagesImported", requestId, error = error.Message }); }
+                return;
+            }
             if (type == "closingText" && (closingRequest is null || message.GetProperty("requestId").GetString() != closingRequest)) return;
             if (!message.TryGetProperty("documentId", out var id)) return;
             var document = workspace.Find(id.GetString());
@@ -195,8 +231,6 @@ public sealed class MainWindow : Form {
 
     private void Publish(bool recovered = false) {
         var document = workspace.Active;
-        browser.CoreWebView2.ClearVirtualHostNameToFolderMapping("document.moye.local");
-        if (document.Path is not null) browser.CoreWebView2.SetVirtualHostNameToFolderMapping("document.moye.local", Path.GetDirectoryName(document.Path)!, CoreWebView2HostResourceAccessKind.DenyCors);
         Post(new {
             type = "workspace", recovered,
             tabs = workspace.Documents.Select(item => new { id = item.Id, name = item.Name, path = item.Path, dirty = item.Dirty, revision = item.Revision }),
@@ -204,7 +238,7 @@ public sealed class MainWindow : Form {
         });
         UpdateTitle();
     }
-    private void UpdateTitle() { var document = workspace.Active; Text = $"{(document.Dirty ? "• " : "")}{document.Name} · 墨页"; }
+    private void UpdateTitle() { var document = workspace.Active; Text = $"{(document.Dirty ? "• " : "")}{document.Name} · Mini Mark"; }
     private void Open() {
         using var dialog = new OpenFileDialog { Filter = "Markdown / YAML 文档|*.md;*.markdown;*.mdown;*.txt;*.yaml;*.yml|所有文件|*.*", CheckFileExists = true, Multiselect = true };
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
@@ -237,14 +271,11 @@ public sealed class MainWindow : Form {
         }
         if (workspace.PathOwnedByAnother(target, document.Id)) throw new IOException("该文件已在另一个标签页打开，请选择其他文件名。");
         var saved = document.Text;
+        ImageAssets.CopyForSaveAs(saved, document.Path, target);
         document.Fingerprint = DocumentStore.Write(target, saved, document.Bom, document.Newline);
         document.Path = target; document.Baseline = saved;
         Persist();
         Post(new { type = "saved", documentId = document.Id, name = document.Name, path = document.Path, text = saved });
-        if (document.Id == workspace.ActiveId) {
-            browser.CoreWebView2.ClearVirtualHostNameToFolderMapping("document.moye.local");
-            browser.CoreWebView2.SetVirtualHostNameToFolderMapping("document.moye.local", Path.GetDirectoryName(target)!, CoreWebView2HostResourceAccessKind.DenyCors);
-        }
         UpdateTitle(); return true;
     }
 
@@ -257,7 +288,7 @@ public sealed class MainWindow : Form {
         }
         workspace.Remove(id); Publish(); Persist();
     }
-    private DialogResult AskSave(OpenDocument document) => MessageBox.Show(this, $"是否保存对“{document.Name}”的修改？", "墨页", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+    private DialogResult AskSave(OpenDocument document) => MessageBox.Show(this, $"是否保存对“{document.Name}”的修改？", "Mini Mark", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
 
     private void OnClosing(object? sender, FormClosingEventArgs e) {
         if (closingConfirmed || !initialized) return;

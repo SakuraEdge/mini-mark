@@ -1,8 +1,8 @@
 {
-  "name": "moye-markdown",
-  "version": "1.1.0",
+  "name": "mini-mark",
+  "version": "2.0.0",
   "private": true,
-  "description": "A fast, local-first Windows Markdown editor with Chinese slash commands.",
+  "description": "Mini Mark: a local-first Markdown and YAML editor for Windows and macOS.",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "desktop": "dotnet run --project native/Moye.csproj",
-    "package:win": "npm run build && dotnet publish native/Moye.csproj -c Release -r win-x64 --self-contained true -o release/Moye",
+    "package:win": "npm run build && dotnet publish native/Moye.csproj -c Release -r win-x64 --self-contained true -o release/MiniMark",
     "test:native": "dotnet run --project native-tests/Moye.Tests.csproj",
     "test:native-ui": "dotnet run --project native-ui-tests/Moye.UiTests.csproj -c Release",
     "docs:map": "node scripts/code-map.mjs"

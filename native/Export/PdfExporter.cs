@@ -27,7 +27,7 @@ public static class PdfExporter {
                 if (e.Request.Uri == url) {
                     e.Response = environment.CreateWebResourceResponse(new MemoryStream(Encoding.UTF8.GetBytes(html)), 200, "OK", "Content-Type: text/html; charset=utf-8");
                 } else if (!Uri.TryCreate(e.Request.Uri, UriKind.Absolute, out var resource) ||
-                           !(resource.Scheme == "data" || (resource.Scheme == "https" && resource.Host == "print-document.moye.local" && e.ResourceContext == CoreWebView2WebResourceContext.Image))) {
+                           !(resource.Scheme == "data" || (resource.Scheme == "https" && e.ResourceContext == CoreWebView2WebResourceContext.Image))) {
                     e.Response = environment.CreateWebResourceResponse(Stream.Null, 403, "Blocked", "Content-Type: text/plain");
                 }
             };

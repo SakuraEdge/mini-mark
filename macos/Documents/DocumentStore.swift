@@ -55,6 +55,8 @@ enum Store {
             session.documents[i].text = normalize(session.documents[i].text)
             session.documents[i].baseline = normalize(session.documents[i].baseline)
         }
+        // Untitled numbering is recalculated for each process, not continued from an old session.
+        session.nextUntitled = 1
         for i in session.documents.indices where !session.documents[i].dirty {
             guard let path = session.documents[i].path else { continue }
             if var disk = try? read(path) { disk.id = session.documents[i].id; session.documents[i] = disk }

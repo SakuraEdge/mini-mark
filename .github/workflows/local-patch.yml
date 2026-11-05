@@ -9,12 +9,12 @@ on:
       target_version:
         description: Target release version
         required: true
-        default: '1.1.0'
+        default: '2.0.0'
         type: string
       base_version:
         description: Installed base release version
         required: true
-        default: '1.0.5'
+        default: '1.1.0'
         type: string
 permissions:
   actions: read
@@ -36,9 +36,9 @@ jobs:
           if($env:RUN_ID -notmatch '^\d+$') { throw 'Invalid build run' }
           $run=gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:RUN_ID" | ConvertFrom-Json
           if($LASTEXITCODE -ne 0 -or $run.conclusion -ne 'success' -or $run.head_branch -ne 'main' -or $run.path -ne '.github/workflows/build.yml') { throw 'Unverified build' }
-          gh run download $env:RUN_ID --repo $env:GITHUB_REPOSITORY --name Moye-windows-x64 --dir release-assets
+          gh run download $env:RUN_ID --repo $env:GITHUB_REPOSITORY --name MiniMark-windows-x64 --dir release-assets
           if($LASTEXITCODE -ne 0) { throw 'Artifact download failed' }
-          Expand-Archive -LiteralPath "release-assets/Moye-$env:TARGET_VERSION-windows-x64.zip" -DestinationPath release/new
+          Expand-Archive -LiteralPath "release-assets/MiniMark-$env:TARGET_VERSION-windows-x64.zip" -DestinationPath release/new
           gh release download "v$env:BASE_VERSION" --repo $env:GITHUB_REPOSITORY --pattern "Moye-$env:BASE_VERSION-windows-x64.zip" --pattern "Moye-Setup-$env:BASE_VERSION-windows-x64.exe" --dir release/base
           if($LASTEXITCODE -ne 0) { throw 'Base release download failed' }
           Expand-Archive -LiteralPath "release/base/Moye-$env:BASE_VERSION-windows-x64.zip" -DestinationPath release/base-expanded
@@ -46,7 +46,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
-          $new=(Resolve-Path release/new/Moye).Path
+          $new=(Resolve-Path release/new/MiniMark).Path
           $old=(Resolve-Path release/base-expanded/Moye).Path
           $stage=Join-Path $PWD 'release/patch'
           New-Item -ItemType Directory -Path $stage -Force | Out-Null
@@ -70,10 +70,10 @@ jobs:
           $iscc=Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'
           & $iscc "/DAppVersion=$env:TARGET_VERSION" "/DPublishDir=$stage" "/DPatchList=$list" installer/Moye.iss
           if($LASTEXITCODE -ne 0) { throw 'Patch compilation failed' }
-          Move-Item -LiteralPath "release/Moye-Setup-$env:TARGET_VERSION-windows-x64.exe" -Destination "release/Moye-Patch-$env:TARGET_VERSION-windows-x64.exe"
+          Move-Item -LiteralPath "release/MiniMark-Setup-$env:TARGET_VERSION-windows-x64.exe" -Destination "release/MiniMark-Patch-$env:TARGET_VERSION-windows-x64.exe"
           $target=Join-Path $env:RUNNER_TEMP 'Moye-patch-test'
           $baseInstaller=(Resolve-Path "release/base/Moye-Setup-$env:BASE_VERSION-windows-x64.exe").Path
-          $patchInstaller=(Resolve-Path "release/Moye-Patch-$env:TARGET_VERSION-windows-x64.exe").Path
+          $patchInstaller=(Resolve-Path "release/MiniMark-Patch-$env:TARGET_VERSION-windows-x64.exe").Path
           $arguments=@('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="'+$target+'"'))
           $process=Start-Process $baseInstaller -ArgumentList $arguments -WindowStyle Hidden -PassThru -Wait
           if($process.ExitCode -ne 0) { throw 'Base installation failed' }
@@ -91,5 +91,5 @@ jobs:
           Get-Item -LiteralPath $patchInstaller | Select-Object Name,Length
       - uses: actions/upload-artifact@v4
         with:
-          name: Moye-maintenance-patch
-          path: release/Moye-Patch-${{ inputs.target_version }}-windows-x64.exe
+          name: MiniMark-maintenance-patch
+          path: release/MiniMark-Patch-${{ inputs.target_version }}-windows-x64.exe

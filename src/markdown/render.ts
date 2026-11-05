@@ -29,6 +29,9 @@ export const md: InstanceType<typeof MarkdownIt> = new MarkdownIt({
 }).use(texmath, { engine: katex, delimiters: 'dollars', katexOptions: { throwOnError: false, trust: false, strict: 'ignore' } })
   .use(taskLists, { enabled: false, label: true });
 
+let imageDocument = '';
+export function setImageDocument(value: string) { imageDocument = value; }
+
 export function renderMarkdown(text: string, resolveLocalImages = true): string {
   const html = DOMPurify.sanitize(md.render(text), { ADD_TAGS: ['eq', 'eqn'], ADD_ATTR: ['target'], FORBID_TAGS: ['style', 'iframe', 'object', 'embed'] });
   if (!resolveLocalImages || !window.chrome?.webview) return html;
@@ -36,7 +39,12 @@ export function renderMarkdown(text: string, resolveLocalImages = true): string 
   template.innerHTML = html;
   for (const image of template.content.querySelectorAll('img')) {
     const src = image.getAttribute('src') ?? '';
-    if (src && !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWith('//')) image.src = new URL(src, location.protocol === 'moye:' ? 'moye://document/' : 'https://document.moye.local/').href;
+    if (src && !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWith('//')) {
+      const resolved = new URL(src, location.protocol === 'moye:' ? 'moye://document/' : 'https://document.moye.local/');
+      resolved.searchParams.set('document', imageDocument);
+      image.src = resolved.href;
+    }
+    image.referrerPolicy = 'no-referrer';
   }
   return template.innerHTML;
 }

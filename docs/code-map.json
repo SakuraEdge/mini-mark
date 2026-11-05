@@ -72,6 +72,31 @@
       ]
     },
     {
+      "path": "src/features/theme",
+      "purpose": "主题过渡",
+      "files": [
+        "src/features/theme/theme.ts"
+      ]
+    },
+    {
+      "path": "src/features/images",
+      "purpose": "图片插入",
+      "files": [
+        "src/features/images/images.ts"
+      ]
+    },
+    {
+      "path": "src/features/plugins",
+      "purpose": "自定义插件与隔离执行",
+      "files": [
+        "src/features/plugins/manager.ts",
+        "src/features/plugins/model.test.ts",
+        "src/features/plugins/model.ts",
+        "src/features/plugins/runtime.ts",
+        "src/features/plugins/writing-tools.js"
+      ]
+    },
+    {
       "path": "native/Host",
       "purpose": "Windows 宿主",
       "files": [
@@ -83,7 +108,8 @@
       "purpose": "Windows 文件与会话",
       "files": [
         "native/Documents/DocumentStore.cs",
-        "native/Documents/DocumentWorkspace.cs"
+        "native/Documents/DocumentWorkspace.cs",
+        "native/Documents/ImageAssets.cs"
       ]
     },
     {
@@ -127,7 +153,8 @@
       "path": "macos/Documents",
       "purpose": "macOS 文件与会话",
       "files": [
-        "macos/Documents/DocumentStore.swift"
+        "macos/Documents/DocumentStore.swift",
+        "macos/Documents/ImageAssets.swift"
       ]
     },
     {
@@ -156,6 +183,7 @@
       "purpose": "界面回归",
       "files": [
         "tests/editor.spec.ts",
+        "tests/features.spec.ts",
         "tests/fixtures/pdf.md",
         "tests/host-sync.spec.ts",
         "tests/tab-motion.spec.ts",
@@ -206,6 +234,7 @@
         "scripts/package-mac.sh",
         "scripts/package-win.ps1",
         "scripts/pdf-fixture.mjs",
+        "scripts/preview-branding.mjs",
         "scripts/test-installer.ps1",
         "scripts/third-party.mjs",
         "scripts/update-manifest.mjs"
@@ -224,7 +253,10 @@
       "path": "public",
       "purpose": "应用资源",
       "files": [
+        "public/mini-mark.svg",
         "public/moye.svg",
+        "public/plugin-host.html",
+        "public/plugin-host.js",
         "public/welcome.md"
       ]
     },
@@ -232,10 +264,23 @@
       "path": "docs",
       "purpose": "开发与发布记录",
       "files": [
+        "docs/branding/README.md",
+        "docs/branding/concepts/mini-mark-a.png",
+        "docs/branding/concepts/mini-mark-a.svg",
+        "docs/branding/concepts/mini-mark-b.png",
+        "docs/branding/concepts/mini-mark-b.svg",
+        "docs/branding/concepts/mini-mark-c.png",
+        "docs/branding/concepts/mini-mark-c.svg",
+        "docs/branding/concepts/mini-mark-icon-concepts.png",
+        "docs/branding/concepts/preview.html",
+        "docs/branding/mini-mark-final.png",
         "docs/code-map.json",
         "docs/editor-v1.png",
         "docs/editor.png",
+        "docs/images.md",
+        "docs/mini-mark-editor.png",
         "docs/performance.md",
+        "docs/plugins.md",
         "docs/release-v1.0.0.md",
         "docs/release-v1.0.1.md",
         "docs/release-v1.0.2.md",
@@ -243,6 +288,7 @@
         "docs/release-v1.0.4.md",
         "docs/release-v1.0.5.md",
         "docs/release-v1.1.0.md",
+        "docs/release-v2.0.0.md",
         "docs/slash-commands.png",
         "docs/tabs-save.png",
         "docs/updates.png",

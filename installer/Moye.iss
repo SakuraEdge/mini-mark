@@ -1,29 +1,30 @@
 #ifndef AppVersion
-  #define AppVersion "1.1.0"
+  #define AppVersion "2.0.0"
 #endif
 #ifndef PublishDir
-  #define PublishDir "..\release\Moye"
+  #define PublishDir "..\release\MiniMark"
 #endif
 
 [Setup]
 AppId={{786D8F80-3AC2-4EA1-A739-1790FC2187DE}
-AppName=墨页 Moye
+AppName=Mini Mark
 AppVersion={#AppVersion}
-AppPublisher=Moye contributors
-AppPublisherURL=https://github.com/SakuraEdge/moye-markdown
-AppSupportURL=https://github.com/SakuraEdge/moye-markdown/issues
-AppUpdatesURL=https://github.com/SakuraEdge/moye-markdown/releases
-DefaultDirName={localappdata}\Programs\Moye
+AppPublisher=Mini Mark contributors
+AppPublisherURL=https://github.com/SakuraEdge/mini-mark
+AppSupportURL=https://github.com/SakuraEdge/mini-mark/issues
+AppUpdatesURL=https://github.com/SakuraEdge/mini-mark/releases
+DefaultDirName={localappdata}\Programs\MiniMark
 UsePreviousAppDir=yes
-DefaultGroupName=墨页 Moye
+DefaultGroupName=Mini Mark
+UsePreviousGroup=no
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\release
-OutputBaseFilename=Moye-Setup-{#AppVersion}-windows-x64
-SetupIconFile=..\native\Assets\moye.ico
-UninstallDisplayIcon={app}\Moye.exe
+OutputBaseFilename=MiniMark-Setup-{#AppVersion}-windows-x64
+SetupIconFile=..\native\Assets\mini-mark.ico
+UninstallDisplayIcon={app}\MiniMark.exe
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -39,8 +40,8 @@ Name: "chinesesimplified"; MessagesFile: "ChineseSimplified.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
-Name: "defaultmd"; Description: "将墨页设为 .md 默认应用（安装后在 Windows 设置中确认）"; GroupDescription: "文件关联："; Flags: unchecked
-Name: "defaultyaml"; Description: "将墨页设为 .yaml/.yml 默认应用（安装后在 Windows 设置中确认）"; GroupDescription: "文件关联："; Flags: unchecked
+Name: "defaultmd"; Description: "将 Mini Mark 设为 .md 默认应用（安装后在 Windows 设置中确认）"; GroupDescription: "文件关联："; Flags: unchecked
+Name: "defaultyaml"; Description: "将 Mini Mark 设为 .yaml/.yml 默认应用（安装后在 Windows 设置中确认）"; GroupDescription: "文件关联："; Flags: unchecked
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -50,22 +51,22 @@ Source: "{#PatchList}"; DestName: "moye-patch-files.txt"; Flags: dontcopy
 #endif
 
 [Icons]
-Name: "{group}\墨页 Moye"; Filename: "{app}\Moye.exe"; WorkingDir: "{app}"
-Name: "{autodesktop}\墨页 Moye"; Filename: "{app}\Moye.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\Mini Mark"; Filename: "{app}\MiniMark.exe"; WorkingDir: "{app}"
+Name: "{autodesktop}\Mini Mark"; Filename: "{app}\MiniMark.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Registry]
 Root: HKCU; Subkey: "Software\Classes\Moye.Markdown"; ValueType: string; ValueName: ""; ValueData: "Markdown 文档"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Classes\Moye.Markdown\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Moye.exe,0"
-Root: HKCU; Subkey: "Software\Classes\Moye.Markdown\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Moye.exe"" ""%1"""
+Root: HKCU; Subkey: "Software\Classes\Moye.Markdown\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\MiniMark.exe,0"
+Root: HKCU; Subkey: "Software\Classes\Moye.Markdown\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\MiniMark.exe"" ""%1"""
 Root: HKCU; Subkey: "Software\Classes\.md\OpenWithProgids"; ValueType: none; ValueName: "Moye.Markdown"; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.markdown\OpenWithProgids"; ValueType: none; ValueName: "Moye.Markdown"; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.mdown\OpenWithProgids"; ValueType: none; ValueName: "Moye.Markdown"; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\Moye.Yaml"; ValueType: string; ValueName: ""; ValueData: "YAML 文档"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Classes\Moye.Yaml\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Moye.exe,0"
-Root: HKCU; Subkey: "Software\Classes\Moye.Yaml\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Moye.exe"" ""%1"""
+Root: HKCU; Subkey: "Software\Classes\Moye.Yaml\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\MiniMark.exe,0"
+Root: HKCU; Subkey: "Software\Classes\Moye.Yaml\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\MiniMark.exe"" ""%1"""
 Root: HKCU; Subkey: "Software\Classes\.yaml\OpenWithProgids"; ValueType: none; ValueName: "Moye.Yaml"; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.yml\OpenWithProgids"; ValueType: none; ValueName: "Moye.Yaml"; Flags: uninsdeletevalue
-Root: HKCU; Subkey: "Software\Moye\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "墨页 Moye"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Moye\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "Mini Mark"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Moye\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "Markdown / YAML 编辑器"
 Root: HKCU; Subkey: "Software\Moye\Capabilities\FileAssociations"; ValueType: string; ValueName: ".md"; ValueData: "Moye.Markdown"
 Root: HKCU; Subkey: "Software\Moye\Capabilities\FileAssociations"; ValueType: string; ValueName: ".markdown"; ValueData: "Moye.Markdown"
@@ -76,7 +77,7 @@ Root: HKCU; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueN
 
 [Run]
 Filename: "ms-settings:defaultapps?registeredAppUser=Moye"; Flags: shellexec nowait skipifsilent; Tasks: defaultmd or defaultyaml; Description: "设置 Markdown/YAML 默认应用"
-Filename: "{app}\Moye.exe"; Description: "启动墨页 Moye"; Flags: nowait postinstall skipifsilent unchecked
+Filename: "{app}\MiniMark.exe"; Description: "启动 Mini Mark"; Flags: nowait postinstall skipifsilent unchecked
 
 [Code]
 var
@@ -143,7 +144,7 @@ begin
     if PatchFiles.IndexOf(Lowercase(Relative)) >= 0 then Continue;
     Full := ExpandConstant('{app}\') + Relative;
     if (Separator <> 65) or not SafeOwnedPath(Relative) or not FileExists(Full) then begin
-      Result := '此修复包需要完整的旧版墨页，请使用完整安装包。';
+      Result := '此修复包需要完整的旧版应用，请使用完整安装包。';
       Exit;
     end;
     if CompareText(GetSHA256OfFile(Full), Hash) <> 0 then begin
@@ -159,12 +160,32 @@ begin
   end;
 end;
 
+procedure RemoveLegacyShortcut(Path: string);
+var
+  Shell, Shortcut: Variant;
+  Target: string;
+begin
+  if not FileExists(Path) then Exit;
+  try
+    Shell := CreateOleObject('WScript.Shell');
+    Shortcut := Shell.CreateShortcut(Path);
+    Target := Shortcut.TargetPath;
+    if (CompareText(Target, ExpandConstant('{app}\Moye.exe')) = 0) or
+       (CompareText(Target, ExpandConstant('{app}\MiniMark.exe')) = 0) then
+      DeleteFile(Path);
+  except
+    Log('Preserved legacy shortcut: ' + Path);
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   I, Separator: Integer;
   Line, Hash, Relative, Full: string;
 begin
   if CurStep <> ssPostInstall then Exit;
+  RemoveLegacyShortcut(ExpandConstant('{autodesktop}\墨页 Moye.lnk'));
+  RemoveLegacyShortcut(ExpandConstant('{userprograms}\墨页 Moye\墨页 Moye.lnk'));
   for I := 0 to OldFiles.Count - 1 do begin
     Line := OldFiles[I];
     Separator := Pos('|', Line);

@@ -10,7 +10,8 @@ struct UpdateManifest: Codable {
         let numbers = version.components(separatedBy: ".").compactMap(Int.init)
         guard schemaVersion == 1, version.range(of: pattern, options: .regularExpression) != nil,
               numbers.count == 3, numbers.allSatisfy({ $0 <= Int32.max }),
-              windows.url == "https://github.com/SakuraEdge/moye-markdown/releases/download/v\(version)/Moye-Setup-\(version)-windows-x64.exe",
+              ["https://github.com/SakuraEdge/moye-markdown/releases/download/v\(version)/Moye-Setup-\(version)-windows-x64.exe",
+               "https://github.com/SakuraEdge/mini-mark/releases/download/v\(version)/MiniMark-Setup-\(version)-windows-x64.exe"].contains(windows.url),
               windows.size > 0, windows.size <= 256 * 1024 * 1024,
               windows.sha256.range(of: "^[a-fA-F0-9]{64}$", options: .regularExpression) != nil else { throw Store.failure("更新清单无效。") }
     }
@@ -31,8 +32,8 @@ final class GitHubUpdates: NSObject, URLSessionTaskDelegate {
     private var lastResult: UpdateCheck?
     private let key = "moye.updateManifest.v1"
     private let feeds = [
-        "https://raw.githubusercontent.com/SakuraEdge/moye-markdown/updates/stable.json",
-        "https://github.com/SakuraEdge/moye-markdown/releases/latest/download/update.json"
+        "https://raw.githubusercontent.com/SakuraEdge/mini-mark/updates/stable.json",
+        "https://github.com/SakuraEdge/mini-mark/releases/latest/download/update.json"
     ]
     private lazy var session = URLSession(configuration: .ephemeral, delegate: self, delegateQueue: .main)
     func check(_ completion: @escaping (Result<UpdateCheck, Error>) -> Void) {
@@ -51,7 +52,7 @@ final class GitHubUpdates: NSObject, URLSessionTaskDelegate {
             return
         }
         var request = URLRequest(url: URL(string: feeds[index])!, timeoutInterval: 7)
-        request.setValue("Moye/" + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.2"), forHTTPHeaderField: "User-Agent")
+        request.setValue("MiniMark/" + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0.0"), forHTTPHeaderField: "User-Agent")
         session.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 do {

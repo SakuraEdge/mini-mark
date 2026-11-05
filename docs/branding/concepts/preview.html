@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mini Mark · 图标提案</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f7f8fb; color: #242735; font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif; letter-spacing: 0; }
+  main { max-width: 1200px; margin: auto; padding: 52px 54px 40px; }
+  header { display: flex; justify-content: space-between; align-items: end; border-bottom: 1px solid #dde1ea; padding-bottom: 22px; }
+  h1 { font-size: 40px; font-weight: 650; margin: 0; }
+  header p { margin: 0 0 5px; color: #777e90; font-size: 14px; }
+  .proposals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; padding-top: 38px; }
+  section { min-width: 0; text-align: center; }
+  .large { display: block; width: 246px; height: 246px; max-width: 100%; margin: 0 auto 20px; }
+  h2 { margin: 0; font-size: 21px; font-weight: 650; }
+  .detail { margin: 9px 0 24px; color: #777e90; font-size: 13px; }
+  .sizes { height: 96px; display: flex; justify-content: center; align-items: center; gap: 25px; border-top: 1px solid #e2e5ed; }
+  .size { display: grid; justify-items: center; gap: 6px; font-size: 10px; color: #9298a7; align-items: center; }
+  .dock { background: #252a34; display: flex; align-items: center; justify-content: center; height: 98px; gap: 16px; margin-top: 10px; border-radius: 8px; color: #f3f5fa; }
+  .dock img { width: 52px; height: 52px; }
+  .dock span { font-size: 15px; }
+  footer { border-top: 1px solid #dde1ea; margin-top: 30px; padding-top: 18px; color: #858c9d; font-size: 12px; display: flex; justify-content: space-between; }
+  @media (max-width: 700px) { main { padding: 28px 20px; } .proposals { grid-template-columns: 1fr; gap: 40px; } header { display: block; } header p { margin-top: 12px; } }
+</style>
+<main>
+  <header><h1>Mini Mark</h1><p>APP ICON · 01 / 设计提案</p></header>
+  <div class="proposals">
+    <section>
+      <img class="large" src="mini-mark-a.svg" alt="A 方案：炫彩渐变底，白色 M 与向下箭头">
+      <h2>A · 炫彩 Markdown</h2><p class="detail">M + 向下箭头，突出编辑器身份</p>
+      <div class="sizes"><div class="size"><img src="mini-mark-a.svg" width="48" height="48" alt=""><span>48 px</span></div><div class="size"><img src="mini-mark-a.svg" width="32" height="32" alt=""><span>32 px</span></div><div class="size"><img src="mini-mark-a.svg" width="16" height="16" alt=""><span>16 px</span></div></div>
+      <div class="dock"><img src="mini-mark-a.svg" alt=""><span>Mini Mark</span></div>
+    </section>
+    <section>
+      <img class="large" src="mini-mark-b.svg" alt="B 方案：珊瑚色与蓝色渐变底，白色折角纸页">
+      <h2>B · 彩色纸页</h2><p class="detail">折角文档，保留纸笔记录的感觉</p>
+      <div class="sizes"><div class="size"><img src="mini-mark-b.svg" width="48" height="48" alt=""><span>48 px</span></div><div class="size"><img src="mini-mark-b.svg" width="32" height="32" alt=""><span>32 px</span></div><div class="size"><img src="mini-mark-b.svg" width="16" height="16" alt=""><span>16 px</span></div></div>
+      <div class="dock"><img src="mini-mark-b.svg" alt=""><span>Mini Mark</span></div>
+    </section>
+    <section>
+      <img class="large" src="mini-mark-c.svg" alt="C 方案：青蓝与粉橙渐变底，大小两个白色 M">
+      <h2>C · Mini × Mark</h2><p class="detail">大小双 M，让名字成为识别符号</p>
+      <div class="sizes"><div class="size"><img src="mini-mark-c.svg" width="48" height="48" alt=""><span>48 px</span></div><div class="size"><img src="mini-mark-c.svg" width="32" height="32" alt=""><span>32 px</span></div><div class="size"><img src="mini-mark-c.svg" width="16" height="16" alt=""><span>16 px</span></div></div>
+      <div class="dock"><img src="mini-mark-c.svg" alt=""><span>Mini Mark</span></div>
+    </section>
+  </div>
+  <footer><span>预览稿 · 尚未替换应用图标</span><span>矢量源文件 · Windows / macOS</span></footer>
+</main>
+</html>

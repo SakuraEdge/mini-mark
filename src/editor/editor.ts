@@ -51,7 +51,15 @@ class RenderedBlock extends WidgetType {
     const element = document.createElement('div');
     element.className = `rendered-block markdown-body ${this.kind}`;
     element.innerHTML = this.html;
-    element.setAttribute('aria-label', this.kind === 'math-block' ? '数学公式，点击编辑' : '表格，点击编辑');
+    element.setAttribute('aria-label', this.kind === 'math-block' ? '数学公式，点击编辑' : this.kind === 'image-block' ? '图片，点击编辑' : '表格，点击编辑');
+    for (const image of element.querySelectorAll('img')) {
+      image.addEventListener('load', () => view.requestMeasure(), { once: true });
+      image.addEventListener('error', () => {
+        const message = document.createElement('span'); message.className = 'image-error';
+        message.textContent = image.alt ? `图片无法加载：${image.alt}` : '图片无法加载';
+        image.replaceWith(message); view.requestMeasure();
+      }, { once: true });
+    }
     element.addEventListener('mousedown', (event) => {
       if ((event.target as HTMLElement).closest('a')) return;
       event.preventDefault();
@@ -96,6 +104,13 @@ function liveDecorations(state: EditorState): DecorationSet {
       if (node.name === 'Table' && !active(node.from, node.to)) {
         add(node.from, node.to, Decoration.replace({ widget: new RenderedBlock(renderMarkdown(state.sliceDoc(node.from, node.to)), node.from + 2, 'table-block'), block: true }));
         return false;
+      }
+      if (node.name === 'Image' && !active(node.from, node.to)) {
+        const line = state.doc.lineAt(node.from);
+        if (state.doc.lineAt(node.to).number === line.number && state.sliceDoc(line.from, node.from).trim() === '' && state.sliceDoc(node.to, line.to).trim() === '') {
+          add(line.from, line.to, Decoration.replace({ widget: new RenderedBlock(renderMarkdown(line.text), node.from, 'image-block'), block: true }));
+          return false;
+        }
       }
       if (/^ATXHeading[1-6]$/.test(node.name)) {
         add(node.from, node.from, Decoration.line({ class: `heading-line heading-${node.name.slice(-1)}` }));
@@ -309,24 +324,47 @@ export function setHeadingLevel(view: EditorView, level: number): boolean {
     const end = state.doc.lineAt(endPosition).number;
     for (let number = start; number <= end; number++) lines.add(number);
   }
-  const changes: { from: number; to: number; insert: string }[] = [];
+  const editable: { from: number; to: number; match: RegExpExecArray | null; prefixFrom: number; contentStart: number; content: string }[] = [];
   for (const number of [...lines].sort((a, b) => a - b)) {
     const line = state.doc.line(number);
     if (!line.text.trim() || inCode(state, line.from)) continue;
     const match = /^([ \t]{0,3})(#{1,6})(?:[ \t]+|$)(.*)$/.exec(line.text);
     if (match) {
-      const indentLength = match[1].length;
       const content = match[3];
-      const contentStart = line.from + match[0].length - content.length;
-      const prefix = `${'#'.repeat(level)}${content ? ' ' : ''}`;
-      const prefixFrom = line.from + indentLength;
-      if (state.sliceDoc(prefixFrom, contentStart) !== prefix) changes.push({ from: prefixFrom, to: contentStart, insert: prefix });
+      editable.push({
+        from: line.from,
+        to: line.to,
+        match,
+        prefixFrom: line.from + match[1].length,
+        contentStart: line.from + match[0].length - content.length,
+        content,
+      });
       continue;
     }
     const leading = /^[ \t]*/.exec(line.text)?.[0] ?? '';
     if (leading.length > 3) continue;
-    const content = line.text.slice(leading.length);
-    changes.push({ from: line.from + leading.length, to: line.from + leading.length, insert: `${'#'.repeat(level)}${content ? ' ' : ''}` });
+    editable.push({
+      from: line.from,
+      to: line.to,
+      match: null,
+      prefixFrom: line.from + leading.length,
+      contentStart: line.from + leading.length,
+      content: line.text.slice(leading.length),
+    });
+  }
+  const toggleOff = editable.length > 0 && editable.every(item => item.match && item.match[2].length === level);
+  const changes: { from: number; to: number; insert: string }[] = [];
+  for (const item of editable) {
+    if (toggleOff) {
+      if (item.match) changes.push({ from: item.prefixFrom, to: item.contentStart, insert: '' });
+      continue;
+    }
+    const prefix = `${'#'.repeat(level)}${item.content ? ' ' : ''}`;
+    if (item.match) {
+      if (state.sliceDoc(item.prefixFrom, item.contentStart) !== prefix) changes.push({ from: item.prefixFrom, to: item.contentStart, insert: prefix });
+    } else {
+      changes.push({ from: item.prefixFrom, to: item.contentStart, insert: prefix });
+    }
   }
   if (!changes.length || view.composing) return false;
   view.dispatch({ changes, userEvent: 'input' });

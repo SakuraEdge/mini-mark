@@ -23,6 +23,14 @@ describe('document workspace', () => {
     workspace.activate(a.id);
     expect(workspace.active).toBe(a);
   });
+  it('restarts untitled numbering from one for each restored session', () => {
+    const workspace = new BrowserWorkspace();
+    workspace.add('', '历史.md');
+    workspace.nextUntitled = 42;
+    const restored = BrowserWorkspace.restore(workspace.serialize())!;
+    expect(restored.add().name).toBe('未命名 1.md');
+    expect(restored.add().name).toBe('未命名 2.md');
+  });
   it('ignores stale and cross-tab revisions', () => {
     const workspace = new BrowserWorkspace();
     const a = workspace.add();

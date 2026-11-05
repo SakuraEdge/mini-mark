@@ -7,8 +7,8 @@ namespace Moye;
 
 public sealed class GitHubUpdates {
     private static readonly string[] Feeds = [
-        "https://raw.githubusercontent.com/SakuraEdge/moye-markdown/updates/stable.json",
-        "https://github.com/SakuraEdge/moye-markdown/releases/latest/download/update.json"
+        "https://raw.githubusercontent.com/SakuraEdge/mini-mark/updates/stable.json",
+        "https://github.com/SakuraEdge/mini-mark/releases/latest/download/update.json"
     ];
     private readonly HttpClient client;
     private readonly string cacheFile, downloadDirectory;
@@ -18,7 +18,7 @@ public sealed class GitHubUpdates {
         cacheFile = Path.Combine(dataRoot, "update-cache.json");
         downloadDirectory = Path.Combine(dataRoot, "Updates");
         client = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("Moye/" + (typeof(GitHubUpdates).Assembly.GetName().Version?.ToString(3) ?? "1.0.2"));
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("MiniMark/" + (typeof(GitHubUpdates).Assembly.GetName().Version?.ToString(3) ?? "2.0.0"));
     }
     public async Task<UpdateCheck> Check() {
         if (lastResult is { OfflineCache: false } cached && DateTimeOffset.UtcNow >= cached.CheckedAt && DateTimeOffset.UtcNow - cached.CheckedAt < TimeSpan.FromSeconds(10)) return cached;
@@ -81,30 +81,31 @@ public sealed class GitHubUpdates {
     public async Task<DownloadedInstaller> DownloadInstaller(string tag, IProgress<int> progress, CancellationToken cancellation) {
         var manifest = lastResult?.Manifest ?? throw new IOException("请先检测更新。");
         manifest.Validate();
-        var installed = typeof(GitHubUpdates).Assembly.GetName().Version ?? new Version(1, 0, 2);
+        var installed = typeof(GitHubUpdates).Assembly.GetName().Version ?? new Version(2, 0, 0);
         if (tag != "v" + manifest.Version || new Version(manifest.Version) <= new Version(installed.Major, installed.Minor, installed.Build)) throw new IOException("此版本不高于当前版本，请重新检测更新。");
         Directory.CreateDirectory(downloadDirectory);
+        var asset = manifest.DownloadAsset;
         var target = Path.Combine(downloadDirectory, "Moye-Update.exe");
-        if (await VerifyInstaller(target, manifest.Windows, cancellation)) return new(target, manifest.Windows);
+        if (await VerifyInstaller(target, asset, cancellation)) return new(target, asset);
         var temporary = target + ".part";
         try {
-            using var response = await Get(new Uri(manifest.Windows.Url), cancellation);
-            if (response.Content.Headers.ContentLength is long declared && declared != manifest.Windows.Size) throw new IOException("安装包大小与发布清单不一致。");
+            using var response = await Get(new Uri(asset.Url), cancellation);
+            if (response.Content.Headers.ContentLength is long declared && declared != asset.Size) throw new IOException("安装包大小与发布清单不一致。");
             await using (var input = await response.Content.ReadAsStreamAsync(cancellation))
             await using (var output = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true)) {
                 var buffer = new byte[81920]; long received = 0; int count, reported = -1;
                 while ((count = await input.ReadAsync(buffer, cancellation)) > 0) {
                     received += count;
-                    if (received > manifest.Windows.Size) throw new IOException("安装包超出发布大小。");
+                    if (received > asset.Size) throw new IOException("安装包超出发布大小。");
                     await output.WriteAsync(buffer.AsMemory(0, count), cancellation);
-                    var percent = (int)(received * 100 / manifest.Windows.Size);
+                    var percent = (int)(received * 100 / asset.Size);
                     if (percent != reported) { reported = percent; progress.Report(percent); }
                 }
                 await output.FlushAsync(cancellation);
             }
-            if (!await VerifyInstaller(temporary, manifest.Windows, cancellation)) throw new IOException("安装包 SHA-256 校验失败，请重试。");
+            if (!await VerifyInstaller(temporary, asset, cancellation)) throw new IOException("安装包 SHA-256 校验失败，请重试。");
             File.Move(temporary, target, true);
-            return new(target, manifest.Windows);
+            return new(target, asset);
         } finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
     public static async Task<bool> VerifyInstaller(string file, UpdateAsset asset, CancellationToken cancellation) {

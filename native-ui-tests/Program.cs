@@ -18,7 +18,12 @@ internal static class Program {
         var browser = window.Controls.OfType<WebView2>().Single();
         var received = 0;
         browser.CoreWebView2InitializationCompleted += (_, args) => {
-            if (args.IsSuccess) browser.CoreWebView2.WebMessageReceived += (_, _) => received++;
+            if (args.IsSuccess) {
+                browser.CoreWebView2.WebMessageReceived += (_, _) => received++;
+                browser.CoreWebView2.WebResourceResponseReceived += (_, response) => {
+                    if (response.Request.Uri.Contains("document.moye.local")) Console.WriteLine($"Image resource: {response.Response.StatusCode} {response.Request.Uri}");
+                };
+            }
         };
         window.Shown += async (_, _) => {
             try {
@@ -28,7 +33,8 @@ internal static class Program {
                 }
                 async Task Wait(string expression, string failure) {
                     for (var i = 0; i < 200; i++) { if (await Evaluate(expression)) return; await Task.Delay(50); }
-                    throw new Exception(failure + $" (renderer messages: {received})");
+                    var diagnostics = await browser.CoreWebView2.ExecuteScriptAsync("JSON.stringify({preview:document.getElementById('reading-view')?.innerHTML,plugin:document.getElementById('plugin-status')?.textContent})");
+                    throw new Exception(failure + $" (renderer messages: {received}; diagnostics: {diagnostics})");
                 }
                 Task Click(string id) => browser.CoreWebView2.ExecuteScriptAsync($"document.getElementById('{id}').click()");
                 await Wait("Boolean(window.__MOYE_READY__)", "Editor did not become ready");
@@ -70,7 +76,39 @@ internal static class Program {
                 await Wait("document.getElementById('save-state').textContent === '已保存' && !document.getElementById('app').classList.contains('transition-pending')", "Native Save button did not complete");
                 var disk = File.ReadAllText(savedFile);
                 if (!disk.Contains("Saved through button.") || !disk.Contains("\r\n")) throw new Exception("Native save lost text or CRLF formatting");
+                using var bitmap = new System.Drawing.Bitmap(24, 24);
+                using (var graphics = System.Drawing.Graphics.FromImage(bitmap)) graphics.Clear(System.Drawing.Color.CornflowerBlue);
+                using var png = new MemoryStream();
+                bitmap.Save(png, System.Drawing.Imaging.ImageFormat.Png);
+                var base64 = Convert.ToBase64String(png.ToArray());
+                await browser.CoreWebView2.ExecuteScriptAsync($$"""
+                (() => {
+                  const data = new DataTransfer();
+                  data.items.add(new File([Uint8Array.from(atob('{{base64}}'), c => c.charCodeAt(0))], 'native-test.png', {type:'image/png'}));
+                  document.querySelector('.cm-content').dispatchEvent(new ClipboardEvent('paste', {clipboardData:data,bubbles:true,cancelable:true}));
+                })()
+                """);
+                await Wait("document.querySelector('.cm-content').textContent.includes('assets/mini-mark-')", "Native image import did not insert an asset reference");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-mode=read]').click()");
+                await Wait("document.querySelector('#reading-view img')?.naturalWidth === 24", "Native image asset did not render");
+                if (Directory.GetFiles(Path.Combine(folder, "assets"), "*.png").Length != 1) throw new Exception("Native image was not persisted beside the document");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-mode=source]').click()");
+                await Click("save-markdown");
+                await Wait("document.getElementById('save-state').textContent === '已保存'", "Image document save failed");
+                await Click("manage-plugins");
+                await Click("plugins-title");
+                await browser.CoreWebView2.ExecuteScriptAsync("""
+                document.querySelector('#plugins-dialog [data-action=new]').click();
+                document.getElementById('plugin-source').value = "miniMark.register({id:'native-test',name:'Native plugin',version:'1',commands:[{id:'check',title:'Native boundary check',async run(){let blocked=false;try{await fetch('https://example.com/probe')}catch{blocked=true}return {message:blocked && typeof chrome === 'undefined' && typeof document === 'undefined' ? 'NATIVE_PLUGIN_OK' : 'NATIVE_PLUGIN_FAILED'}}}]});";
+                document.querySelector('#plugins-dialog [data-action=save]').click();
+                """);
+                await Wait("document.getElementById('plugin-status').textContent === '已保存'", "Native plugin sandbox did not initialize");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('.plugin-commands button').click()");
+                await Wait("document.getElementById('toast').textContent === 'NATIVE_PLUGIN_OK'", "Native plugin sandbox network/bridge isolation failed");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('#plugins-dialog [data-action=close]').click()");
+                if (!window.Text.Contains("Mini Mark")) throw new Exception("Window branding did not update");
                 Console.WriteLine($"PASS actual WebView2 CRLF restore, native New/Open/Save/tab buttons, view/theme/focus/menu controls, clean session, bounded messages ({received})");
+                Console.WriteLine("PASS actual WebView2 image import/render/save and plugin sandbox/network/bridge isolation");
             } catch (Exception error) { Console.Error.WriteLine(error); Environment.ExitCode = 1; }
             finally { window.Dispose(); Application.ExitThread(); }
         };

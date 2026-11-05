@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="base" x1="0" y1="1" x2="1" y2="0">
+      <stop stop-color="#28a8d7"/>
+      <stop offset=".36" stop-color="#4476dd"/>
+      <stop offset=".67" stop-color="#b25fc8"/>
+      <stop offset="1" stop-color="#fa9b83"/>
+    </linearGradient>
+    <linearGradient id="tint" x1="0" y1="0" x2=".75" y2="1">
+      <stop stop-color="#87edda" stop-opacity=".95"/>
+      <stop offset=".5" stop-color="#66b6e4" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#f088ca" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="24" width="976" height="976" rx="224" fill="url(#base)"/>
+  <rect x="24" y="24" width="976" height="976" rx="224" fill="url(#tint)"/>
+  <g transform="translate(-30 0)">
+    <path d="M218 675V345h67l120 170 120-170h67v330h-87V514L405 652 305 514v161z" fill="white"/>
+    <path d="M635 675V457h56l64 92 64-92h56v218h-71V587l-49 67-49-67v88z" fill="white" opacity=".94"/>
+    <rect x="218" y="730" width="657" height="22" rx="11" fill="white" opacity=".63"/>
+  </g>
+</svg>

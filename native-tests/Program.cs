@@ -22,6 +22,25 @@ try {
     DocumentStore.Write(file, "next\nline", false, "\n");
     Check(!DocumentStore.Read(file).Bom, "Unexpected BOM");
     Check(!Directory.EnumerateFiles(folder, "*.tmp").Any(), "Temporary files left behind");
+    var imageBytes = new byte[] { 137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3 };
+    var imageData = "data:" + "image/png;base64," + Convert.ToBase64String(imageBytes);
+    Check(ImageAssets.Import(imageData, null) == imageData, "Draft image must remain portable");
+    var imagePath = ImageAssets.Import(imageData, file);
+    Check(imagePath.StartsWith("assets/mini-mark-") && File.ReadAllBytes(Path.Combine(folder, imagePath)).SequenceEqual(imageBytes), "Image asset did not round trip");
+    Check(ImageAssets.ReadLocal(folder, imagePath).Data.SequenceEqual(imageBytes), "Document image resource failed");
+    try { ImageAssets.ReadLocal(folder, "../escape.png"); throw new Exception("Image traversal accepted"); }
+    catch (IOException) { count++; }
+    try { ImageAssets.ReadLocal(folder, "session-v2.json"); throw new Exception("Non-image resource accepted"); }
+    catch (IOException) { count++; }
+    Check(ImageAssets.Import(imageData, file) == imagePath && Directory.GetFiles(Path.Combine(folder, "assets")).Length == 1, "Identical images were duplicated");
+    var movedFile = Path.Combine(folder, "moved", "note.md");
+    ImageAssets.CopyForSaveAs("![](" + imagePath + ")", file, movedFile);
+    Check(File.ReadAllBytes(Path.Combine(folder, "moved", imagePath)).SequenceEqual(imageBytes), "Save As lost imported image assets");
+    try { ImageAssets.Import("data:" + "image/png;base64," + Convert.ToBase64String("invalid"u8.ToArray()), file); throw new Exception("Invalid image signature accepted"); }
+    catch (IOException) { count++; }
+    File.WriteAllText(Path.Combine(folder, imagePath), "user modified");
+    try { ImageAssets.Import(imageData, file); throw new Exception("Modified asset was overwritten"); }
+    catch (IOException) { count++; }
     File.WriteAllBytes(file, new byte[] { 0xff, 0xfe, 0x00 });
     try { DocumentStore.Read(file); throw new Exception("Invalid UTF-8 accepted"); }
     catch (DecoderFallbackException) { count++; }
@@ -39,6 +58,13 @@ try {
     workspace.Activate(a.Id); workspace.SaveSession(sessionFile);
     var restored = DocumentWorkspace.Restore(sessionFile, draftFile);
     Check(restored.Documents.Count == 2 && restored.ActiveId == a.Id && restored.Active.Text == "最后输入", "Multi-document recovery failed");
+    var namingWorkspace = new DocumentWorkspace();
+    namingWorkspace.AddNew("", "历史.md");
+    namingWorkspace.AddNew("", "未命名 9.md");
+    var namingSession = Path.Combine(folder, "naming-session.json");
+    namingWorkspace.SaveSession(namingSession);
+    var namingRestored = DocumentWorkspace.Restore(namingSession, draftFile);
+    Check(namingRestored.AddNew().Name == "未命名 1.md", "Untitled numbering did not restart at one");
     workspace.Remove(a.Id);
     Check(workspace.ActiveId == b.Id, "Close did not select adjacent document");
     workspace.Remove(b.Id);

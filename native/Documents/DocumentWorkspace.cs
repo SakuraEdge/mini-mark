@@ -36,8 +36,14 @@ public sealed class DocumentWorkspace {
     public OpenDocument Active => Find(ActiveId) ?? throw new InvalidOperationException("No active document");
     public OpenDocument? Find(string? id) => Documents.Find(document => document.Id == id);
     public OpenDocument AddNew(string text = "", string? name = null, string baseline = "") {
-        var document = new OpenDocument { Text = text, Baseline = baseline, UntitledName = name ?? $"未命名 {NextUntitled++}.md" };
+        var document = new OpenDocument { Text = text, Baseline = baseline, UntitledName = name ?? NextUntitledName() };
         Documents.Add(document); ActiveId = document.Id; return document;
+    }
+    private string NextUntitledName() {
+        var number = 1;
+        while (Documents.Any(document => string.Equals(document.Name, $"未命名 {number}.md", StringComparison.OrdinalIgnoreCase))) number++;
+        NextUntitled = number + 1;
+        return $"未命名 {number}.md";
     }
     public OpenDocument Open(string path) {
         var absolute = System.IO.Path.GetFullPath(path);
@@ -71,7 +77,8 @@ public sealed class DocumentWorkspace {
             if (session.SchemaVersion != 2) throw new IOException("会话版本不受支持；原会话文件将保留。");
             if (session.Documents is null || session.Documents.Any(document => document is null || string.IsNullOrEmpty(document.Id) || document.Text is null || document.Baseline is null) || session.Documents.Select(document => document.Id).Distinct().Count() != session.Documents.Count) throw new IOException("会话文件内容无效；原会话文件将保留。");
             workspace.Documents.AddRange(session.Documents);
-            workspace.NextUntitled = Math.Max(1, session.NextUntitled);
+            // Untitled numbering is recalculated for each process, not continued from an old session.
+            workspace.NextUntitled = 1;
             workspace.ActiveId = workspace.Find(session.ActiveId)?.Id ?? workspace.Documents.FirstOrDefault()?.Id ?? "";
             foreach (var document in workspace.Documents.Where(document => !document.Dirty && document.Path is not null)) {
                 try { document.Load(DocumentStore.Read(document.Path!)); }

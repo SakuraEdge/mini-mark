@@ -13,32 +13,32 @@ function Read-Choices {
   }) -join "`n"
 }
 $before = Read-Choices
-$installer = (Resolve-Path "release/Moye-Setup-$version-windows-x64.exe").Path
+$installer = (Resolve-Path "release/MiniMark-Setup-$version-windows-x64.exe").Path
 $arguments = @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/TASKS=defaultmd,defaultyaml,desktopicon',("/DIR=`"$target`""))
 $process = Start-Process -FilePath $installer -ArgumentList $arguments -WindowStyle Hidden -PassThru -Wait
 if($process.ExitCode -ne 0) { throw "Installer exited $($process.ExitCode)" }
-if(-not (Test-Path -LiteralPath (Join-Path $target 'Moye.exe'))) { throw 'Installed application missing' }
+if(-not (Test-Path -LiteralPath (Join-Path $target 'MiniMark.exe'))) { throw 'Installed application missing' }
 $command = (Get-Item 'HKCU:\Software\Classes\Moye.Markdown\shell\open\command').GetValue('')
-if($command -ne ('"' + (Join-Path $target 'Moye.exe') + '" "%1"')) { throw 'Open command does not quote paths correctly' }
+if($command -ne ('"' + (Join-Path $target 'MiniMark.exe') + '" "%1"')) { throw 'Open command does not quote paths correctly' }
 $capability = Get-ItemProperty 'HKCU:\Software\Moye\Capabilities\FileAssociations'
 if($capability.'.md' -ne 'Moye.Markdown') { throw 'MD capability was not registered' }
 if($capability.'.yaml' -ne 'Moye.Yaml' -or $capability.'.yml' -ne 'Moye.Yaml') { throw 'YAML capability was not registered' }
 if((Read-Choices) -ne $before) { throw 'Installer changed protected default choice' }
 $yamlCommand = (Get-Item 'HKCU:\Software\Classes\Moye.Yaml\shell\open\command').GetValue('')
-if($yamlCommand -ne ('"' + (Join-Path $target 'Moye.exe') + '" "%1"')) { throw 'YAML open command does not quote paths correctly' }
+if($yamlCommand -ne ('"' + (Join-Path $target 'MiniMark.exe') + '" "%1"')) { throw 'YAML open command does not quote paths correctly' }
 $shell = New-Object -ComObject WScript.Shell
 function Normalize-ShortcutPath([string]$path) {
   if([string]::IsNullOrWhiteSpace($path)) { return '' }
   return [IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($path)).TrimEnd('\','/')
 }
-foreach($link in @((Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) '墨页 Moye.lnk'), (Join-Path ([Environment]::GetFolderPath('Programs')) '墨页 Moye/墨页 Moye.lnk'))) {
+foreach($link in @((Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Mini Mark.lnk'), (Join-Path ([Environment]::GetFolderPath('Programs')) 'Mini Mark/Mini Mark.lnk'))) {
   if(-not (Test-Path -LiteralPath $link)) { throw "Missing shortcut: $link" }
   # WSH cannot load filenames outside the system ANSI code page; inspect identical bytes under an ASCII name.
   $readableLink = Join-Path $env:RUNNER_TEMP 'moye-shortcut-check.lnk'
   Copy-Item -LiteralPath $link -Destination $readableLink -Force
   if((Get-FileHash -LiteralPath $link).Hash -ne (Get-FileHash -LiteralPath $readableLink).Hash) { throw 'Shortcut verification copy differs' }
   $shortcut = $shell.CreateShortcut($readableLink)
-  if((Normalize-ShortcutPath $shortcut.TargetPath) -ne (Normalize-ShortcutPath (Join-Path $target 'Moye.exe')) -or (Normalize-ShortcutPath $shortcut.WorkingDirectory) -ne (Normalize-ShortcutPath $target)) {
+  if((Normalize-ShortcutPath $shortcut.TargetPath) -ne (Normalize-ShortcutPath (Join-Path $target 'MiniMark.exe')) -or (Normalize-ShortcutPath $shortcut.WorkingDirectory) -ne (Normalize-ShortcutPath $target)) {
     throw "Shortcut points outside installation: target=$($shortcut.TargetPath); working=$($shortcut.WorkingDirectory); expected=$target"
   }
 }

@@ -1,4 +1,4 @@
-# 墨页开发导航
+# Mini Mark 开发导航
 
 这份文件按职责说明代码入口。完整文件索引保存在 `docs/code-map.json`，调整文件位置后执行 `npm run docs:map` 更新。
 
@@ -13,6 +13,9 @@ src/
   markdown/            Markdown/公式渲染、HTML 与 PDF 的排版内容
   platform/            前端与原生宿主的消息桥、浏览器预览文件操作
   features/updates/    检测更新界面、版本比较、提醒偏好
+  features/theme/      主题偏好与渐变切换
+  features/images/     图片插入、粘贴与拖入
+  features/plugins/    插件管理、校验与隔离执行协议
   styles/              全局样式、主题、响应式布局和动画
 native/                Windows / .NET
   Program.cs           程序入口、单实例入口与退出后启动更新
@@ -50,6 +53,9 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 | Markdown、YAML、公式、代码高亮 | `src/markdown/render.ts`、`src/editor/editor.ts`、`src/documents/formats.ts` |
 | PDF、HTML 导出 | `src/markdown/export.ts`、两平台的 `Export/` |
 | 主题、字号、标签动画 | `src/styles/app.css`、`src/app/main.ts` |
+| Mini Mark 图标与预览 | `public/mini-mark.svg`、`docs/branding/README.md`、`scripts/create-icon.mjs`、`scripts/icon-mac.mjs` |
+| 图片导入与资源访问 | `src/features/images/`、`src/markdown/render.ts`、两平台 `Documents/ImageAssets`、`docs/images.md` |
+| 自定义插件 | `src/features/plugins/`、`public/plugin-host.html`、`public/plugin-host.js`、`docs/plugins.md` |
 | 更新、提醒、下载 | `src/features/updates/`、两平台的 `Updates/` |
 | 数据盘、单实例 | `native/Infrastructure/` |
 | 安装位置、快捷方式、旧文件清理 | `installer/Moye.iss`、`scripts/package-win.ps1` |
@@ -63,9 +69,13 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 
 `revision` 只在真实编辑时增长。新建、切换、保存等请求已经携带当前正文；收到 `workspace` 时不得无条件发回 `edit`，否则会在冲突时形成消息循环。接收后的较新本地编辑仍保留在缓存中。
 
-标题快捷键由 `src/editor/editor.ts` 以单次 CodeMirror 事务处理，当前行或选中行一起变更，并跳过代码围栏；YAML 文档和阅读模式不会响应。
+标题快捷键由 `src/editor/editor.ts` 以单次 CodeMirror 事务处理，当前行或选中行一起变更，并跳过代码围栏；选中可编辑行已经全部处于目标标题等级时，再按同一快捷键恢复正文。YAML 文档和阅读模式不会响应。标题跨度采用内联排版，换行高度由浏览器计算，不固定跨度高度；对应回归在 `tests/editor.spec.ts`。
+
+未命名文档从 1 开始寻找当前标签中尚未占用的编号，不沿用持久化会话的历史计数。浏览器、Windows 和 macOS 的命名入口分别在 `src/documents/workspace.ts`、`native/Documents/DocumentWorkspace.cs`、`macos/App/Main.swift`。
 
 实际数据目录由 `MOYE_DATA_DIR`（开发覆盖）、当前用户注册表 `Software\Moye\DataDirectory` 或默认 AppData 决定。测试必须使用隔离目录，不改写实际用户会话。
+
+v2 的展示名、可执行文件和主要安装包使用 Mini Mark / MiniMark；AppId、数据目录和存储键保留兼容。`update.json` 的 `windows` 字段保留旧地址与兼容安装包名，`windowsV2` 使用新地址；两者必须是相同哈希的同一安装器，避免 v1.x 验证器拒绝升级。插件从主页面发送消息到无同源权限的 iframe，再在 Worker 执行；不要改成在主线程直接 eval，也不要开放原生文件或网络能力。
 
 ## 开发与验证
 

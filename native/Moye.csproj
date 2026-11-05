@@ -5,12 +5,13 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>Moye</AssemblyName>
-    <Version>1.1.0</Version>
-    <Product>墨页 Moye</Product>
+    <AssemblyName>MiniMark</AssemblyName>
+    <Version>2.0.0</Version>
+    <Product>Mini Mark</Product>
+    <Title>Mini Mark</Title>
     <Description>Local-first Markdown editor</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>Assets/moye.ico</ApplicationIcon>
+    <ApplicationIcon>Assets/mini-mark.ico</ApplicationIcon>
     <PublishReadyToRun>true</PublishReadyToRun>
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>

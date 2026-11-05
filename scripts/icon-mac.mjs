@@ -4,7 +4,7 @@ const folder = new URL('../release/mac-build/Moye.iconset/', import.meta.url);
 await mkdir(folder, { recursive: true });
 const browser = await chromium.launch();
 try {
-  const svg = await readFile(new URL('../public/moye.svg', import.meta.url), 'utf8');
+  const svg = await readFile(new URL('../public/mini-mark.svg', import.meta.url), 'utf8');
   const page = await browser.newPage();
   for (const size of [16, 32, 128, 256, 512]) {
     for (const scale of [1, 2]) {
