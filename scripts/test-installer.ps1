@@ -52,6 +52,18 @@ function Add-OldFile([string]$relative, [string]$content) {
   [IO.File]::AppendAllText($owned, "$hash|$relative`n")
 }
 Add-OldFile 'wwwroot\old-unused.js' 'old code'
+Add-OldFile 'Moye.exe' 'legacy executable'
+$legacyDesktop = Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) '墨页 Moye.lnk'
+$legacyMenu = Join-Path ([Environment]::GetFolderPath('Programs')) '墨页 Moye/墨页 Moye.lnk'
+foreach($legacyLink in @($legacyDesktop, $legacyMenu)) {
+  New-Item -ItemType Directory -Path (Split-Path $legacyLink) -Force | Out-Null
+  $temporaryLink = Join-Path $env:RUNNER_TEMP 'legacy-moye.lnk'
+  $shortcut = $shell.CreateShortcut($temporaryLink)
+  $shortcut.TargetPath = Join-Path $target 'Moye.exe'
+  $shortcut.WorkingDirectory = $target
+  $shortcut.Save()
+  Copy-Item -LiteralPath $temporaryLink -Destination $legacyLink -Force
+}
 Add-OldFile 'changed.txt' 'original'
 [IO.File]::WriteAllText((Join-Path $target 'changed.txt'), 'user changes')
 Add-OldFile 'Data\session-v2.json' 'user session'
@@ -67,6 +79,8 @@ New-Item -ItemType Junction -Path (Join-Path $target 'linked') -Target $outside 
 $process = Start-Process -FilePath $installer -ArgumentList $arguments -WindowStyle Hidden -PassThru -Wait
 if($process.ExitCode -ne 0) { throw "Upgrade exited $($process.ExitCode)" }
 if(Test-Path -LiteralPath (Join-Path $target 'wwwroot/old-unused.js')) { throw 'Obsolete owned file survived upgrade' }
+if(Test-Path -LiteralPath (Join-Path $target 'Moye.exe')) { throw 'Legacy executable survived branded upgrade' }
+if((Test-Path -LiteralPath $legacyDesktop) -or (Test-Path -LiteralPath $legacyMenu)) { throw 'Legacy shortcut survived branded upgrade' }
 if([IO.File]::ReadAllText((Join-Path $target 'changed.txt')) -ne 'user changes') { throw 'Upgrade removed user modifications' }
 foreach($file in @('Data/session-v2.json','Source/notes.md','Backups/notes.md')) {
   if(-not (Test-Path -LiteralPath (Join-Path $target $file))) { throw "Protected data removed: $file" }

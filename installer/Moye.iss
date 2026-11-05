@@ -163,12 +163,14 @@ end;
 procedure RemoveLegacyShortcut(Path: string);
 var
   Shell, Shortcut: Variant;
-  Target: string;
+  Target, ReadablePath: string;
 begin
   if not FileExists(Path) then Exit;
   try
+    ReadablePath := ExpandConstant('{tmp}\mini-mark-legacy.lnk');
+    if not FileCopy(Path, ReadablePath, False) then Exit;
     Shell := CreateOleObject('WScript.Shell');
-    Shortcut := Shell.CreateShortcut(Path);
+    Shortcut := Shell.CreateShortcut(ReadablePath);
     Target := Shortcut.TargetPath;
     if (CompareText(Target, ExpandConstant('{app}\Moye.exe')) = 0) or
        (CompareText(Target, ExpandConstant('{app}\MiniMark.exe')) = 0) then
