@@ -12,7 +12,7 @@ for (const offline of [false, true]) {
           messages.push(message);
           const emit = (data: unknown) => queueMicrotask(() => callback({ data }));
           if (message.type === 'ready') emit({ type: 'workspace', tabs: [{ id: 'doc', name: 'note.md', dirty: false, revision: 0 }], document: { id: 'doc', name: 'note.md', text: '# Keep writing', baseline: '# Keep writing', revision: 0 } });
-          if (message.type === 'checkUpdates') emit({ type: 'updateResult', requestId: message.requestId, releases: [{ tag_name: offline ? 'v1.0.0' : 'v3.0.0' }], cacheNotice: offline ? '网络暂不可用，以下为 11-04 12:00 的检测记录。' : null, installSupported: true });
+          if (message.type === 'checkUpdates') emit({ type: 'updateResult', requestId: message.requestId, releases: [{ tag_name: offline ? 'v1.0.0' : 'v4.0.0' }], cacheNotice: offline ? '网络暂不可用，以下为 11-04 12:00 的检测记录。' : null, installSupported: true });
           if (message.type === 'installUpdate') emit({ type: 'updateInstallStatus', message: '正在下载更新… 30%', downloading: true });
           if (message.type === 'cancelUpdate') emit({ type: 'updateInstallStatus', message: '下载已取消或超时，可以重新尝试。', downloading: false });
         },
@@ -37,7 +37,7 @@ for (const offline of [false, true]) {
       await expect(install).toBeEnabled();
       await expect(page.locator('#update-status')).toContainText('下载已取消');
       const messages = await page.evaluate(() => (window as any).__testMessages);
-      expect(messages.filter((message: any) => message.type === 'installUpdate')).toEqual([{ type: 'installUpdate', version: 'v3.0.0' }]);
+      expect(messages.filter((message: any) => message.type === 'installUpdate')).toEqual([{ type: 'installUpdate', version: 'v4.0.0' }]);
       expect(messages.some((message: any) => message.type === 'cancelUpdate')).toBe(true);
       await page.screenshot({ path: 'test-results/updates-v102.png' });
     }
@@ -55,7 +55,7 @@ test('major update popup opt-out persists while manual checking remains availabl
       postMessage: (message: any) => {
         messages.push(message);
         if (message.type === 'ready') queueMicrotask(() => callback({ data: { type: 'workspace', tabs: [{ id: 'doc', name: '更新测试.md', dirty: false, revision: 0 }], document: { id: 'doc', name: '更新测试.md', text: '# 保留文档', baseline: '# 保留文档', revision: 0 } } }));
-        if (message.type === 'checkUpdates') queueMicrotask(() => callback({ data: { type: 'updateResult', requestId: message.requestId, releases: [{ tag_name: 'v3.0.0', draft: false, prerelease: false }] } }));
+        if (message.type === 'checkUpdates') queueMicrotask(() => callback({ data: { type: 'updateResult', requestId: message.requestId, releases: [{ tag_name: 'v4.0.0', draft: false, prerelease: false }] } }));
       },
     } } });
     Object.assign(window, { __testMessages: messages });
@@ -77,7 +77,7 @@ test('major update popup opt-out persists while manual checking remains availabl
   await page.getByRole('button', { name: '更多', exact: true }).click();
   await page.getByRole('button', { name: '检测更新', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.locator('#update-status')).toHaveText('发现大版本 v3.0.0。');
+  await expect(page.locator('#update-status')).toHaveText('发现大版本 v4.0.0。');
   await expect(page.getByLabel('不再弹出大版本更新提醒')).toBeChecked();
   await expect(page.getByRole('button', { name: '查看新版 / 下载' })).toBeVisible();
   await page.getByRole('button', { name: '关闭更新窗口' }).click();

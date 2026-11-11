@@ -1,15 +1,18 @@
 import { Compartment, EditorSelection, EditorState, Prec, RangeSetBuilder, StateField, type Extension } from '@codemirror/state';
-import { Decoration, EditorView, ViewPlugin, WidgetType, drawSelection, highlightActiveLine, keymap, lineNumbers, placeholder, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+import { Decoration, EditorView, ViewPlugin, WidgetType, highlightActiveLine, keymap, lineNumbers, placeholder, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { HighlightStyle, bracketMatching, foldGutter, indentOnInput, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { markdown, markdownLanguage, markdownKeymap } from '@codemirror/lang-markdown';
 import { yamlLanguage } from '@codemirror/lang-yaml';
+import { html } from '@codemirror/lang-html';
 import { languages } from '@codemirror/language-data';
 import { search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { tags } from '@lezer/highlight';
 import { commands, imeBlocksCommand, matchingCommands, slashQuery, type SlashCommand } from './commands';
 import { renderMarkdown, renderMath } from '../markdown/render';
 import type { DocumentLanguage } from '../documents/formats';
+import { createIcons, PencilLine, Sigma } from 'lucide';
+import { EDIT_FORMULA_EVENT, mathBlocks } from './math-blocks';
 
 export type EditorMode = 'live' | 'source' | 'read' | 'split';
 export const modeCompartment = new Compartment();
@@ -33,6 +36,9 @@ const colors = HighlightStyle.define([
   { tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], class: 'syntax-function' },
   { tag: [tags.comment, tags.meta], class: 'syntax-comment' },
   { tag: tags.processingInstruction, class: 'syntax-keyword' },
+  { tag: tags.tagName, class: 'syntax-keyword' },
+  { tag: tags.attributeName, class: 'syntax-type' },
+  { tag: tags.attributeValue, class: 'syntax-string' },
 ]);
 
 function inCode(state: EditorState, pos: number): boolean {
@@ -71,6 +77,40 @@ class RenderedBlock extends WidgetType {
   ignoreEvent() { return false; }
 }
 
+class FormulaButton extends WidgetType {
+  constructor(readonly position: number, readonly latex?: string) { super(); }
+  eq(other: FormulaButton) { return this.position === other.position && this.latex === other.latex; }
+  toDOM(view: EditorView) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = this.latex === undefined ? 'formula-entry' : 'rendered-block markdown-body math-block formula-rendered';
+    button.setAttribute('aria-label', '公式编辑器');
+    button.title = '编辑公式';
+    button.innerHTML = this.latex?.trim() ? renderMath(this.latex) : '<i data-lucide="sigma"></i><span>公式编辑器</span><i data-lucide="pencil-line"></i>';
+    createIcons({ icons: { Sigma, PencilLine }, root: button, attrs: { 'stroke-width': 1.65 } });
+    button.addEventListener('mousedown', event => event.preventDefault());
+    button.addEventListener('click', event => {
+      event.preventDefault(); event.stopPropagation();
+      view.dom.dispatchEvent(new CustomEvent(EDIT_FORMULA_EVENT, { detail: this.position }));
+    });
+    return button;
+  }
+  ignoreEvent() { return true; }
+}
+
+const formulaEntries = StateField.define<DecorationSet>({
+  create: formulaEntryDecorations,
+  update: (_, transaction) => formulaEntryDecorations(transaction.state),
+  provide: field => EditorView.decorations.from(field),
+});
+
+function formulaEntryDecorations(state: EditorState) {
+  const block = mathBlocks(state).find(item => state.selection.main.head >= item.from && state.selection.main.head <= item.to);
+  if (!block) return Decoration.none;
+  const position = state.doc.lineAt(block.contentFrom).to;
+  return Decoration.set([Decoration.widget({ widget: new FormulaButton(block.from), side: 1 }).range(position)]);
+}
+
 function liveDecorations(state: EditorState): DecorationSet {
   const decorations: { from: number; to: number; value: Decoration }[] = [];
   const covered: { from: number; to: number }[] = [];
@@ -79,13 +119,9 @@ function liveDecorations(state: EditorState): DecorationSet {
   }));
   const active = (from: number, to: number) => selected.some((range) => range.from <= to && range.to >= from);
   const add = (from: number, to: number, value: Decoration) => decorations.push({ from, to, value });
-  const text = state.doc.toString();
-  const math = /^ {0,3}\$\$[ \t]*\n([\s\S]*?)\n {0,3}\$\$[ \t]*$/gm;
-  let match: RegExpExecArray | null;
-  while ((match = math.exec(text))) {
-    const from = match.index, to = from + match[0].length;
-    if (!active(from, to) && !inCode(state, from + 1)) {
-      add(from, to, Decoration.replace({ widget: new RenderedBlock(renderMath(match[1]), from + match[0].indexOf('\n') + 1, 'math-block'), block: true }));
+  for (const { from, to, latex } of mathBlocks(state)) {
+    if (!active(from, to)) {
+      add(from, to, Decoration.replace({ widget: new FormulaButton(from, latex), block: true }));
       covered.push({ from, to });
     }
   }
@@ -267,14 +303,15 @@ export function modeExtensions(mode: EditorMode): Extension {
 const listeners = new WeakMap<EditorView, (update: ViewUpdate) => void>();
 
 function languageExtensions(language: DocumentLanguage): Extension {
-  const parser = language === 'yaml'
+  const parser = language === 'html' ? html() : language === 'yaml'
     ? yamlLanguage
     : markdown({ base: markdownLanguage, codeLanguages: languages });
-  if (language === 'yaml') {
+  if (language !== 'markdown') {
     return [parser, keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab])];
   }
   return [
     parser,
+    formulaEntries,
     Prec.highest(slashPlugin),
     keymap.of([...markdownKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
   ];
@@ -284,7 +321,7 @@ function makeState(doc: string, onChange: (update: ViewUpdate) => void, mode: Ed
   return EditorState.create({
       doc,
       extensions: [
-        history(), drawSelection(), indentOnInput(), bracketMatching(), highlightSelectionMatches(),
+        history(), indentOnInput(), bracketMatching(), highlightSelectionMatches(),
         languageCompartment.of(languageExtensions(language)),
         syntaxHighlighting(colors),
         search({ top: true }),

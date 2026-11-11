@@ -1,6 +1,6 @@
 import { sample } from '../documents/sample';
 import { BrowserWorkspace, type DocumentData, type TabData } from '../documents/workspace';
-import { documentLanguage } from '../documents/formats';
+import { documentLanguage, formatLabel } from '../documents/formats';
 export type { DocumentData, TabData } from '../documents/workspace';
 
 export type HostMessage =
@@ -12,6 +12,7 @@ export type HostMessage =
   | { type: 'updateResult'; requestId: string; releases?: unknown; error?: string; cacheNotice?: string; installSupported?: boolean }
   | { type: 'updateInstallStatus'; message: string; downloading: boolean }
   | { type: 'imagesImported'; requestId: string; sources?: string[]; error?: string }
+  | { type: 'equationCopied'; requestId: string; error?: string }
   | { type: 'error' | 'notice'; message: string };
 
 const native = window.chrome?.webview;
@@ -36,9 +37,9 @@ function download(name: string, content: string, mime: string) {
 }
 function documentFileName(value: string, sourceName: string) {
   const name = value.trim();
-  if (/\.(?:md|markdown|mdown|yaml|yml)$/i.test(name)) return name;
+  if (/\.(?:md|markdown|mdown|yaml|yml|html|htm)$/i.test(name)) return name;
   const yaml = documentLanguage(sourceName) === 'yaml';
-  const extension = /\.yml$/i.test(sourceName) ? '.yml' : yaml ? '.yaml' : '.md';
+  const extension = /\.htm$/i.test(sourceName) ? '.htm' : documentLanguage(sourceName) === 'html' ? '.html' : /\.yml$/i.test(sourceName) ? '.yml' : yaml ? '.yaml' : '.md';
   return `${name || '未命名'}${extension}`;
 }
 
@@ -63,6 +64,14 @@ export function connect(callback: typeof onMessage) {
 
 export function send(type: string, payload: Record<string, unknown> = {}) {
   if (native) { native.postMessage({ type, ...payload }); return; }
+  if (type === 'copyEquation') {
+    void navigator.clipboard.write([new ClipboardItem({
+      'text/html': new Blob([String(payload.html)], { type: 'text/html' }),
+      'text/plain': new Blob([String(payload.mathml)], { type: 'text/plain' }),
+    })]).then(() => onMessage({ type: 'equationCopied', requestId: String(payload.requestId) }),
+      () => onMessage({ type: 'equationCopied', requestId: String(payload.requestId), error: '浏览器不允许复制公式，请使用桌面版或允许剪贴板访问。' }));
+    return;
+  }
   if (type === 'importImages') {
     onMessage({ type: 'imagesImported', requestId: String(payload.requestId), sources: (payload.images as { dataUrl: string }[]).map(image => image.dataUrl) });
     return;
@@ -82,7 +91,7 @@ export function send(type: string, payload: Record<string, unknown> = {}) {
     onMessage({ type: 'operationComplete' });
   }
   if (type === 'open') {
-    fileInput ??= Object.assign(document.createElement('input'), { type: 'file', accept: '.md,.markdown,.mdown,.txt,.yaml,.yml,text/plain,text/markdown,text/yaml', multiple: true });
+    fileInput ??= Object.assign(document.createElement('input'), { type: 'file', accept: '.md,.markdown,.mdown,.txt,.yaml,.yml,.html,.htm,text/plain,text/markdown,text/yaml,text/html', multiple: true });
     fileInput.onchange = async () => {
       try {
         for (const file of Array.from(fileInput?.files ?? [])) {
@@ -96,12 +105,12 @@ export function send(type: string, payload: Record<string, unknown> = {}) {
     fileInput.click();
   }
   if ((type === 'save' || type === 'saveAs') && doc) {
-    const name = type === 'saveAs' ? prompt(documentLanguage(doc.name) === 'yaml' ? 'YAML 文件名' : 'Markdown 文件名', doc.name) : doc.name;
+    const name = type === 'saveAs' ? prompt(`${formatLabel(doc.name)} 文件名`, doc.name) : doc.name;
     if (name) {
       const fileName = documentFileName(name, doc.name);
-      const mime = documentLanguage(fileName) === 'yaml' ? 'application/yaml;charset=utf-8' : 'text/markdown;charset=utf-8';
+      const mime = documentLanguage(fileName) === 'html' ? 'text/html;charset=utf-8' : documentLanguage(fileName) === 'yaml' ? 'application/yaml;charset=utf-8' : 'text/markdown;charset=utf-8';
       download(fileName, doc.text, mime);
-      onMessage({ type: 'notice', message: `已发起 ${documentLanguage(fileName) === 'yaml' ? 'YAML' : 'Markdown'} 下载；草稿仍保留。` });
+      onMessage({ type: 'notice', message: `已发起 ${formatLabel(fileName)} 下载；草稿仍保留。` });
     }
   }
   if (type === 'exportHtml') {

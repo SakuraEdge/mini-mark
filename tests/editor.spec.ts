@@ -9,6 +9,14 @@ async function replace(page: Page, value: string) {
   return editor;
 }
 
+async function sourceLines(page: Page) {
+  return page.locator('.cm-line').evaluateAll(lines => lines.map(line => {
+    const copy = line.cloneNode(true) as Element;
+    copy.querySelectorAll('.formula-entry').forEach(button => button.remove());
+    return copy.textContent;
+  }));
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.cm-editor')).toBeVisible();
@@ -29,8 +37,7 @@ test('/公式 inserts dollars and positions caret in formula', async ({ page }) 
   const editor = await replace(page, '/公式');
   await expect(page.getByRole('listbox')).toBeVisible();
   await page.keyboard.press('Enter'); await page.keyboard.insertText('x^2');
-  await expect(editor).toHaveText('$$x^2$$');
-  const lines = await editor.locator('.cm-line').allTextContents();
+  const lines = await sourceLines(page);
   expect(lines).toEqual(['$$', 'x^2', '$$']);
 });
 
@@ -46,7 +53,7 @@ test('IME confirmation does not execute slash command', async ({ page }) => {
   await page.waitForTimeout(160);
   await page.keyboard.press('Enter');
   await expect(editor).not.toContainText('/公式');
-  expect(await editor.locator('.cm-line').allTextContents()).toEqual(['$$', '', '$$']);
+  expect(await sourceLines(page)).toEqual(['$$', '', '$$']);
 });
 
 test('Escape, navigation, and mouse selection', async ({ page }) => {
@@ -57,7 +64,7 @@ test('Escape, navigation, and mouse selection', async ({ page }) => {
   await expect(page.getByRole('listbox')).toBeHidden();
   await page.keyboard.insertText('公式');
   await page.getByRole('option').filter({ hasText: 'LaTeX' }).click();
-  expect(await editor.locator('.cm-line').allTextContents()).toEqual(['$$', '', '$$']);
+  expect(await sourceLines(page)).toEqual(['$$', '', '$$']);
 });
 
 test('does not offer commands inside code or URLs', async ({ page }) => {

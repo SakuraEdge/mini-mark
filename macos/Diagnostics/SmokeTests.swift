@@ -34,6 +34,35 @@ func runStoreTests() throws {
 }
 
 extension AppDelegate {
+    func checkHtmlSmoke(_ completion: @escaping (Error?) -> Void) {
+        guard let output = smokeOutput else { return }
+        do {
+            let file = output.appendingPathComponent("preview.html")
+            try Data("<!doctype html><html><head><link rel='stylesheet' href='local.css'></head><body><h1 id='result'>BEFORE</h1><script src='local.js'></script></body></html>".utf8).write(to: file)
+            try Data("h1 { color: rgb(12, 100, 50); }".utf8).write(to: output.appendingPathComponent("local.css"))
+            try Data("document.getElementById('result').textContent='HTML_SCRIPT_OK'".utf8).write(to: output.appendingPathComponent("local.js"))
+            let preview = HtmlPreview(file: file)
+            preview.showWindow(nil)
+            func poll(_ remaining: Int) {
+                preview.web.evaluateJavaScript("""
+                document.getElementById('result')?.textContent === 'HTML_SCRIPT_OK' &&
+                getComputedStyle(document.querySelector('h1')).color === 'rgb(12, 100, 50)' &&
+                typeof window.chrome?.webview === 'undefined' &&
+                typeof window.webkit?.messageHandlers?.bridge === 'undefined'
+                """) { value, error in
+                    if value as? Bool == true {
+                        preview.close()
+                        print("PASS macOS HTML relative CSS/JS and no native bridge")
+                        completion(nil)
+                    } else if remaining == 0 {
+                        preview.close()
+                        completion(error ?? Store.failure("HTML preview smoke failed"))
+                    } else { DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { poll(remaining - 1) } }
+                }
+            }
+            poll(100)
+        } catch { completion(error) }
+    }
     func checkPluginSmoke(_ completion: @escaping (Error?) -> Void) {
         web.callAsyncJavaScript("""
         const wait = async predicate => {
@@ -77,6 +106,8 @@ extension AppDelegate {
                 guard error == nil, result as? Bool == true else { self.smokeFinish(error ?? Store.failure("Editor, math, tabs or local storage unavailable")); return }
                 self.checkPluginSmoke { error in
                 if let error = error { self.smokeFinish(error); return }
+                self.checkHtmlSmoke { error in
+                if let error = error { self.smokeFinish(error); return }
                 self.web.takeSnapshot(with: nil) { image, error in
                     if let image = image, let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff), let png = bitmap.representation(using: .png, properties: [:]) { try? png.write(to: output.appendingPathComponent("macos-editor.png")) }
                     do {
@@ -87,6 +118,7 @@ extension AppDelegate {
                         guard try Store.read(path).text == self.session.documents[index].text else { throw Store.failure("Native save mismatch") }
                         try self.beginPdf(self.session.documents[index], output.appendingPathComponent("macos-export.pdf"))
                     } catch { self.smokeFinish(error) }
+                }
                 }
                 }
             }

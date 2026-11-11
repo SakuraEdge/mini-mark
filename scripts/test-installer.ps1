@@ -5,7 +5,9 @@ $target = Join-Path $env:RUNNER_TEMP 'Moye-install-test'
 $choices = @(
   'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\UserChoice',
   'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.yaml\UserChoice',
-  'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.yml\UserChoice'
+  'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.yml\UserChoice',
+  'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.html\UserChoice',
+  'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.htm\UserChoice'
 )
 function Read-Choices {
   return ($choices | ForEach-Object {
@@ -23,6 +25,9 @@ if($command -ne ('"' + (Join-Path $target 'MiniMark.exe') + '" "%1"')) { throw '
 $capability = Get-ItemProperty 'HKCU:\Software\Moye\Capabilities\FileAssociations'
 if($capability.'.md' -ne 'Moye.Markdown') { throw 'MD capability was not registered' }
 if($capability.'.yaml' -ne 'Moye.Yaml' -or $capability.'.yml' -ne 'Moye.Yaml') { throw 'YAML capability was not registered' }
+if($capability.'.html' -ne 'MiniMark.Html' -or $capability.'.htm' -ne 'MiniMark.Html') { throw 'HTML capability was not registered' }
+$htmlCommand = (Get-Item 'HKCU:\Software\Classes\MiniMark.Html\shell\open\command').GetValue('')
+if($htmlCommand -ne ('"' + (Join-Path $target 'MiniMark.exe') + '" "%1"')) { throw 'HTML command does not quote paths correctly' }
 if((Read-Choices) -ne $before) { throw 'Installer changed protected default choice' }
 $yamlCommand = (Get-Item 'HKCU:\Software\Classes\Moye.Yaml\shell\open\command').GetValue('')
 if($yamlCommand -ne ('"' + (Join-Path $target 'MiniMark.exe') + '" "%1"')) { throw 'YAML open command does not quote paths correctly' }
@@ -76,6 +81,7 @@ $outsideFile = Join-Path $outside 'keep.txt'
 $outsideHash = (Get-FileHash -LiteralPath $outsideFile).Hash
 New-Item -ItemType Junction -Path (Join-Path $target 'linked') -Target $outside | Out-Null
 [IO.File]::AppendAllText($owned, "$outsideHash|linked\keep.txt`n$outsideHash|..\Moye-outside-test\keep.txt`n")
+$arguments = $arguments -replace '/TASKS=defaultmd,defaultyaml,desktopicon','/TASKS=defaultmd,defaultyaml,defaulthtml,desktopicon'
 $process = Start-Process -FilePath $installer -ArgumentList $arguments -WindowStyle Hidden -PassThru -Wait
 if($process.ExitCode -ne 0) { throw "Upgrade exited $($process.ExitCode)" }
 if(Test-Path -LiteralPath (Join-Path $target 'wwwroot/old-unused.js')) { throw 'Obsolete owned file survived upgrade' }
@@ -92,6 +98,7 @@ $process = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT','/SU
 if($process.ExitCode -ne 0) { throw "Uninstaller exited $($process.ExitCode)" }
 if(Test-Path 'HKCU:\Software\Classes\Moye.Markdown') { throw 'Owned ProgID was not removed' }
 if(Test-Path 'HKCU:\Software\Classes\Moye.Yaml') { throw 'YAML ProgID was not removed' }
+if(Test-Path 'HKCU:\Software\Classes\MiniMark.Html') { throw 'HTML ProgID was not removed' }
 if((Read-Choices) -ne $before) { throw 'Uninstaller changed protected default choice' }
 if(-not (Test-Path -LiteralPath (Join-Path $target 'Data/session-v2.json'))) { throw 'Uninstall removed user data' }
 Write-Output 'PASS Windows install, in-place upgrade, obsolete-file cleanup, data/junction protection, shortcuts, default choice and uninstall'

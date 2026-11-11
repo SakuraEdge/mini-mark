@@ -3,6 +3,13 @@ THIRD-PARTY NOTICES - MINI MARK
 Runtime npm dependencies and their distributed license texts.
 .NET and WebView2 redistribution notices are also included in the Windows package.
 
+Formula editor additions:
+- MathLive 0.111.4 (MIT): wwwroot/vendor/mathlive/LICENSE.txt.
+- mathml2omml-plus 0.6.4 (LGPL-3.0-or-later): the separate, replaceable
+  wwwroot/vendor/mathml2omml/index.js module is distributed with LICENSE,
+  GPL-3.0.txt, NOTICE.txt, and corresponding source-0.6.4.tar.gz.
+  Reverse engineering for debugging modifications to this library is permitted.
+
 ========================================================================
 @codemirror/autocomplete 6.20.4 (MIT)
 

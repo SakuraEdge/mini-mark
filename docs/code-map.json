@@ -28,7 +28,8 @@
       "files": [
         "src/editor/commands.test.ts",
         "src/editor/commands.ts",
-        "src/editor/editor.ts"
+        "src/editor/editor.ts",
+        "src/editor/math-blocks.ts"
       ]
     },
     {
@@ -97,6 +98,23 @@
       ]
     },
     {
+      "path": "src/features/formulas",
+      "purpose": "可视化公式与 Office 复制",
+      "files": [
+        "src/features/formulas/clipboard.ts",
+        "src/features/formulas/dialog.ts",
+        "src/features/formulas/equation.ts",
+        "src/features/formulas/formulas.ts"
+      ]
+    },
+    {
+      "path": "src/features/html",
+      "purpose": "HTML 编辑入口与隔离运行",
+      "files": [
+        "src/features/html/preview.ts"
+      ]
+    },
+    {
       "path": "native/Host",
       "purpose": "Windows 宿主",
       "files": [
@@ -124,6 +142,7 @@
       "path": "native/Export",
       "purpose": "Windows PDF",
       "files": [
+        "native/Export/EquationClipboard.cs",
         "native/Export/PdfExporter.cs"
       ]
     },
@@ -133,6 +152,15 @@
       "files": [
         "native/Updates/GitHubUpdates.cs",
         "native/Updates/UpdateManifest.cs"
+      ]
+    },
+    {
+      "path": "native/Preview",
+      "purpose": "Windows HTML 运行与 Chrome 启动",
+      "files": [
+        "native/Preview/ChromeLauncher.cs",
+        "native/Preview/HtmlPreviewWindow.cs",
+        "native/Preview/HtmlResources.cs"
       ]
     },
     {
@@ -161,6 +189,7 @@
       "path": "macos/Export",
       "purpose": "macOS PDF",
       "files": [
+        "macos/Export/EquationClipboard.swift",
         "macos/Export/PdfExporter.swift"
       ]
     },
@@ -179,13 +208,22 @@
       ]
     },
     {
+      "path": "macos/Preview",
+      "purpose": "macOS HTML 运行",
+      "files": [
+        "macos/Preview/HtmlPreview.swift"
+      ]
+    },
+    {
       "path": "tests",
       "purpose": "界面回归",
       "files": [
         "tests/editor.spec.ts",
         "tests/features.spec.ts",
         "tests/fixtures/pdf.md",
+        "tests/formulas.spec.ts",
         "tests/host-sync.spec.ts",
+        "tests/html-selection.spec.ts",
         "tests/tab-motion.spec.ts",
         "tests/updates.spec.ts"
       ]
@@ -230,7 +268,9 @@
         "scripts/benchmark.ps1",
         "scripts/code-map.mjs",
         "scripts/create-icon.mjs",
+        "scripts/formula-assets.mjs",
         "scripts/icon-mac.mjs",
+        "scripts/install-local.ps1",
         "scripts/package-mac.sh",
         "scripts/package-win.ps1",
         "scripts/pdf-fixture.mjs",
@@ -289,6 +329,7 @@
         "docs/release-v1.0.5.md",
         "docs/release-v1.1.0.md",
         "docs/release-v2.0.0.md",
+        "docs/release-v3.0.0.md",
         "docs/slash-commands.png",
         "docs/tabs-save.png",
         "docs/updates.png",

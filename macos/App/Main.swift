@@ -1,6 +1,7 @@
 import AppKit
 import WebKit
 import UniformTypeIdentifiers
+import CoreServices
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate {
     var window: NSWindow!
@@ -14,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     var closingApplication = false
     var pdfRequest: (id: String, documentId: String, folder: URL?, target: URL)?
     var pdfExporter: PdfExporter?
+    var htmlPreviews: [UUID: HtmlPreview] = [:]
     let updates = GitHubUpdates()
     let root = Bundle.main.resourceURL!.appendingPathComponent("wwwroot")
     let dataRoot: URL = {
@@ -47,6 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         let menu = NSMenu(), appItem = NSMenuItem(), appMenu = NSMenu()
         appMenu.addItem(withTitle: "关于 Mini Mark", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(withTitle: "检测更新…", action: #selector(checkUpdateMenu), keyEquivalent: "")
+        let htmlDefault = NSMenuItem(title: "HTML 默认应用…", action: #selector(htmlDefaultMenu), keyEquivalent: "")
+        htmlDefault.target = self; appMenu.addItem(htmlDefault)
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "退出 Mini Mark", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu; menu.addItem(appItem)
@@ -65,6 +69,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
     func click(_ id: String) { web.evaluateJavaScript("document.getElementById('\(id)')?.click()", completionHandler: nil) }
     @objc func checkUpdateMenu() { click("check-updates") }
+    @objc func htmlDefaultMenu() {
+        let alert = NSAlert()
+        alert.messageText = "HTML 默认应用"
+        alert.informativeText = "仅更改 HTML 文件的打开方式，不更改默认网页浏览器。"
+        let choice = NSButton(checkboxWithTitle: "使用 Mini Mark 打开 HTML 文件", target: nil, action: nil)
+        choice.frame = NSRect(x: 0, y: 0, width: 300, height: 26)
+        alert.accessoryView = choice
+        alert.addButton(withTitle: "应用"); alert.addButton(withTitle: "取消")
+        if alert.runModal() == .alertFirstButtonReturn && choice.state == .on {
+            let result = LSSetDefaultRoleHandlerForContentType("public.html" as CFString, .all, Bundle.main.bundleIdentifier! as CFString)
+            if result != noErr { notice("无法更改 HTML 默认应用，请在 Finder 显示简介中选择打开方式。", error: true) }
+        }
+    }
     @objc func newMenu() { click("new-file") }
     @objc func openMenu() { click("open-file") }
     @objc func saveMenu() { click("save-markdown") }
@@ -105,6 +122,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             }; return
         }
         if type == "openExternal", let value = body["url"] as? String, let url = URL(string: value), ["https", "http"].contains(url.scheme ?? "") { NSWorkspace.shared.open(url); return }
+        if type == "copyEquation", let requestId = body["requestId"] as? String {
+            do {
+                guard let mathml = body["mathml"] as? String, let omml = body["omml"] as? String else { throw Store.failure("公式数据缺失。") }
+                try EquationClipboard.copy(mathml: mathml, omml: omml)
+                post(["type": "equationCopied", "requestId": requestId])
+            } catch { post(["type": "equationCopied", "requestId": requestId, "error": "公式复制失败：\(error.localizedDescription)"]) }
+            return
+        }
         if type == "exportPlugin", let source = body["source"] as? String, source.utf8.count <= 800000 {
             let panel = NSSavePanel(); panel.allowedContentTypes = [UTType(filenameExtension: "js") ?? .plainText]
             panel.nameFieldStringValue = URL(fileURLWithPath: body["name"] as? String ?? "plugin.js").lastPathComponent
@@ -155,10 +180,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
                 if try confirmSave(i) { remove(target); publish(); persist() }
             }
         case "open":
-            let panel = NSOpenPanel(); panel.allowedContentTypes = [.plainText, .text, UTType(filenameExtension: "md") ?? .plainText, UTType(filenameExtension: "markdown") ?? .plainText, UTType(filenameExtension: "mdown") ?? .plainText, UTType(filenameExtension: "yaml") ?? .plainText, UTType(filenameExtension: "yml") ?? .plainText]; panel.allowsMultipleSelection = true
+            let panel = NSOpenPanel(); panel.allowedContentTypes = [.plainText, .text, .html, UTType(filenameExtension: "md") ?? .plainText, UTType(filenameExtension: "markdown") ?? .plainText, UTType(filenameExtension: "mdown") ?? .plainText, UTType(filenameExtension: "yaml") ?? .plainText, UTType(filenameExtension: "yml") ?? .plainText]; panel.allowsMultipleSelection = true
             if panel.runModal() == .OK { for url in panel.urls { try openPath(url.path) }; publish(); persist() }
         case "save", "saveAs": _ = try save(index, saveAs: type == "saveAs", allowPdf: true)
         case "exportPdf": try choosePdf(session.documents[index])
+        case "runHtml":
+            guard ["html", "htm"].contains(documentExtension(session.documents[index].name)),
+                  let target = body["target"] as? String, ["builtin", "chrome"].contains(target) else { throw Store.failure("仅 HTML 文档可运行。") }
+            let chrome = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.google.Chrome")
+            if target == "chrome" && chrome == nil { throw Store.failure("未找到 Google Chrome，请安装 Chrome 或使用内置浏览器。") }
+            guard try save(index, saveAs: false, allowPdf: false), let path = session.documents[index].path,
+                  ["html", "htm"].contains(documentExtension(path)) else { return }
+            let file = URL(fileURLWithPath: path)
+            if target == "chrome", let chrome = chrome {
+                NSWorkspace.shared.open([file], withApplicationAt: chrome, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+                    if let error = error { DispatchQueue.main.async { self.notice(error.localizedDescription, error: true) } }
+                }
+            } else {
+                let id = UUID(), preview = HtmlPreview(file: file)
+                preview.closed = { [weak self] in self?.htmlPreviews.removeValue(forKey: id) }
+                htmlPreviews[id] = preview; preview.showWindow(nil)
+            }
         case "exportHtml":
             let panel = NSSavePanel(); panel.allowedContentTypes = [.html]; panel.nameFieldStringValue = URL(fileURLWithPath: body["name"] as? String ?? "文档").deletingPathExtension().lastPathComponent + ".html"
             if panel.runModal() == .OK, let url = panel.url, let html = body["html"] as? String { try Data(html.utf8).write(to: url, options: .atomic); notice("HTML 已导出") }
@@ -201,13 +243,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
     func documentExtension(_ name: String) -> String {
         let ext = URL(fileURLWithPath: name).pathExtension.lowercased()
-        return ["yaml", "yml"].contains(ext) ? ext : "md"
+        return ["yaml", "yml", "html", "htm"].contains(ext) ? ext : "md"
     }
     func documentType(_ name: String) -> UTType {
         UTType(filenameExtension: documentExtension(name)) ?? .plainText
     }
     func save(_ index: Int, saveAs: Bool, allowPdf: Bool) throws -> Bool {
         var doc = session.documents[index], path = doc.path
+        let isHtml = ["html", "htm"].contains(documentExtension(doc.name))
+        let allowPdf = allowPdf && !isHtml
         if path == nil || saveAs {
             let panel = NSSavePanel(); panel.nameFieldStringValue = doc.name; panel.allowedContentTypes = [documentType(doc.name)]
             let formats = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 240, height: 28))
@@ -230,7 +274,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         }
         guard let target = path else { return false }
         if session.documents.contains(where: { $0.id != doc.id && ($0.path.map { Store.samePath($0, target) } ?? false) }) { throw Store.failure("该文件已在另一个标签打开，请选择其他文件名。") }
-        try ImageAssets.copyForSaveAs(doc.text, previousPath: doc.path, targetPath: target)
+        if !isHtml { try ImageAssets.copyForSaveAs(doc.text, previousPath: doc.path, targetPath: target) }
         doc.fingerprint = try Store.write(doc, to: target); doc.path = target; doc.baseline = doc.text; session.documents[index] = doc
         persist(); post(["type": "saved", "documentId": doc.id, "name": doc.name, "path": target, "text": doc.text])
         if doc.id == session.activeId { scheme.documentFolder = URL(fileURLWithPath: target).deletingLastPathComponent() }; title(); return true

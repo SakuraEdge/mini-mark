@@ -6,6 +6,17 @@ Directory.CreateDirectory(folder);
 var count = 0;
 void Check(bool valid, string message) { if (!valid) throw new Exception(message); count++; }
 try {
+    var previewFolder = Path.Combine(folder, "html");
+    Directory.CreateDirectory(previewFolder);
+    File.WriteAllText(Path.Combine(previewFolder, "index.html"), "<h1>HTML</h1>");
+    File.WriteAllText(Path.Combine(previewFolder, "test.js"), "window.ready=true");
+    Check(Encoding.UTF8.GetString(HtmlResources.Read(previewFolder, "index.html").Data) == "<h1>HTML</h1>", "HTML resource read failed");
+    Check(HtmlResources.Read(previewFolder, "test.js").Mime.StartsWith("text/javascript"), "JavaScript MIME incorrect");
+    Check(HtmlResources.IsHtml("中文.HTM") && !HtmlResources.IsHtml("x.md"), "HTML extension recognition failed");
+    foreach (var bad in new[] { "../index.html", "/index.html", "folder/../../index.html", "C:/index.html", "index.html:secret", "secret.txt", "a\\test.js" }) {
+        try { HtmlResources.Read(previewFolder, bad); throw new Exception("Unsafe HTML resource accepted"); }
+        catch (IOException) { count++; }
+    }
     var file = Path.Combine(folder, "中文 文件.md");
     var fingerprint = DocumentStore.Write(file, "# 标题\n公式 $$x$$\n", true, "\r\n");
     var document = DocumentStore.Read(file);

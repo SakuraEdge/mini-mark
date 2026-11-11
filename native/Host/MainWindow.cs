@@ -129,6 +129,14 @@ public sealed class MainWindow : Form {
             if (type == "checkUpdates") { _ = CheckUpdates(message.GetProperty("requestId").GetString()!); return; }
             if (type == "installUpdate") { _ = InstallUpdate(message.GetProperty("version").GetString()!); return; }
             if (type == "cancelUpdate") { updateDownload?.Cancel(); return; }
+            if (type == "copyEquation") {
+                var requestId = message.GetProperty("requestId").GetString()!;
+                try {
+                    EquationClipboard.Copy(message.GetProperty("mathml").GetString()!, message.GetProperty("omml").GetString()!);
+                    Post(new { type = "equationCopied", requestId });
+                } catch (Exception error) { Post(new { type = "equationCopied", requestId, error = $"公式复制失败：{error.Message}" }); }
+                return;
+            }
             if (type == "exportPlugin") {
                 var code = message.GetProperty("source").GetString()!;
                 var filename = Path.GetFileName(message.GetProperty("name").GetString()!);
@@ -173,6 +181,17 @@ public sealed class MainWindow : Form {
                 case "save": RunAction(() => Save(document, false, true)); break;
                 case "saveAs": RunAction(() => Save(document, true, true)); break;
                 case "exportPdf": RunAction(() => ChoosePdf(document)); break;
+                case "runHtml":
+                    var previewTarget = message.GetProperty("target").GetString();
+                    RunAction(() => {
+                        if (!HtmlResources.IsHtml(document.Name)) throw new IOException("仅 HTML 文档可运行。");
+                        if (previewTarget is not ("builtin" or "chrome")) throw new IOException("未知的浏览器。");
+                        var chrome = previewTarget == "chrome" ? ChromeLauncher.FindChrome() ?? throw new IOException("未找到 Google Chrome，请安装 Chrome 或使用内置浏览器。") : null;
+                        if (!Save(document, false, false)) return;
+                        if (!HtmlResources.IsHtml(document.Name)) throw new IOException("请保存为 .html 或 .htm 后再运行。");
+                        if (chrome is not null) ChromeLauncher.Open(chrome, document.Path!);
+                        else new HtmlPreviewWindow(document.Path!) { ShowInTaskbar = ShowInTaskbar, Opacity = Opacity }.Show(this);
+                    }); break;
                 case "exportHtml":
                     var html = message.GetProperty("html").GetString()!;
                     var exportName = message.TryGetProperty("name", out var htmlName) ? htmlName.GetString()! : document.Name;
@@ -240,20 +259,21 @@ public sealed class MainWindow : Form {
     }
     private void UpdateTitle() { var document = workspace.Active; Text = $"{(document.Dirty ? "• " : "")}{document.Name} · Mini Mark"; }
     private void Open() {
-        using var dialog = new OpenFileDialog { Filter = "Markdown / YAML 文档|*.md;*.markdown;*.mdown;*.txt;*.yaml;*.yml|所有文件|*.*", CheckFileExists = true, Multiselect = true };
+        using var dialog = new OpenFileDialog { Filter = "Markdown / YAML / HTML 文档|*.md;*.markdown;*.mdown;*.txt;*.yaml;*.yml;*.html;*.htm|所有文件|*.*", CheckFileExists = true, Multiselect = true };
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
         foreach (var file in dialog.FileNames) workspace.Open(file);
         Publish(); Persist();
     }
 
     private static bool IsYaml(string name) => Path.GetExtension(name).Equals(".yaml", StringComparison.OrdinalIgnoreCase) || Path.GetExtension(name).Equals(".yml", StringComparison.OrdinalIgnoreCase);
-    private static string PreferredExtension(string name) => Path.GetExtension(name).Equals(".yml", StringComparison.OrdinalIgnoreCase) ? ".yml" : IsYaml(name) ? ".yaml" : ".md";
+    private static string PreferredExtension(string name) => HtmlResources.IsHtml(name) ? Path.GetExtension(name).ToLowerInvariant() : Path.GetExtension(name).Equals(".yml", StringComparison.OrdinalIgnoreCase) ? ".yml" : IsYaml(name) ? ".yaml" : ".md";
 
     private bool Save(OpenDocument document, bool saveAs, bool allowPdf) {
+        allowPdf &= !HtmlResources.IsHtml(document.Name);
         var target = document.Path;
         if (target is null || saveAs) {
             using var dialog = new SaveFileDialog {
-                Filter = allowPdf ? "Markdown / YAML 文档 (*.md;*.markdown;*.mdown;*.yaml;*.yml)|*.md;*.markdown;*.mdown;*.yaml;*.yml|PDF 文档 (*.pdf)|*.pdf" : "Markdown / YAML 文档 (*.md;*.markdown;*.mdown;*.yaml;*.yml)|*.md;*.markdown;*.mdown;*.yaml;*.yml",
+                Filter = "Markdown / YAML / HTML 文档|*.md;*.markdown;*.mdown;*.yaml;*.yml;*.html;*.htm" + (allowPdf ? "|PDF 文档 (*.pdf)|*.pdf" : ""),
                 DefaultExt = PreferredExtension(document.Name).TrimStart('.'), FileName = document.Name, AddExtension = true, OverwritePrompt = true
             };
             if (dialog.ShowDialog(this) != DialogResult.OK) return false;
@@ -271,7 +291,7 @@ public sealed class MainWindow : Form {
         }
         if (workspace.PathOwnedByAnother(target, document.Id)) throw new IOException("该文件已在另一个标签页打开，请选择其他文件名。");
         var saved = document.Text;
-        ImageAssets.CopyForSaveAs(saved, document.Path, target);
+        if (!HtmlResources.IsHtml(document.Name)) ImageAssets.CopyForSaveAs(saved, document.Path, target);
         document.Fingerprint = DocumentStore.Write(target, saved, document.Bom, document.Newline);
         document.Path = target; document.Baseline = saved;
         Persist();

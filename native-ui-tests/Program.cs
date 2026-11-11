@@ -106,6 +106,74 @@ internal static class Program {
                 await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('.plugin-commands button').click()");
                 await Wait("document.getElementById('toast').textContent === 'NATIVE_PLUGIN_OK'", "Native plugin sandbox network/bridge isolation failed");
                 await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('#plugins-dialog [data-action=close]').click()");
+                await Click("math");
+                await Wait("document.getElementById('formula-dialog')?.open === true", "Production formula dialog failed to load");
+                await browser.CoreWebView2.ExecuteScriptAsync("""
+                (() => {
+                  const source = document.getElementById('formula-latex');
+                  source.value = String.raw`\frac{1}{2}+\sqrt{x}+\alpha`;
+                  source.dispatchEvent(new Event('input', {bubbles:true}));
+                })()
+                """);
+                await Wait("Boolean(document.querySelector('#formula-dialog .formula-preview .katex'))", "Formula preview missing");
+                var previousClipboard = new DataObject();
+                var clipboard = Clipboard.GetDataObject();
+                if (clipboard is not null) {
+                    // OLE owner/link descriptors cannot be republished by a different process.
+                    foreach (var format in new[] { DataFormats.UnicodeText, DataFormats.Html, DataFormats.Rtf, DataFormats.Bitmap, DataFormats.FileDrop }) {
+                        try {
+                            if (!clipboard.GetDataPresent(format, false)) continue;
+                            var data = clipboard.GetData(format, false);
+                            if (data is MemoryStream bytes) data = new MemoryStream(bytes.ToArray());
+                            if (data is System.Drawing.Image image) data = image.Clone();
+                            if (data is not null) previousClipboard.SetData(format, false, data);
+                        } catch { /* A clipboard owner may decline a delayed format. */ }
+                    }
+                }
+                try {
+                    await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('#formula-dialog [data-action=copy]').click()");
+                    await Wait("document.getElementById('formula-status').textContent === '已复制可编辑公式'", "Native structured equation copy failed");
+                    var copied = Clipboard.GetDataObject() ?? throw new Exception("Equation clipboard was empty");
+                    var html = copied.GetData(DataFormats.Html) as string ?? "";
+                    if (!copied.GetDataPresent("MathML", false) || !html.Contains("<m:f>") || !html.Contains("<m:rad>") || !html.Contains("α"))
+                        throw new Exception("Clipboard lost structured equation or Unicode");
+                    var bytes = System.Text.Encoding.UTF8.GetBytes(html);
+                    int Offset(string name) => int.Parse(System.Text.RegularExpressions.Regex.Match(html, name + @":(\d+)").Groups[1].Value);
+                    var fragment = System.Text.Encoding.UTF8.GetString(bytes[Offset("StartFragment")..Offset("EndFragment")]);
+                    if (!fragment.StartsWith("<p>") || !fragment.EndsWith("</p>")) throw new Exception("CF_HTML UTF-8 fragment offsets are incorrect");
+                    if (copied.GetData("MathML", false) is not MemoryStream stream || !System.Text.Encoding.UTF8.GetString(stream.ToArray()).Contains("<mfrac>"))
+                        throw new Exception("Registered MathML clipboard bytes are incorrect");
+                } finally {
+                    Clipboard.SetDataObject(previousClipboard, true, 20, 100);
+                }
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('#formula-dialog [data-action=save]').click()");
+                await Wait("!document.getElementById('formula-dialog') && document.querySelector('.cm-content').textContent.includes('frac')", "Formula writeback failed");
+                await Click("save-markdown");
+                await Wait("document.getElementById('save-state').textContent === '已保存'", "Formula document save failed");
+                if (!File.ReadAllText(savedFile).Contains("\\frac{1}{2}+\\sqrt{x}+\\alpha")) throw new Exception("Saved file lost formula");
+                Console.WriteLine("PASS production formula dialog, preview, structured MathML/OMML clipboard, UTF-8 offsets, writeback and native save");
+                var htmlFile = Path.Combine(folder, "网页.html");
+                File.WriteAllText(Path.Combine(folder, "local.css"), "h1 { color: rgb(12, 100, 50); }");
+                File.WriteAllText(Path.Combine(folder, "local.js"), "document.getElementById('result').textContent='HTML_SCRIPT_OK';");
+                File.WriteAllText(htmlFile, "<!doctype html><html><head><link rel='stylesheet' href='local.css'></head><body><h1 id='result'>BEFORE</h1><script src='local.js'></script></body></html>");
+                window.OpenFromArguments([htmlFile]);
+                await Wait("document.getElementById('document-format').textContent === 'HTML' && document.getElementById('surface').dataset.mode === 'source'", "HTML source mode missing");
+                if (window.OwnedForms.OfType<HtmlPreviewWindow>().Any()) throw new Exception("HTML executed on open");
+                await Click("run-html");
+                HtmlPreviewWindow? htmlWindow = null;
+                WebView2? htmlWeb = null;
+                for (var attempt = 0; attempt < 200; attempt++) {
+                    htmlWindow = window.OwnedForms.OfType<HtmlPreviewWindow>().FirstOrDefault();
+                    htmlWeb = htmlWindow?.Controls.OfType<WebView2>().SingleOrDefault();
+                    if (htmlWeb?.CoreWebView2 is not null && await htmlWeb.CoreWebView2.ExecuteScriptAsync("document.getElementById('result')?.textContent === 'HTML_SCRIPT_OK'") == "true") break;
+                    await Task.Delay(50);
+                }
+                if (htmlWeb?.CoreWebView2 is null || await htmlWeb.CoreWebView2.ExecuteScriptAsync("document.getElementById('result')?.textContent === 'HTML_SCRIPT_OK' && getComputedStyle(document.querySelector('h1')).color === 'rgb(12, 100, 50)'") != "true")
+                    throw new Exception("Native HTML relative CSS/JS did not execute");
+                if (htmlWeb.CoreWebView2.Settings.IsWebMessageEnabled || htmlWeb.CoreWebView2.Settings.AreHostObjectsAllowed)
+                    throw new Exception("HTML preview exposes native bridge");
+                htmlWindow!.Close();
+                Console.WriteLine("PASS native HTML open/save/run, local CSS/JS and isolated preview without host bridge");
                 if (!window.Text.Contains("Mini Mark")) throw new Exception("Window branding did not update");
                 Console.WriteLine($"PASS actual WebView2 CRLF restore, native New/Open/Save/tab buttons, view/theme/focus/menu controls, clean session, bounded messages ({received})");
                 Console.WriteLine("PASS actual WebView2 image import/render/save and plugin sandbox/network/bridge isolation");

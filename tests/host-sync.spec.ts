@@ -74,11 +74,14 @@ test('toolbar and shell buttons respond across editing and reading modes', async
     await page.getByRole('button', { name, exact: true }).click();
     await expect(editor).toHaveText(value);
   }
-  for (const [name, value] of [['代码块', '```cpp'], ['公式', '$$'], ['表格', '| 标题'], ['引用', '> ']]) {
+  for (const [name, value] of [['代码块', '```cpp'], ['表格', '| 标题'], ['引用', '> ']]) {
     await editor.fill('');
     await page.getByRole('button', { name, exact: true }).click();
     await expect(editor).toContainText(value);
   }
+  await page.getByRole('button', { name: '公式', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '公式编辑器' })).toBeVisible();
+  await page.getByRole('button', { name: '关闭公式编辑器', exact: true }).click();
   await page.getByRole('button', { name: '查找与替换', exact: true }).click();
   await expect(page.locator('.cm-search')).toBeVisible();
   await page.getByRole('button', { name: '切换侧栏', exact: true }).click();

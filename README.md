@@ -6,13 +6,13 @@
 
 **轻快写作，清晰表达。**
 
-为 Windows 与 macOS 打造的 Markdown / YAML 编辑器。
-中文公式、实时分屏、图片和自定义插件，让想法留在自己的电脑里。
+为 Windows 与 macOS 打造的 Markdown / YAML / HTML 编辑器。
+中文公式、实时分屏、网页预览、图片和自定义插件，让想法留在自己的电脑里。
 
 [![Release](https://img.shields.io/github/v/release/SakuraEdge/mini-mark?color=286bd6&label=Download)](https://github.com/SakuraEdge/mini-mark/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-526a85)](LICENSE)
 
-[下载 Windows 版](https://github.com/SakuraEdge/mini-mark/releases/latest/download/MiniMark-Setup-2.0.0-windows-x64.exe) · [下载 macOS 版](https://github.com/SakuraEdge/mini-mark/releases/latest/download/MiniMark-2.0.0-macos-universal.dmg) · [全部版本](https://github.com/SakuraEdge/mini-mark/releases)
+[下载 Windows 版](https://github.com/SakuraEdge/mini-mark/releases/latest/download/MiniMark-Setup-3.0.0-windows-x64.exe) · [下载 macOS 版](https://github.com/SakuraEdge/mini-mark/releases/latest/download/MiniMark-3.0.0-macos-universal.dmg) · [全部版本](https://github.com/SakuraEdge/mini-mark/releases)
 
 </div>
 
@@ -28,6 +28,8 @@
 | **清晰排版** | 数学公式、语法高亮、表格、任务清单与大纲 |
 | **多文档** | 标签切换、独立撤销、草稿恢复，不打断当前思路 |
 | **YAML** | 保留注释和缩进，编辑配置文件也能看得清楚 |
+| **HTML** | 编辑网页源码，在内置浏览器或本地 Chrome 中运行 |
+| **公式编辑器** | 点击创建分数、根号、积分和矩阵，预览后写入 Markdown |
 | **自定义插件** | 用 JavaScript 编写自己的文字处理命令 |
 | **分享成果** | 保存 Markdown / YAML，导出 PDF 或 HTML |
 
@@ -44,6 +46,16 @@ $$
 ```
 
 离开公式所在行，即时视图会自动排版。输入 `/` 可浏览全部命令，也支持拼音和英文前缀。
+
+也可点击空公式处的“公式编辑器”或顶部公式按钮，使用可视化模板创建公式。选择“写入 Markdown”插回文档，或“复制到 Word / WPS”复制结构化公式；接收软件的版本和粘贴方式会影响兼容性。
+
+## 编辑与运行 HTML
+
+在“更多 → 新建 HTML”创建网页，或直接打开 `.html` / `.htm`。源码支持 HTML、CSS 和 JavaScript 高亮。
+
+点击播放按钮，保存并在内置浏览器运行；点击旁边的浏览器按钮，保存并使用本地 Google Chrome 打开。内置窗口可重新运行，支持同目录及子目录中的 CSS、脚本、图片和字体。打开文件本身不会执行脚本。
+
+HTML 不会自动改为由 Mini Mark 默认打开。Windows 安装时可主动勾选并在系统设置确认；macOS 可在应用菜单“HTML 默认应用…”中主动设置。只运行可信页面，运行页面可以联网；带后端服务的项目仍需自己的开发服务器。
 
 | 输入 | 插入内容 |
 | --- | --- |
@@ -64,12 +76,12 @@ $$
 
 | 系统 | 安装版 | 便携 / 压缩包 |
 | --- | --- | --- |
-| Windows 10 / 11，x64 | [下载 EXE](https://github.com/SakuraEdge/mini-mark/releases/download/v2.0.0/MiniMark-Setup-2.0.0-windows-x64.exe) | [下载 ZIP](https://github.com/SakuraEdge/mini-mark/releases/download/v2.0.0/MiniMark-2.0.0-windows-x64.zip) |
-| macOS 13 或更新版本 | [下载 DMG](https://github.com/SakuraEdge/mini-mark/releases/download/v2.0.0/MiniMark-2.0.0-macos-universal.dmg) | [下载 ZIP](https://github.com/SakuraEdge/mini-mark/releases/download/v2.0.0/MiniMark-2.0.0-macos-universal.zip) |
+| Windows 10 / 11，x64 | [下载 EXE](https://github.com/SakuraEdge/mini-mark/releases/download/v3.0.0/MiniMark-Setup-3.0.0-windows-x64.exe) | [下载 ZIP](https://github.com/SakuraEdge/mini-mark/releases/download/v3.0.0/MiniMark-3.0.0-windows-x64.zip) |
+| macOS 13 或更新版本 | [下载 DMG](https://github.com/SakuraEdge/mini-mark/releases/download/v3.0.0/MiniMark-3.0.0-macos-universal.dmg) | [下载 ZIP](https://github.com/SakuraEdge/mini-mark/releases/download/v3.0.0/MiniMark-3.0.0-macos-universal.zip) |
 
-macOS 通用版支持 **Apple Silicon 与 Intel**。[查看 SHA-256 校验和](https://github.com/SakuraEdge/mini-mark/releases/download/v2.0.0/SHA256SUMS-v2.0.0.txt)
+macOS 通用版支持 **Apple Silicon 与 Intel**。[查看 SHA-256 校验和](https://github.com/SakuraEdge/mini-mark/releases/download/v3.0.0/SHA256SUMS-v3.0.0.txt)
 
-**Windows：** 运行安装程序，可选择桌面快捷方式和 Markdown / YAML 文件关联。默认应用的最终选择由 Windows 设置确认。便携版完整解压后运行 `MiniMark.exe`。需要系统安装 Microsoft Edge WebView2 Runtime。
+**Windows：** 运行安装程序，可选择桌面快捷方式和 Markdown / YAML / HTML 文件关联。默认应用的最终选择由 Windows 设置确认。便携版完整解压后运行 `MiniMark.exe`。需要系统安装 Microsoft Edge WebView2 Runtime。
 
 **macOS：** 打开 DMG，将 `Mini Mark.app` 拖入 Applications。从原“墨页 Moye”升级时，新应用会继续读取原有草稿；确认文档恢复后，可移除旧的 `Moye.app`，避免两个入口混淆。
 

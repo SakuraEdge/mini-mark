@@ -16,7 +16,8 @@
   --accent: #286bd6;
   --accent-soft: #eaf2ff;
   --code: #f3f6fa;
-  --selection: #d7e8ff;
+  --selection: #165fc0;
+  --selection-text: #fff;
   --editor-size: 16px;
   --shadow: 0 8px 36px #293b531a, 0 1px 4px #293b5310;
   color-scheme: light;
@@ -33,7 +34,8 @@
   --accent: #8dbbff;
   --accent-soft: #2c3b51;
   --code: #2b3038;
-  --selection: #3d5575;
+  --selection: #acd2ff;
+  --selection-text: #10213a;
   --shadow: 0 8px 36px #0005;
   color-scheme: dark;
 }
@@ -114,7 +116,7 @@ svg { width: 17px; height: 17px; flex-shrink: 0; }
 .cm-gutters { background: var(--sidebar) !important; color: var(--muted) !important; border: none !important; font: 11px/1.95 Consolas, monospace; }
 .cm-lineNumbers .cm-gutterElement { padding-left: 12px !important; min-width: 45px; }
 .cm-activeLine { background: var(--sidebar) !important; }
-.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection { background: var(--selection) !important; }
+.cm-content::selection, .cm-content *::selection { background: var(--selection) !important; color: var(--selection-text) !important; }
 .cm-cursor { border-left-color: var(--accent) !important; }
 .cm-placeholder { color: var(--muted) !important; }
 .syntax-h1, .syntax-h2, .syntax-h3 { display: inline; line-height: 1.35; vertical-align: baseline; overflow-wrap: anywhere; }
@@ -225,6 +227,44 @@ svg { width: 17px; height: 17px; flex-shrink: 0; }
 .image-dialog > label { display: block; margin: 16px 0 6px; color: var(--soft); }
 .image-dialog > input { display: block; width: 100%; min-height: 36px; }
 .image-dialog #image-status { min-height: 18px; color: var(--soft); }
+.html-tools { display: flex; gap: 4px; align-items: center; }
+.html-document .format-tools { flex: 0 0 auto; }
+.html-document .html-tools { flex: 1; }
+.html-document .format-tools .divider, .html-document .format-tools button:not(#undo):not(#redo) { display: none; }
+.html-preview-dialog { width: min(1100px, calc(100vw - 24px)); height: min(760px, calc(100dvh - 24px)); padding: 16px; }
+.html-preview-dialog iframe { width: 100%; height: calc(100% - 54px); border: 1px solid var(--line); background: white; }
+.html-preview-dialog header { margin-bottom: 12px; }
+.html-preview-dialog h2 { flex: 1; }
+.html-readonly-source { white-space: pre-wrap; font: 14px/1.8 Consolas, monospace; }
+.formula-entry { display: inline-flex; vertical-align: middle; align-items: center; gap: 7px; margin: 0 10px; padding: 5px 10px; height: 32px; border: 1px solid var(--line); border-radius: 4px; background: var(--accent-soft); color: var(--accent); font: 12px/1.4 "Segoe UI", "Microsoft YaHei UI", sans-serif; }
+.formula-entry svg, .formula-rendered > svg { width: 16px; height: 16px; }
+.formula-rendered { width: 100%; border: 1px solid transparent; border-radius: 4px; color: var(--text); background: transparent; text-align: center; cursor: pointer; min-height: 60px; }
+.formula-rendered:hover { border-color: var(--line); background: var(--sidebar); }
+.formula-rendered > span, .formula-rendered > svg { display: inline-block; vertical-align: middle; margin: 0 5px; }
+.formula-dialog { width: min(760px, calc(100vw - 24px)); }
+.formula-templates { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.feature-dialog .formula-templates button { height: 58px; padding: 5px; overflow: hidden; font-size: 15px; }
+.formula-templates .katex { font-size: 1em; }
+.formula-symbols { display: flex; flex-wrap: wrap; gap: 4px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.feature-dialog .formula-symbols button { min-width: 32px; height: 32px; padding: 3px 7px; border: 0; }
+.formula-field-label { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 6px; color: var(--soft); }
+.formula-edit-tools { display: flex; gap: 3px; }
+.formula-dialog math-field { display: block; width: 100%; min-height: 88px; padding: 16px; font-size: 24px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--text); --caret-color: var(--accent); --selection-background-color: var(--accent-soft); --primary: var(--accent); }
+.formula-dialog math-field:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.formula-dialog math-field::part(virtual-keyboard-toggle), .formula-dialog math-field::part(menu-toggle) { display: none; }
+.formula-source { margin-top: 12px; color: var(--soft); }
+.formula-source summary { cursor: pointer; padding: 6px 0; }
+.formula-source textarea { display: block; margin-top: 6px; width: 100%; min-height: 72px; max-height: 180px; resize: vertical; font: 13px/1.6 Consolas, monospace; }
+.formula-preview { min-height: 70px; max-height: 150px; overflow: auto; padding: 8px 0; font-size: 18px; }
+#formula-status { min-height: 20px; margin: 6px 0 14px; color: var(--soft); line-height: 1.6; overflow-wrap: anywhere; }
+.formula-dialog footer { flex-wrap: wrap; }
+.formula-dialog footer svg { width: 16px; height: 16px; flex-shrink: 0; }
+@media (max-width: 520px) {
+  .formula-dialog { padding: 16px; }
+  .formula-templates { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .formula-dialog math-field { font-size: 22px; }
+  .formula-dialog footer button { flex: 1 1 180px; }
+}
 .plugins-dialog { width: min(880px, calc(100vw - 32px)); padding: 22px 0 0; }
 .plugins-dialog > header, .plugin-toolbar { padding: 0 22px; }
 .plugin-toolbar { display: flex; align-items: center; gap: 8px; padding-bottom: 18px; }

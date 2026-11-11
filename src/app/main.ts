@@ -7,12 +7,15 @@ import { createEditor, insertCommand, modeCompartment, modeExtensions, replaceDo
 import { connect, isDesktop, send, type DocumentData, type TabData } from '../platform/bridge';
 import { headings, renderMarkdown, renderYaml, wordCount, setImageDocument } from '../markdown/render';
 import { sample } from '../documents/sample';
-import { documentLanguage, type DocumentLanguage } from '../documents/formats';
+import { documentLanguage, formatLabel, type DocumentLanguage } from '../documents/formats';
+import { htmlTemplate, openBrowserPreview } from '../features/html/preview';
 import { normalizeText } from '../documents/workspace';
 import { APP_VERSION, initializeUpdates, openUpdates, scheduleUpdateCheck, handleUpdateMessage } from '../features/updates/updates';
 import { initializeTheme, toggleTheme } from '../features/theme/theme';
 import { initializeImages, handleImageMessage } from '../features/images/images';
 import { initializePlugins } from '../features/plugins/manager';
+import { initializeFormulas } from '../features/formulas/formulas';
+import { handleFormulaMessage } from '../features/formulas/clipboard';
 import '../styles/app.css';
 
 const app = mountApp(isDesktop, APP_VERSION);
@@ -71,6 +74,10 @@ const view = createEditor(document.querySelector('#editor')!, (update) => {
   }
 });
 const imageActions = initializeImages({
+  view, notice: showToast,
+  snapshot: () => ({ documentId: activeId, revision, editable: !transitionPending && mode !== 'read' && language === 'markdown' }),
+});
+const formulaActions = initializeFormulas({
   view, notice: showToast,
   snapshot: () => ({ documentId: activeId, revision, editable: !transitionPending && mode !== 'read' && language === 'markdown' }),
 });
@@ -187,7 +194,7 @@ function animateDocumentSwitch() {
 function updateOutline() {
   const outline = document.querySelector('#outline')!;
   outline.replaceChildren();
-  if (language === 'yaml') {
+  if (language !== 'markdown') {
     const empty = document.createElement('span'); empty.className = 'outline-empty'; empty.textContent = '暂无标题'; outline.append(empty);
     return;
   }
@@ -223,22 +230,29 @@ function showToast(message: string) {
 
 function updateDocumentFormatUi() {
   const isYaml = language === 'yaml';
+  const isHtml = language === 'html';
+  app.classList.toggle('html-document', isHtml);
+  document.querySelector<HTMLElement>('#html-tools')!.hidden = !isHtml;
+  document.querySelector<HTMLElement>('.view-switch')!.hidden = isHtml;
+  document.querySelector<HTMLButtonElement>('#save-pdf')!.hidden = isHtml;
+  document.querySelector<HTMLButtonElement>('#export-html')!.hidden = isHtml;
   const format = document.querySelector<HTMLElement>('#document-format');
-  if (format) format.textContent = isYaml ? 'YAML' : 'Markdown';
+  if (format) format.textContent = formatLabel(name);
   const saveLabel = document.querySelector<HTMLElement>('#save-format-label');
-  if (saveLabel) saveLabel.textContent = isYaml ? '保存 YAML (.yaml)' : '保存 Markdown (.md)';
+  if (saveLabel) saveLabel.textContent = isHtml ? '保存 HTML (.html)' : isYaml ? '保存 YAML (.yaml)' : '保存 Markdown (.md)';
   const liveButton = document.querySelector<HTMLButtonElement>('.view-switch button[data-mode="live"]');
   if (liveButton) {
-    liveButton.disabled = isYaml;
+    liveButton.disabled = language !== 'markdown';
     liveButton.title = isYaml ? 'YAML 使用源码模式编辑' : '即时排版';
   }
   document.querySelectorAll<HTMLButtonElement>('#format-tools button').forEach((button) => {
     const markdownOnly = !['undo', 'redo'].includes(button.id);
-    button.disabled = mode === 'read' || (isYaml && markdownOnly);
+    button.disabled = mode === 'read' || (language !== 'markdown' && markdownOnly);
   });
 }
 
 function setMode(next: EditorMode) {
+  if (language === 'html') next = 'source';
   if (language === 'yaml' && next === 'live') next = 'source';
   const changed = mode !== next;
   mode = next;
@@ -274,6 +288,10 @@ function refreshPreview() {
 }
 
 function renderDocument(text: string) {
+  if (language === 'html') {
+    const pre = document.createElement('pre'); pre.className = 'html-readonly-source'; pre.textContent = text;
+    return pre.outerHTML;
+  }
   return language === 'yaml' ? renderYaml(text) : renderMarkdown(text);
 }
 
@@ -296,6 +314,20 @@ function nativeAction(type: string, payload: Record<string, unknown> = {}) {
 
 function on(id: string, action: () => void) { document.querySelector(`#${id}`)!.addEventListener('click', action); }
 on('new-file', () => nativeAction('new'));
+on('new-html', () => {
+  document.querySelector<HTMLElement>('#more-menu')!.hidden = true;
+  let number = 1;
+  while (tabs.some(tab => tab.name.toLowerCase() === `未命名 ${number}.html`)) number++;
+  nativeAction('new', { name: `未命名 ${number}.html`, initialText: htmlTemplate });
+});
+function runHtml(target: 'builtin' | 'chrome') {
+  if (transitionPending || language !== 'html') return;
+  if (isDesktop) nativeAction('runHtml', { target });
+  else if (target === 'builtin') openBrowserPreview(view.state.doc.toString());
+  else showToast('调用本地 Chrome 请使用桌面版。');
+}
+on('run-html', () => runHtml('builtin'));
+on('chrome-html', () => runHtml('chrome'));
 on('new-tab', () => nativeAction('new'));
 on('open-file', () => nativeAction('open'));
 on('save-file', () => { const menu = document.querySelector<HTMLElement>('#save-menu')!; menu.hidden = !menu.hidden; document.querySelector<HTMLElement>('#more-menu')!.hidden = true; });
@@ -312,7 +344,8 @@ on('link', () => surround(view, '[', '](https://)'));
 on('image', () => imageActions.open());
 on('undo', () => { undo(view); view.focus(); });
 on('redo', () => { redo(view); view.focus(); });
-for (const id of ['code', 'math', 'table', 'quote']) on(id, () => insertCommand(view, id));
+on('math', formulaActions.open);
+for (const id of ['code', 'table', 'quote']) on(id, () => insertCommand(view, id));
 on('search', () => { if (mode === 'read') setMode('source'); openSearchPanel(view); });
 on('theme', toggleTheme);
 on('font-size', () => {
@@ -391,6 +424,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && act
 
 let updateScheduled = false;
 connect((message) => {
+  if (handleFormulaMessage(message)) return;
   if (handleImageMessage(message)) return;
   if (handleUpdateMessage(message)) return;
   if (message.type === 'workspace') {
@@ -417,7 +451,7 @@ connect((message) => {
     revision = current.revision;
     loading = true;
     const nextLanguage = documentLanguage(doc.name);
-    mode = cached?.mode ?? (nextLanguage === 'yaml' ? 'source' : mode);
+    mode = nextLanguage === 'html' ? 'source' : cached?.mode ?? (nextLanguage === 'yaml' ? 'source' : mode);
     if (nextLanguage === 'yaml' && mode === 'live') mode = 'source';
     language = nextLanguage;
     if (cached && cached.document.text === current.text) {
@@ -471,7 +505,7 @@ connect((message) => {
       const nextLanguage = documentLanguage(name);
       if (nextLanguage !== language) {
         language = nextLanguage;
-        if (language === 'yaml' && mode === 'live') mode = 'source';
+        if (language === 'html' || language === 'yaml' && mode === 'live') mode = 'source';
         setEditorLanguage(view, language);
         if (cached) {
           cached.state = view.state;

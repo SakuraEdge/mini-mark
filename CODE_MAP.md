@@ -15,6 +15,8 @@ src/
   features/updates/    检测更新界面、版本比较、提醒偏好
   features/theme/      主题偏好与渐变切换
   features/images/     图片插入、粘贴与拖入
+  features/formulas/   按需加载的公式编辑器、Office 公式转换与复制
+  features/html/       HTML 新建模板和浏览器隔离预览
   features/plugins/    插件管理、校验与隔离执行协议
   styles/              全局样式、主题、响应式布局和动画
 native/                Windows / .NET
@@ -56,6 +58,9 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 | Mini Mark 图标与预览 | `public/mini-mark.svg`、`docs/branding/README.md`、`scripts/create-icon.mjs`、`scripts/icon-mac.mjs` |
 | 图片导入与资源访问 | `src/features/images/`、`src/markdown/render.ts`、两平台 `Documents/ImageAssets`、`docs/images.md` |
 | 自定义插件 | `src/features/plugins/`、`public/plugin-host.html`、`public/plugin-host.js`、`docs/plugins.md` |
+| 公式编辑与 Word/WPS 复制 | `src/features/formulas/`、`src/editor/math-blocks.ts`、两平台 `Export/EquationClipboard`、`scripts/formula-assets.mjs` |
+| HTML 编辑与运行 | `src/documents/formats.ts`、`src/features/html/`、两平台 `Preview/`；`runHtml` 保存成功后才运行 |
+| 文字选区 | `src/editor/editor.ts` 使用原生选区；`src/styles/app.css` 的 `::selection` 在有背景的代码行上仍可见 |
 | 更新、提醒、下载 | `src/features/updates/`、两平台的 `Updates/` |
 | 数据盘、单实例 | `native/Infrastructure/` |
 | 安装位置、快捷方式、旧文件清理 | `installer/Moye.iss`、`scripts/package-win.ps1` |

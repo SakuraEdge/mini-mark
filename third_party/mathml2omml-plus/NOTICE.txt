@@ -1,0 +1,13 @@
+mathml2omml-plus 0.6.4
+Copyright Johannes Wilm and contributors; maintained fork by lofcz.
+License: LGPL-3.0-or-later, together with GPL-3.0.
+
+Source repository: https://github.com/lofcz/mathml2omml
+Commit: 3f88fa3826b549de39735a45ffc99eed250f691f
+The corresponding upstream source is included as source-0.6.4.tar.gz.
+The distribution includes the unminified ESM module in index.js.
+Mini Mark imports this module separately. It can be replaced with a
+compatible modified version; no signature check restricts replacement.
+
+The MIT parser attribution is retained in the corresponding source.
+The library has not been modified by Mini Mark.
