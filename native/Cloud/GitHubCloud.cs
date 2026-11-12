@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace Moye;
 
-public sealed class GitHubCloud {
+public sealed partial class GitHubCloud {
     private readonly HttpClient http;
     private readonly ICloudTokenStore store;
     private readonly Func<string> clientId;
@@ -180,6 +180,7 @@ public sealed class GitHubCloud {
             }
             case "read": return await Read(Value("owner"), Value("path"));
             case "write": return await Write(Value("owner"), Value("path"), Value("text"), Value("sha") is "" ? null : Value("sha"));
+            case "delete": return await Delete(Value("owner"), Value("path"), Value("sha"), Value("entryType"));
             case "folder": {
                 var owner = await Account(Value("owner"));
                 var path = CloudPaths.Validate(Value("path"), true);

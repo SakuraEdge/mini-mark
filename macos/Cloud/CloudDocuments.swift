@@ -18,11 +18,15 @@ extension AppDelegate {
             self.cloudBusy = false
             if case .failure(let error) = result { self.closingRequest = nil; self.notice(error.localizedDescription, error: true) }
             self.post(["type": "operationComplete"])
-            if !self.queuedPaths.isEmpty && !self.confirmedClose {
-                let paths = self.queuedPaths; self.queuedPaths = []
-                do { for path in paths { try self.openPath(path) }; self.publish(); self.persist(); self.window.makeKeyAndOrderFront(nil) }
-                catch { self.notice(error.localizedDescription, error: true) }
-            }
+            self.drainQueuedDocumentPaths()
+        }
+    }
+
+    func drainQueuedDocumentPaths() {
+        if !queuedPaths.isEmpty && !confirmedClose {
+            let paths = queuedPaths; queuedPaths = []
+            do { for path in paths { try openPath(path) }; publish(); persist(); window.makeKeyAndOrderFront(nil) }
+            catch { notice(error.localizedDescription, error: true) }
         }
     }
 

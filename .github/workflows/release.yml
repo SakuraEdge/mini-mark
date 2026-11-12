@@ -50,26 +50,28 @@ jobs:
           release_version=$(node -p "require('./package.json').releaseVersion")
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          tag="v$version"
+          tag="rev-v$release_version"
           title="Mini Mark Rev v$release_version"
           notes="$PWD/docs/release-rev-v$release_version.md"
           test -f "$notes"
-          node scripts/update-manifest.mjs "$version" release-assets
           cd release-assets
-          files=("MiniMark-Setup-$version-windows-x64.exe" "MiniMark-$version-windows-x64.zip" "MiniMark-$version-macos-universal.dmg" "MiniMark-$version-macos-universal.zip" "Moye-Setup-$version-windows-x64.exe")
-          for file in "${files[@]}"; do test -s "$file"; done
           cp "MiniMark-Setup-$version-windows-x64.exe" "MiniMark-Rev-$release_version-Setup-windows-x64.exe"
           cp "MiniMark-$version-windows-x64.zip" "MiniMark-Rev-$release_version-windows-x64.zip"
           cp "MiniMark-$version-macos-universal.dmg" "MiniMark-Rev-$release_version-macos-universal.dmg"
           cp "MiniMark-$version-macos-universal.zip" "MiniMark-Rev-$release_version-macos-universal.zip"
-          files+=("MiniMark-Rev-$release_version-Setup-windows-x64.exe" "MiniMark-Rev-$release_version-windows-x64.zip" "MiniMark-Rev-$release_version-macos-universal.dmg" "MiniMark-Rev-$release_version-macos-universal.zip")
+          files=("MiniMark-Rev-$release_version-Setup-windows-x64.exe" "MiniMark-Rev-$release_version-windows-x64.zip" "MiniMark-Rev-$release_version-macos-universal.dmg" "MiniMark-Rev-$release_version-macos-universal.zip")
+          for file in "${files[@]}"; do test -s "$file"; done
+          node ../scripts/update-manifest.mjs "$version" . "$release_version"
           checksums="SHA256SUMS-Rev-v$release_version.txt"
           sha256sum "${files[@]}" > "$checksums"
           already_published=false
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft > existing.json 2>/dev/null; then
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > published.json
+            expected_names=$(printf '%s\n' "${files[@]}" "$checksums" update.json | jq -R . | jq -s 'sort')
+            jq -e --argjson names "$expected_names" 'all(.assets[]; .name as $name | $names | index($name) != null)' published.json > /dev/null
             if test "$(jq -r .isDraft existing.json)" = false; then
               already_published=true
-              gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > published.json
+              jq -e --argjson names "$expected_names" '([.assets[].name] | sort) == $names' published.json > /dev/null
               for file in "${files[@]}" "$checksums" update.json; do
                 expected="sha256:$(sha256sum "$file" | cut -d ' ' -f 1)"
                 actual=$(jq -r --arg name "$file" '.assets[] | select(.name == $name) | .digest' published.json)
@@ -83,11 +85,14 @@ jobs:
             gh release upload "$tag" --repo "$GITHUB_REPOSITORY" "${files[@]}" "$checksums" update.json --clobber
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
           fi
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > published.json
+          expected_names=$(printf '%s\n' "${files[@]}" "$checksums" update.json | jq -R . | jq -s 'sort')
+          jq -e --argjson names "$expected_names" '([.assets[].name] | sort) == $names and .draft == false and .prerelease == false' published.json > /dev/null
           if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/updates" > /dev/null 2>&1; then
             gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/heads/updates -f sha="$BUILD_SHA"
           fi
-          if ! old_sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/stable.json?ref=updates" --jq .sha 2>/dev/null); then old_sha=''; fi
+          if ! old_sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/rev-stable.json?ref=updates" --jq .sha 2>/dev/null); then old_sha=''; fi
           jq -n --arg message "Publish update feed $tag" --arg content "$(base64 -w 0 update.json)" --arg sha "$old_sha" \
             '{message:$message,content:$content,branch:"updates"} + (if $sha == "" then {} else {sha:$sha} end)' > feed-request.json
-          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/stable.json" --input feed-request.json > /dev/null
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/rev-stable.json" --input feed-request.json > /dev/null
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url,isDraft,isPrerelease,assets

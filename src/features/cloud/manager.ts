@@ -1,7 +1,7 @@
-import { ArrowUp, Cloud, ExternalLink, FileText, Folder, FolderPlus, LogIn, LogOut, RefreshCw, Save, X, createIcons } from 'lucide';
+import { ArrowUp, Cloud, ExternalLink, FileText, Folder, FolderPlus, LogIn, LogOut, RefreshCw, Save, Trash2, X, createIcons } from 'lucide';
 import { isDesktop, send } from '../../platform/bridge';
 import { cloudRequest, handleCloudResponse } from './client';
-import { cloudFileName, cloudFolderName, joinCloudPath, parentCloudPath, readCloudEntries, type CloudAccount, type CloudBinding, type CloudEntry, type CloudRepository, type DeviceAuthorization, type LoginPoll } from './model';
+import { cloudFileName, cloudFolderName, isCloudSha, joinCloudPath, parentCloudPath, readCloudDeletion, readCloudEntries, type CloudAccount, type CloudBinding, type CloudEntry, type CloudRepository, type DeviceAuthorization, type LoginPoll } from './model';
 import '../../styles/cloud.css';
 
 interface Options {
@@ -31,6 +31,7 @@ export function initializeCloud(options: Options) {
   let generation = 0;
   let currentDocumentId = '';
   let authorizationUrl = '';
+  let deletingPath: string | undefined;
   const dialog = document.createElement('dialog');
   dialog.id = 'cloud-dialog'; dialog.className = 'feature-dialog cloud-dialog';
   dialog.setAttribute('aria-labelledby', 'cloud-title');
@@ -67,7 +68,7 @@ export function initializeCloud(options: Options) {
     <div id="cloud-status" role="status" aria-live="polite"></div>
     <footer><span id="cloud-document-path"></span><button data-action="save-current"><i data-lucide="save"></i>保存当前文档到云端</button></footer>`;
   document.body.append(dialog);
-  const icons = { ArrowUp, Cloud, ExternalLink, FileText, Folder, FolderPlus, LogIn, LogOut, RefreshCw, Save, X };
+  const icons = { ArrowUp, Cloud, ExternalLink, FileText, Folder, FolderPlus, LogIn, LogOut, RefreshCw, Save, Trash2, X };
   createIcons({ icons, root: dialog, attrs: { 'stroke-width': 1.65 } });
   const get = <T extends HTMLElement>(id: string) => dialog.querySelector<T>(`#${id}`)!;
   const action = (name: string) => dialog.querySelector<HTMLButtonElement>(`[data-action="${name}"]`)!;
@@ -116,7 +117,11 @@ export function initializeCloud(options: Options) {
     saveEnabled.disabled = busy;
     saveForm.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled = busy || !listingReady || !account.authenticated || !repository?.exists || !saveEnabled.checked;
     folderForm.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input,button').forEach(item => { item.disabled = busy || !listingReady; });
-    get('cloud-entries').querySelectorAll<HTMLButtonElement>('button').forEach(item => { item.disabled = busy || intent === 'save' && item.dataset.type === 'file'; });
+    get('cloud-entries').querySelectorAll<HTMLButtonElement>('.cloud-entry').forEach(item => { item.disabled = busy || intent === 'save' && item.dataset.type === 'file'; });
+    get('cloud-entries').querySelectorAll<HTMLButtonElement>('.cloud-delete').forEach(item => {
+      const entry = entries.find(entry => entry.path === item.dataset.path);
+      item.disabled = busy || !entry || !canDelete(entry);
+    });
     get('cloud-breadcrumb').querySelectorAll<HTMLButtonElement>('button').forEach(item => { item.disabled = busy; });
   }
   async function perform(operation: (signal: AbortSignal) => Promise<void>) {
@@ -127,9 +132,44 @@ export function initializeCloud(options: Options) {
     catch (error) { if (stamp === generation) showError(error); }
     finally { if (stamp === generation) { busy = false; redraw(); } }
   }
+  function canDelete(entry: CloudEntry) {
+    return intent === 'browse' && listingReady && account.authenticated && Boolean(account.login) && repository?.exists === true &&
+      isCloudSha(entry.sha) && entries.includes(entry) && parentCloudPath(entry.path) === folder;
+  }
+  async function deleteEntry(entry: CloudEntry, signal: AbortSignal) {
+    if (!canDelete(entry)) return;
+    const owner = account.login!, parent = folder, path = entry.path, sha = entry.sha!;
+    const fullPath = `${owner}/MiniMarkDisk/${path}`;
+    const warning = entry.type === 'dir'
+      ? `删除文件夹“${fullPath}”及其全部子内容（包括列表中未显示的文件类型）？`
+      : `删除文件“${fullPath}”？`;
+    if (!confirm(`${warning}\n此操作无法在应用内撤销。已打开的文档将保留为本地文档，未保存的修改不会丢失。`)) return;
+    if (signal.aborted || !canDelete(entry) || account.login !== owner) return;
+    deletingPath = path; listingReady = false; redraw();
+    setStatus(`正在删除 ${path}…`);
+    try {
+      const result = await cloudRequest<unknown>('delete', { owner, path, sha, entryType: entry.type }, signal);
+      if (signal.aborted) return;
+      readCloudDeletion(result, entry);
+      deletingPath = undefined;
+      entries = entries.filter(item => item !== entry); renderEntries();
+      options.notice(`已删除云端${entry.type === 'dir' ? '文件夹' : '文件'}：${path}`);
+      try {
+        await listFolder(parent, signal);
+        if (!signal.aborted) setStatus(`已删除：${path}`);
+      } catch (error) {
+        if (signal.aborted) return;
+        listingReady = false;
+        setStatus(`已删除：${path}。目录刷新失败，请重新刷新。${error instanceof Error ? error.message : ''}`, true);
+      }
+    } finally {
+      if (!signal.aborted) deletingPath = undefined;
+    }
+  }
   function renderEntries() {
     const list = get('cloud-entries'); list.replaceChildren();
     for (const entry of entries) {
+      const row = document.createElement('div'); row.className = 'cloud-entry-row';
       const button = document.createElement('button'); button.type = 'button'; button.dataset.type = entry.type;
       button.className = 'cloud-entry'; button.setAttribute('aria-label', `${entry.type === 'dir' ? '文件夹' : '打开'} ${entry.name}`);
       const glyph = document.createElement('i'); glyph.dataset.lucide = entry.type === 'dir' ? 'folder' : 'file-text';
@@ -145,7 +185,12 @@ export function initializeCloud(options: Options) {
           if (!signal.aborted) closeDialog();
         }
       });
-      list.append(button);
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'icon-button cloud-delete'; remove.dataset.path = entry.path;
+      const deleteLabel = `删除${entry.type === 'dir' ? '文件夹' : '文件'} ${entry.name}`;
+      remove.title = deleteLabel; remove.setAttribute('aria-label', deleteLabel);
+      const trash = document.createElement('i'); trash.dataset.lucide = 'trash-2'; remove.append(trash);
+      remove.onclick = () => { if (!busy && canDelete(entry)) void perform(signal => deleteEntry(entry, signal)); };
+      row.append(button, remove); list.append(row);
     }
     if (!entries.length) { const empty = document.createElement('p'); empty.className = 'cloud-empty'; empty.textContent = '此目录没有文档'; list.append(empty); }
     const breadcrumb = get('cloud-breadcrumb'); breadcrumb.replaceChildren();
@@ -240,6 +285,10 @@ export function initializeCloud(options: Options) {
   function resetRequests() {
     generation++; controller.abort(); controller = new AbortController(); busy = false;
     cancelPendingLogin();
+    if (deletingPath) {
+      options.notice(`删除请求已提交：${deletingPath}。关闭窗口不会撤销，请重新打开云目录核对结果。`);
+      deletingPath = undefined;
+    }
   }
   function closeDialog() {
     resetRequests();

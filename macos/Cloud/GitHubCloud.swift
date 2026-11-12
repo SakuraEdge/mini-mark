@@ -152,7 +152,7 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
                     else { finish(.failure(error)) }
                 }
             }
-        case "repository", "createRepository", "list", "read", "write", "folder":
+        case "repository", "createRepository", "list", "read", "write", "folder", "delete":
             try loadCredentials()
             authenticate { result in
                 do {
@@ -386,6 +386,21 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
             finish(result)
         }
         switch action {
+        case "delete":
+            let path = try checkedPath(body["path"] as? String ?? "")
+            guard let expected = body["sha"] as? String, validSha(expected),
+                  let entryType = body["entryType"] as? String, ["file", "dir"].contains(entryType),
+                  entryType == "dir" || isDocument(path) else { throw CloudFailure("删除目标无效，请刷新云文档后重试。") }
+            let deletion = try CloudDeletion(path: path, expectedSha: expected, entryType: entryType) { route, method, payload, completion in
+                guard epoch == self.generation else { completion(.failure(CloudFailure("账号连接已更改，删除已停止。"))); return }
+                self.api(prefix + route, method: method, token: token, json: payload, completion: completion)
+            }
+            deletion.run { result in
+                switch result {
+                case .success(let commit): complete(.success(["path": path, "type": entryType, "deleted": true, "commit": commit]))
+                case .failure(let error): complete(.failure(error))
+                }
+            }
         case "repository", "createRepository":
             let receive: (Result<Any, Error>) -> Void = { result in
                 do {
@@ -493,7 +508,7 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
         return path.split(separator: "/").map { String($0).addingPercentEncoding(withAllowedCharacters: allowed)! }.joined(separator: "/")
     }
     private func isDocument(_ path: String) -> Bool { supportedExtensions.contains((path as NSString).pathExtension.lowercased()) }
-    private func validSha(_ sha: String) -> Bool { sha.range(of: "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$", options: .regularExpression) != nil }
+    private func validSha(_ sha: String) -> Bool { sha.range(of: #"\A(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})\z"#, options: .regularExpression) != nil }
 
     private func oauth(_ path: String, fields: [String: String], completion: @escaping (Result<[String: Any], Error>) -> Void) {
         var request = URLRequest(url: URL(string: "https://github.com/login/" + path)!)

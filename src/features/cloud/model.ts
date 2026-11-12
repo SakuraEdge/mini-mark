@@ -26,6 +26,26 @@ export interface CloudEntry {
   size?: number;
 }
 
+export interface CloudDeletion {
+  path: string;
+  type: 'file' | 'dir';
+  deleted: true;
+  commit: string;
+}
+
+export function isCloudSha(value: unknown): value is string {
+  return typeof value === 'string' && (value.length === 40 || value.length === 64) && /^[a-f0-9]+$/i.test(value);
+}
+
+export function readCloudDeletion(value: unknown, entry: CloudEntry): CloudDeletion {
+  if (!value || typeof value !== 'object' || !('path' in value) || value.path !== entry.path ||
+      !('type' in value) || value.type !== entry.type || !('deleted' in value) || value.deleted !== true ||
+      !('commit' in value) || !isCloudSha(value.commit)) {
+    throw new Error('删除结果无法确认，请刷新云目录后核对。');
+  }
+  return { path: entry.path, type: entry.type, deleted: true, commit: value.commit };
+}
+
 export interface DeviceAuthorization {
   userCode: string;
   verificationUri: string;

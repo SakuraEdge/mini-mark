@@ -1,7 +1,7 @@
 {
   "name": "mini-mark",
-  "version": "4.0.0",
-  "releaseVersion": "1.0.0",
+  "version": "4.0.1",
+  "releaseVersion": "1.0.1",
   "private": true,
   "description": "Mini Mark: a local-first Markdown, YAML and HTML editor for Windows and macOS.",
   "type": "module",
@@ -11,7 +11,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "vitest run",
+    "test": "vitest run && node --test scripts/update-manifest.test.mjs",
     "test:e2e": "playwright test",
     "desktop": "dotnet run --project native/Moye.csproj",
     "package:win": "npm run build && dotnet publish native/Moye.csproj -c Release -r win-x64 --self-contained true -o release/MiniMark",

@@ -116,6 +116,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         if type == "rendered" { if smokeOutput != nil && !smokeStarted { smokeStarted = true; runSmoke() }; return }
         if type == "cloudRequest" {
             guard ready else { return }
+            if body["action"] as? String == "delete" { deleteCloudEntry(body); return }
+            if let action = body["action"] as? String, ["write", "folder"].contains(action) { mutateCloudEntry(body); return }
             cloud.handle(body) { self.post($0) }; return
         }
         if type == "checkUpdates" {

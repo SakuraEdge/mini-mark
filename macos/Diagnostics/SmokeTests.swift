@@ -3,6 +3,7 @@ import WebKit
 import PDFKit
 
 func runStoreTests() throws {
+    try runUpdateManifestTests()
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent("moye-test-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: folder) }

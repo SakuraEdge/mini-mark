@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>MiniMark</AssemblyName>
-    <Version>4.0.0</Version>
+    <Version>4.0.1</Version>
     <Product>Mini Mark</Product>
     <Title>Mini Mark</Title>
     <Description>Local-first Markdown editor</Description>

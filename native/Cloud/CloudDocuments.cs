@@ -3,9 +3,20 @@ using System.Text.Json;
 namespace Moye;
 
 public sealed partial class MainWindow {
-    private async Task CloudRequest(JsonElement message) {
+    private long cloudDeletionRevision;
+    private async Task CloudRequest(JsonElement message, long? queuedDeletionRevision = null) {
         var requestId = message.GetProperty("requestId").GetString();
-        try { Post(new { type = "cloudResponse", requestId, data = await cloud.Execute(message) }); }
+        try {
+            if (queuedDeletionRevision is long queued && queued != cloudDeletionRevision)
+                throw new IOException("云端目录已变化，请刷新后重新操作。");
+            var data = await cloud.Execute(message);
+            if (data is CloudDeletion deletion) {
+                cloudDeletionRevision++;
+                CloudDeletionWorkspace.Detach(workspace, message.GetProperty("owner").GetString()!, deletion);
+                Publish(); Persist();
+            }
+            Post(new { type = "cloudResponse", requestId, data });
+        }
         catch (Exception error) { Post(new { type = "cloudResponse", requestId, error = CloudError(error) }); }
     }
     private static string CloudError(Exception error) => error is OperationCanceledException
@@ -21,7 +32,8 @@ public sealed partial class MainWindow {
         document.Cloud = new(owner, path, file.Sha, file.Text);
         Publish(); Persist();
     }
-    private async Task BindCloud(OpenDocument document, string owner, string path) {
+    private async Task BindCloud(OpenDocument document, string owner, string path, long queuedDeletionRevision) {
+        if (queuedDeletionRevision != cloudDeletionRevision) throw new IOException("云端目录已变化，请重新选择保存位置。");
         CloudPaths.Validate(path);
         if (workspace.Documents.Any(item => item.Id != document.Id && item.Cloud?.Owner.Equals(owner, StringComparison.OrdinalIgnoreCase) == true && item.Cloud.Path == path))
             throw new IOException("该云文档已在其他标签打开。");

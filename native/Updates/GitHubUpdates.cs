@@ -7,7 +7,7 @@ namespace Moye;
 
 public sealed class GitHubUpdates {
     private static readonly string[] Feeds = [
-        "https://raw.githubusercontent.com/SakuraEdge/mini-mark/updates/stable.json",
+        "https://raw.githubusercontent.com/SakuraEdge/mini-mark/updates/rev-stable.json",
         "https://github.com/SakuraEdge/mini-mark/releases/latest/download/update.json"
     ];
     private readonly HttpClient client;
@@ -82,7 +82,7 @@ public sealed class GitHubUpdates {
         var manifest = lastResult?.Manifest ?? throw new IOException("请先检测更新。");
         manifest.Validate();
         var installed = typeof(GitHubUpdates).Assembly.GetName().Version ?? new Version(2, 0, 0);
-        if (tag != "v" + manifest.Version || new Version(manifest.Version) <= new Version(installed.Major, installed.Minor, installed.Build)) throw new IOException("此版本不高于当前版本，请重新检测更新。");
+        if (tag != manifest.ReleaseTag || new Version(manifest.Version) <= new Version(installed.Major, installed.Minor, installed.Build)) throw new IOException("此版本不高于当前版本，请重新检测更新。");
         Directory.CreateDirectory(downloadDirectory);
         var asset = manifest.DownloadAsset;
         var target = Path.Combine(downloadDirectory, "Moye-Update.exe");

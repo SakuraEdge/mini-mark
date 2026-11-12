@@ -5,7 +5,7 @@ using System.Text.Json;
 using Moye;
 
 static class UpdateTests {
-    private const string Primary = "https://raw.githubusercontent.com/SakuraEdge/mini-mark/updates/stable.json";
+    private const string Primary = "https://raw.githubusercontent.com/SakuraEdge/mini-mark/updates/rev-stable.json";
     private const string Fallback = "https://github.com/SakuraEdge/mini-mark/releases/latest/download/update.json";
     public static async Task Run(string root, Action<bool, string> check) {
         var bytes = Encoding.UTF8.GetBytes("verified installer fixture");
@@ -73,6 +73,73 @@ static class UpdateTests {
         using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
         try { await cancelUpdater.DownloadInstaller("v2.0.0", new Progress<int>(), cancellation.Token); throw new Exception("Canceled download completed"); }
         catch (OperationCanceledException) { check(!Directory.EnumerateFiles(Path.Combine(cancelFolder, "Updates")).Any(), "Canceled download left temporary files"); }
+        await RevUpdates(root, bytes, check);
+    }
+
+    private static async Task RevUpdates(string root, byte[] bytes, Action<bool, string> check) {
+        var manifest = new UpdateManifest(2, "4.0.1",
+            new UpdateAsset("https://github.com/SakuraEdge/mini-mark/releases/download/rev-v1.0.0/MiniMark-Rev-1.0.0-Setup-windows-x64.exe",
+                Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length), ReleaseVersion: "1.0.0", Tag: "rev-v1.0.0");
+        var parsed = UpdateManifest.Parse(JsonSerializer.SerializeToUtf8Bytes(manifest, UpdateManifest.JsonOptions));
+        check(parsed.ReleaseTag == "rev-v1.0.0" && parsed.DownloadAsset == manifest.Windows && parsed.Version == "4.0.1", "Rev feed lost public tag or internal version");
+        var release = parsed.Releases[0];
+        check(release.GetProperty("tag_name").GetString() == "rev-v1.0.0" && release.GetProperty("version").GetString() == "4.0.1" &&
+            release.GetProperty("releaseVersion").GetString() == "1.0.0" && release.GetProperty("name").GetString() == "Mini Mark Rev v1.0.0", "Rev renderer metadata mixed display and internal versions");
+        foreach (var invalid in new[] {
+            manifest with { SchemaVersion = 3 },
+            manifest with { Version = "04.0.1" },
+            manifest with { Version = "4.0.1-beta" },
+            manifest with { ReleaseVersion = null },
+            manifest with { ReleaseVersion = "01.0.0" },
+            manifest with { ReleaseVersion = "1.0" },
+            manifest with { ReleaseVersion = "1.0.0.1" },
+            manifest with { ReleaseVersion = "1.0.0-beta" },
+            manifest with { ReleaseVersion = "2147483648.0.0" },
+            manifest with { ReleaseVersion = "../../1.0.0" },
+            manifest with { Tag = null },
+            manifest with { Tag = "v4.0.1" },
+            manifest with { Tag = "rev-v2.0.0" },
+            manifest with { Tag = "rev-v1.0.0?download=1" },
+            manifest with { WindowsV2 = manifest.Windows },
+            manifest with { Windows = manifest.Windows with { Url = "https://example.com/MiniMark-Rev-1.0.0-Setup-windows-x64.exe" } },
+            manifest with { Windows = manifest.Windows with { Url = manifest.Windows.Url.Replace("/rev-v1.0.0/", "/rev-v2.0.0/") } },
+            manifest with { Windows = manifest.Windows with { Url = manifest.Windows.Url.Replace("MiniMark-Rev-1.0.0", "MiniMark-Rev-2.0.0") } },
+            manifest with { Windows = manifest.Windows with { Url = manifest.Windows.Url + "?download=1" } },
+            manifest with { Windows = manifest.Windows with { Url = manifest.Windows.Url.Replace("https://", "http://") } },
+            manifest with { Windows = manifest.Windows with { Url = "https://github.com/SakuraEdge/mini-mark/releases/download/v4.0.1/MiniMark-Setup-4.0.1-windows-x64.exe" } },
+            manifest with { Windows = manifest.Windows with { Size = 0 } },
+            manifest with { Windows = manifest.Windows with { Size = UpdateManifest.MaximumInstallerBytes + 1 } },
+            manifest with { Windows = manifest.Windows with { Sha256 = new string('x', 64) } },
+            manifest with { Windows = manifest.Windows with { Sha256 = manifest.Windows.Sha256 + "\n" } }
+        }) {
+            try { UpdateManifest.Parse(JsonSerializer.SerializeToUtf8Bytes(invalid, UpdateManifest.JsonOptions)); throw new Exception("Invalid Rev metadata accepted"); }
+            catch (IOException) { check(true, "Invalid Rev metadata rejected"); }
+        }
+        HttpResponseMessage Manifest() => new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(manifest, UpdateManifest.JsonOptions)) };
+        var handler = new FakeUpdateHandler(uri => uri == manifest.Windows.Url ? new(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) } : Manifest());
+        var folder = Path.Combine(root, "rev-download");
+        var updater = new GitHubUpdates(folder, handler);
+        await updater.Check();
+        foreach (var wrong in new[] { "v4.0.1", "v1.0.0", "rev-v2.0.0", "../rev-v1.0.0" }) {
+            try { await updater.DownloadInstaller(wrong, new Progress<int>(), default); throw new Exception("Unverified Rev tag accepted"); }
+            catch (IOException) { check(handler.Uris.Count == 1, "Wrong Rev tag reached the download endpoint"); }
+        }
+        var downloaded = await updater.DownloadInstaller("rev-v1.0.0", new Progress<int>(), default);
+        check(await GitHubUpdates.VerifyInstaller(downloaded.Path, manifest.Windows, default) && GitHubUpdates.VerifyBeforeLaunch(downloaded), "Rev installer download or integrity check failed");
+        await updater.DownloadInstaller("rev-v1.0.0", new Progress<int>(), default);
+        check(handler.Uris.SequenceEqual(new[] { Primary, manifest.Windows.Url }), "Rev cached download used a legacy asset or downloaded twice");
+        var offline = await new GitHubUpdates(folder, new FakeUpdateHandler(_ => new(HttpStatusCode.ServiceUnavailable))).Check();
+        check(offline.OfflineCache && offline.Manifest.ReleaseTag == manifest.ReleaseTag && offline.Manifest.ReleaseVersion == "1.0.0", "Rev offline cache lost release metadata");
+        File.WriteAllBytes(downloaded.Path, new byte[bytes.Length]);
+        check(!GitHubUpdates.VerifyBeforeLaunch(downloaded), "Tampered Rev installer passed verification");
+
+        var installed = typeof(GitHubUpdates).Assembly.GetName().Version!;
+        var downgrade = manifest with { Version = $"{installed.Major}.{installed.Minor}.{Math.Max(0, installed.Build)}" };
+        var downgradeHandler = new FakeUpdateHandler(_ => new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(downgrade, UpdateManifest.JsonOptions)) });
+        var downgradeUpdater = new GitHubUpdates(Path.Combine(root, "rev-no-downgrade"), downgradeHandler);
+        await downgradeUpdater.Check();
+        try { await downgradeUpdater.DownloadInstaller(manifest.ReleaseTag, new Progress<int>(), default); throw new Exception("Rev public name bypassed internal downgrade protection"); }
+        catch (IOException) { check(downgradeHandler.Uris.Count == 1, "Internal downgrade reached the download endpoint"); }
     }
 }
 

@@ -64,7 +64,7 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 | 公式编辑与 Word/WPS 复制 | `src/features/formulas/`、`src/editor/math-blocks.ts`、两平台 `Export/EquationClipboard`、`scripts/formula-assets.mjs` |
 | HTML 编辑与运行 | `src/documents/formats.ts`、`src/features/html/`、两平台 `Preview/`；`runHtml` 保存成功后才运行 |
 | 文字选区 | `src/editor/editor.ts` 使用原生选区；`src/styles/app.css` 的 `::selection` 在有背景的代码行上仍可见 |
-| 更新、提醒、下载 | `src/features/updates/`、两平台的 `Updates/` |
+| 更新、提醒、下载 | `src/features/updates/`、两平台的 `Updates/`、`docs/updates-development.md` |
 | GitHub 登录与云文档 | `src/features/cloud/`、两平台的 `Cloud/`、`docs/cloud-development.md` |
 | macOS 个人开发签名 | `docs/mac-signing.md`、`scripts/package-mac.sh`；免费开发证书不用于公开分发身份 |
 | 文档类型图标 | `public/document-icons/`、`scripts/document-icons.mjs`、`installer/Moye.iss`、`macos/Info.plist` |
@@ -86,7 +86,7 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 
 实际数据目录由 `MOYE_DATA_DIR`（开发覆盖）、当前用户注册表 `Software\Moye\DataDirectory` 或默认 AppData 决定。测试必须使用隔离目录，不改写实际用户会话。
 
-v2 的展示名、可执行文件和主要安装包使用 Mini Mark / MiniMark；AppId、数据目录和存储键保留兼容。`update.json` 的 `windows` 字段保留旧地址与兼容安装包名，`windowsV2` 使用新地址；两者必须是相同哈希的同一安装器，避免 v1.x 验证器拒绝升级。插件从主页面发送消息到无同源权限的 iframe，再在 Worker 执行；不要改成在主线程直接 eval，也不要开放原生文件或网络能力。
+展示名、可执行文件和主要安装包使用 Mini Mark / MiniMark；AppId、数据目录和存储键保留兼容。Rev v1.0.1 起，正式 Release 只使用 `rev-vX.Y.Z` 与 Rev 附件，schema 2 的 `releaseVersion` 决定展示与主版本提醒，内部 `version` 递增用于防降级。旧 schema 1 及一次性过渡流程见 `docs/updates-development.md`。插件从主页面发送消息到无同源权限的 iframe，再在 Worker 执行；不要改成在主线程直接 eval，也不要开放原生文件或网络能力。
 
 ## 开发与验证
 

@@ -15,9 +15,10 @@ export default defineConfig({
   base: './',
   define: {
     __APP_VERSION__: JSON.stringify(metadata.version),
+    __APP_RELEASE_VERSION__: JSON.stringify(metadata.releaseVersion),
     __APP_DISPLAY_VERSION__: JSON.stringify(`Rev v${metadata.releaseVersion}`),
   },
   build: { target: 'es2022', sourcemap: true, rollupOptions: { output: { paths: { './vendor/mathml2omml/index.js': '../vendor/mathml2omml/index.js' } } } },
-  server: { port: 4173, strictPort: true, watch: { ignored: ['**/native/**', '**/native-tests/**', '**/native-pdf-tests/**'] } },
+  server: { port: 4173, strictPort: true, watch: { ignored: ['**/native/**', '**/native-tests/**', '**/native-pdf-tests/**', '**/release/**'] } },
   preview: { port: 4173, strictPort: true },
 });

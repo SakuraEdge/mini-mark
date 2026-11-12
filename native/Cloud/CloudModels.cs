@@ -6,6 +6,11 @@ namespace Moye;
 public sealed record CloudBinding(string Owner, string Path, string? Sha, string Baseline);
 public sealed record CloudFile(string Path, string Sha, string Text);
 public sealed record CloudWrite(string Path, string Sha);
+public sealed record CloudDeletion(
+    [property: System.Text.Json.Serialization.JsonPropertyName("path")] string Path,
+    [property: System.Text.Json.Serialization.JsonPropertyName("type")] string Type,
+    [property: System.Text.Json.Serialization.JsonPropertyName("deleted")] bool Deleted,
+    [property: System.Text.Json.Serialization.JsonPropertyName("commit")] string Commit);
 public interface ICloudTokenStore {
     string? Read();
     void Write(string token);
@@ -29,6 +34,6 @@ public static partial class CloudPaths {
     public static bool IsSha(string? value) => value is not null && ShaPattern().IsMatch(value);
     [GeneratedRegex(@"\.(md|markdown|mdown|txt|yaml|yml|html|htm)$", RegexOptions.IgnoreCase)]
     private static partial Regex DocumentExtension();
-    [GeneratedRegex("^[a-fA-F0-9]{40}([a-fA-F0-9]{24})?$")]
+    [GeneratedRegex("\\A[a-fA-F0-9]{40}([a-fA-F0-9]{24})?\\z")]
     private static partial Regex ShaPattern();
 }

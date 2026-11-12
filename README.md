@@ -6,7 +6,7 @@
 
 Markdown、YAML、HTML 编辑器，支持 Windows 和 macOS。
 
-[![Release](https://img.shields.io/badge/release-Rev%20v1.0.0-286bd6)](https://github.com/SakuraEdge/mini-mark/releases/latest)
+[![Release](https://img.shields.io/badge/release-Rev%20v1.0.1-286bd6)](https://github.com/SakuraEdge/mini-mark/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-526a85)](LICENSE)
 
 [下载正式版](https://github.com/SakuraEdge/mini-mark/releases/latest) · [版本记录](https://github.com/SakuraEdge/mini-mark/releases) · [反馈问题](https://github.com/SakuraEdge/mini-mark/issues)
@@ -41,6 +41,8 @@ Rev v1.0.0 新增 GitHub 云文档。本地编辑仍然不需要账号。
 本地文件不会自动上传。在保存菜单中选择“保存至云文档”，再选择目录和文件名。取消“云文档”开关后，当前文件恢复为本地文档，后续保存不再上传；云端原文件不会删除。
 
 保存遇到云端修改冲突时，Mini Mark 会保留当前正文并停止覆盖。可以把修改另存为其他文件，或重新打开云端版本后合并。退出账号不会删除仓库和文档。
+
+云文档列表可删除文件或文件夹，操作前会要求确认。删除文件夹会同时删除其中的全部内容；已打开的文档标签保留并切回本地，不删除本地副本。若云端内容已变化，刷新目录后才能重新确认删除。
 
 GitHub OAuth 授权会申请可读写私有仓库的 `repo` 权限。该权限本身不限于单一仓库，软件只操作当前账号的 `MiniMarkDisk`。登录凭据保存在 Windows 凭据管理器或 macOS 钥匙串，不写入文档。可在 GitHub 应用授权设置中撤销访问。
 
@@ -90,7 +92,7 @@ macOS 将 `Mini Mark.app` 拖入 Applications。当前包使用 **ad-hoc 签名�
 
 本地文档支持 UTF-8 文本，打开上限为 20 MB。草稿恢复不替代正式保存；PDF 是阅读副本，导出后仍需保存源文件。
 
-“更多 → 检测更新”可检查正式版本。Windows 支持下载并覆盖安装，沿用安装目录并保留文档和草稿。大版本提醒可关闭。
+“更多 → 检测更新”可检查正式版本。Windows 支持下载并覆盖安装，沿用安装目录并保留文档和草稿。Rev v1.0.1 起，发布页和下载包统一使用 Rev 版本号；同一大版本内可检测并安装更新，不自动弹窗，升到 Rev v2.0.0 时才提醒。大版本提醒可关闭。
 
 本地编辑可离线使用，没有遥测。GitHub 登录、云同步、更新检测和外链图片需要网络。暂不支持 Mermaid。
 

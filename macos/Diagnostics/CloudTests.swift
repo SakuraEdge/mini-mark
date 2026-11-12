@@ -192,4 +192,5 @@ func runCloudCredentialTests() throws {
     try wait { cancelledResponse != nil }
     guard cancelStore.value == originalEncoded, cancelStore.writes == 0 else { throw Store.failure("Late refresh changed cancelled authentication") }
     print("PASS macOS cloud: legacy tokens, expiry, rotation, concurrent refresh, offline, invalid refresh, 401, stale identity, account identity, logout and cancellation")
+    try runCloudDeleteTests()
 }

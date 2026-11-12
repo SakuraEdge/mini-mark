@@ -71,6 +71,7 @@
       "files": [
         "src/features/cloud/client.ts",
         "src/features/cloud/manager.ts",
+        "src/features/cloud/model.test.ts",
         "src/features/cloud/model.ts"
       ]
     },
@@ -169,8 +170,10 @@
       "purpose": "Windows GitHub 请求、凭据续期与云同步",
       "files": [
         "native/Cloud/CloudCredential.cs",
+        "native/Cloud/CloudDeletionWorkspace.cs",
         "native/Cloud/CloudDocuments.cs",
         "native/Cloud/CloudModels.cs",
+        "native/Cloud/GitHubCloud.Delete.cs",
         "native/Cloud/GitHubCloud.cs",
         "native/Cloud/WindowsTokenStore.cs"
       ]
@@ -225,8 +228,10 @@
       "path": "macos/Diagnostics",
       "purpose": "macOS 实际运行验证",
       "files": [
+        "macos/Diagnostics/CloudDeleteTests.swift",
         "macos/Diagnostics/CloudTests.swift",
-        "macos/Diagnostics/SmokeTests.swift"
+        "macos/Diagnostics/SmokeTests.swift",
+        "macos/Diagnostics/UpdateTests.swift"
       ]
     },
     {
@@ -234,6 +239,8 @@
       "purpose": "macOS GitHub 请求、钥匙串凭据与云同步",
       "files": [
         "macos/Cloud/CloudCredentials.swift",
+        "macos/Cloud/CloudDeletion.swift",
+        "macos/Cloud/CloudDocumentDeletion.swift",
         "macos/Cloud/CloudDocuments.swift",
         "macos/Cloud/GitHubCloud.swift"
       ]
@@ -249,6 +256,7 @@
       "path": "tests",
       "purpose": "界面回归",
       "files": [
+        "tests/cloud-delete.spec.ts",
         "tests/cloud.spec.ts",
         "tests/editor.spec.ts",
         "tests/features.spec.ts",
@@ -264,6 +272,7 @@
       "path": "native-tests",
       "purpose": "原生单元检查",
       "files": [
+        "native-tests/CloudDeleteTests.cs",
         "native-tests/CloudRefreshTests.cs",
         "native-tests/CloudTests.cs",
         "native-tests/Moye.Tests.csproj",
@@ -312,7 +321,8 @@
         "scripts/preview-branding.mjs",
         "scripts/test-installer.ps1",
         "scripts/third-party.mjs",
-        "scripts/update-manifest.mjs"
+        "scripts/update-manifest.mjs",
+        "scripts/update-manifest.test.mjs"
       ]
     },
     {
@@ -321,7 +331,8 @@
       "files": [
         ".github/workflows/build.yml",
         ".github/workflows/local-patch.yml",
-        ".github/workflows/release.yml"
+        ".github/workflows/release.yml",
+        ".github/workflows/rev-transition.yml"
       ]
     },
     {
@@ -372,6 +383,7 @@
         "docs/performance.md",
         "docs/plugins.md",
         "docs/release-rev-v1.0.0.md",
+        "docs/release-rev-v1.0.1.md",
         "docs/release-v1.0.0.md",
         "docs/release-v1.0.1.md",
         "docs/release-v1.0.2.md",
@@ -383,6 +395,7 @@
         "docs/release-v3.0.0.md",
         "docs/slash-commands.png",
         "docs/tabs-save.png",
+        "docs/updates-development.md",
         "docs/updates.png",
         "docs/validation.md",
         "docs/写下一个好想法.md"

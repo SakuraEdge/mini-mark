@@ -119,7 +119,14 @@ public sealed partial class MainWindow : Form {
                 return;
             }
             if (!initialized) return;
-            if (type == "cloudRequest") { _ = CloudRequest(message.Clone()); return; }
+            if (type == "cloudRequest") {
+                var request = message.Clone();
+                if (request.TryGetProperty("action", out var cloudAction) && cloudAction.GetString() is "delete" or "write" or "folder") {
+                    long? queuedDeletion = cloudAction.GetString() == "delete" ? null : cloudDeletionRevision;
+                    RunAsync(() => CloudRequest(request, queuedDeletion));
+                } else _ = CloudRequest(request);
+                return;
+            }
             if (type is "pdfHtml" or "pdfError") {
                 var pending = pdfRequest;
                 if (pending is null || message.GetProperty("requestId").GetString() != pending.Id || message.GetProperty("documentId").GetString() != pending.DocumentId) return;
@@ -191,14 +198,20 @@ public sealed partial class MainWindow : Form {
                 case "cloudBind":
                     var bindOwner = message.GetProperty("owner").GetString()!;
                     var bindPath = message.GetProperty("cloudPath").GetString()!;
-                    RunAsync(() => BindCloud(document, bindOwner, bindPath)); break;
+                    var bindRevision = cloudDeletionRevision;
+                    RunAsync(() => BindCloud(document, bindOwner, bindPath, bindRevision)); break;
                 case "cloudDetach":
                     RunAction(() => { document.UntitledName = document.Name; document.Cloud = null; Publish(); Persist(); }); break;
                 case "closeTab":
                     var closeId = message.GetProperty("targetId").GetString()!;
                     RunAsync(() => CloseTab(closeId)); break;
                 case "open": RunAction(Open); break;
-                case "save": RunAsync(async () => { if (document.Cloud is not null) await SaveCloud(document); else Save(document, false, true); }); break;
+                case "save":
+                    var saveBinding = document.Cloud;
+                    RunAsync(async () => {
+                        if (saveBinding != document.Cloud) throw new IOException("文档存储位置已变化，请重新保存。");
+                        if (document.Cloud is not null) await SaveCloud(document); else Save(document, false, true);
+                    }); break;
                 case "saveAs": RunAction(() => Save(document, true, true)); break;
                 case "exportPdf": RunAction(() => ChoosePdf(document)); break;
                 case "runHtml":

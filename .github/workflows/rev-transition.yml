@@ -1,0 +1,81 @@
+name: Publish One-Time Rev Upgrade Bridge
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Verified main build for Rev v1.0.1
+        required: true
+        type: string
+permissions:
+  actions: read
+  contents: write
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_ID: ${{ inputs.build_run_id }}
+    steps:
+      - name: Resolve verified transition build
+        id: build
+        run: |
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > run.json
+          test "$(jq -r .conclusion run.json)" = success
+          test "$(jq -r .head_branch run.json)" = main
+          test "$(jq -r .path run.json)" = .github/workflows/build.yml
+          echo "sha=$(jq -r .head_sha run.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.build.outputs.sha }}
+      - name: Verify published Rev package
+        run: |
+          test "$(node -p "require('./package.json').version")" = 4.0.1
+          test "$(node -p "require('./package.json').releaseVersion")" = 1.0.1
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/rev-v1.0.1" > rev.json
+          test "$(jq -r .draft rev.json)" = false
+          test "$(jq -r .prerelease rev.json)" = false
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name MiniMark-windows-x64 --dir bridge-assets
+          expected="sha256:$(sha256sum bridge-assets/MiniMark-Setup-4.0.1-windows-x64.exe | cut -d ' ' -f 1)"
+          actual=$(jq -r '.assets[] | select(.name == "MiniMark-Rev-1.0.1-Setup-windows-x64.exe") | .digest' rev.json)
+          test "$actual" = "$expected"
+      - name: Publish temporary compatibility endpoint
+        env:
+          BUILD_SHA: ${{ steps.build.outputs.sha }}
+        run: |
+          cd bridge-assets
+          cp MiniMark-Setup-4.0.1-windows-x64.exe Moye-Setup-4.0.1-windows-x64.exe
+          hash=$(sha256sum MiniMark-Setup-4.0.1-windows-x64.exe | cut -d ' ' -f 1)
+          size=$(wc -c < MiniMark-Setup-4.0.1-windows-x64.exe)
+          jq -n --arg hash "$hash" --argjson size "$size" '{
+            schemaVersion:1,version:"4.0.1",
+            windows:{url:"https://github.com/SakuraEdge/moye-markdown/releases/download/v4.0.1/Moye-Setup-4.0.1-windows-x64.exe",sha256:$hash,size:$size},
+            windowsV2:{url:"https://github.com/SakuraEdge/mini-mark/releases/download/v4.0.1/MiniMark-Setup-4.0.1-windows-x64.exe",sha256:$hash,size:$size}
+          }' > update.json
+          files=(MiniMark-Setup-4.0.1-windows-x64.exe Moye-Setup-4.0.1-windows-x64.exe update.json)
+          if gh release view v4.0.1 --repo "$GITHUB_REPOSITORY" --json isDraft > existing.json 2>/dev/null; then
+            if test "$(jq -r .isDraft existing.json)" = false; then
+              gh api "repos/$GITHUB_REPOSITORY/releases/tags/v4.0.1" > published.json
+              test "$(jq -r .prerelease published.json)" = true
+              for file in "${files[@]}"; do
+                expected="sha256:$(sha256sum "$file" | cut -d ' ' -f 1)"
+                actual=$(jq -r --arg name "$file" '.assets[] | select(.name == $name) | .digest' published.json)
+                test "$actual" = "$expected"
+              done
+            else
+              gh release upload v4.0.1 --repo "$GITHUB_REPOSITORY" "${files[@]}" --clobber
+              gh release edit v4.0.1 --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false
+            fi
+          else
+            gh release create v4.0.1 --repo "$GITHUB_REPOSITORY" --target "$BUILD_SHA" \
+              --title "Rev v1.0.1 upgrade bridge" \
+              --notes "Temporary endpoint for upgrading older installations to Rev v1.0.1. Use the Rev v1.0.1 release for normal downloads." --draft --prerelease
+            gh release upload v4.0.1 --repo "$GITHUB_REPOSITORY" "${files[@]}"
+            gh release edit v4.0.1 --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false
+          fi
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" = rev-v1.0.1
+          old_sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/stable.json?ref=updates" --jq .sha)
+          jq -n --arg content "$(base64 -w 0 update.json)" --arg sha "$old_sha" \
+            '{message:"Enable one-time Rev v1.0.1 upgrade",content:$content,branch:"updates",sha:$sha}' > request.json
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/stable.json" --input request.json > /dev/null
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" = rev-v1.0.1

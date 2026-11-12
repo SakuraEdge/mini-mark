@@ -2,13 +2,15 @@ import { send, isDesktop, type HostMessage } from '../../platform/bridge';
 
 export const APP_VERSION = __APP_VERSION__;
 export const APP_DISPLAY_VERSION = __APP_DISPLAY_VERSION__;
-const SETTINGS_KEY = 'moye.updates.v1';
+export const APP_RELEASE_VERSION = __APP_RELEASE_VERSION__;
+const SETTINGS_KEY = 'moye.updates.rev.v1';
+const LEGACY_SETTINGS_KEY = 'moye.updates.v1';
 const DAY = 86_400_000;
-export interface Release { tag_name: string; name?: string; draft?: boolean; prerelease?: boolean }
+export interface Release { tag_name: string; version?: string; releaseVersion?: string; name?: string; draft?: boolean; prerelease?: boolean }
 interface Version { core: number[]; pre: string[] }
 export function parseVersion(value: string): Version | null {
   const match = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(value);
-  if (!match) return null;
+  if (!match || match[0] !== value) return null;
   const core = match.slice(1, 4).map(Number), pre = match[4]?.split('.') ?? [];
   if (core.some(n => !Number.isSafeInteger(n)) || pre.some(p => !p || (/^\d+$/.test(p) && p.length > 1 && p[0] === '0'))) return null;
   return { core, pre };
@@ -29,23 +31,50 @@ export function compareVersions(left: string, right: string) {
   }
   return 0;
 }
-export function latestRelease(data: unknown, current: string): Release | null {
+function stableVersion(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const version = parseVersion(value);
+  return version !== null && version.pre.length === 0 && version.core.join('.') === value && version.core.every(part => part <= 2147483647);
+}
+export function releaseVersions(release: Release): { version: string; releaseVersion?: string } | null {
+  if (release.tag_name.startsWith('rev-')) {
+    if (!stableVersion(release.version) || !stableVersion(release.releaseVersion) || release.tag_name !== `rev-v${release.releaseVersion}`) return null;
+    return { version: release.version, releaseVersion: release.releaseVersion };
+  }
+  const version = release.tag_name.replace(/^v/, '');
+  if (!stableVersion(version) || release.releaseVersion !== undefined || release.version !== undefined && release.version !== version) return null;
+  return { version };
+}
+export function latestRelease(data: unknown, current: string, currentReleaseVersion = APP_RELEASE_VERSION): Release | null {
   if (!Array.isArray(data)) throw new Error('GitHub 返回的版本列表无效。');
-  return data.filter((r): r is Release => r && typeof r.tag_name === 'string' && parseVersion(r.tag_name) !== null && !r.draft && !r.prerelease && !parseVersion(r.tag_name)!.pre.length && compareVersions(r.tag_name, current) > 0)
-    .sort((a, b) => compareVersions(b.tag_name, a.tag_name))[0] ?? null;
+  return data.filter((release): release is Release => {
+    if (!release || typeof release.tag_name !== 'string' || release.draft || release.prerelease) return false;
+    const versions = releaseVersions(release);
+    return versions !== null && compareVersions(versions.version, current) > 0 && (!versions.releaseVersion || compareVersions(versions.releaseVersion, currentReleaseVersion) >= 0);
+  }).sort((a, b) => compareVersions(releaseVersions(b)!.version, releaseVersions(a)!.version))[0] ?? null;
 }
 export function isMajorUpdate(current: string, candidate: string) {
   return parseVersion(candidate)!.core[0] > parseVersion(current)!.core[0];
 }
-interface Settings { auto: boolean; notifyMajor: boolean; lastAttempt: number; promptedMajor: number }
-function readSettings(): Settings {
+export interface Settings { auto: boolean; notifyMajor: boolean; lastAttempt: number; promptedMajor: number }
+export function readSettings(): Settings {
   try {
-    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
-    return { auto: raw.auto !== false, notifyMajor: raw.notifyMajor !== false, lastAttempt: Number(raw.lastAttempt) || 0, promptedMajor: Number(raw.promptedMajor) || 0 };
+    const current = localStorage.getItem(SETTINGS_KEY);
+    const raw = JSON.parse(current ?? localStorage.getItem(LEGACY_SETTINGS_KEY) ?? '{}') ?? {};
+    return { auto: raw.auto !== false, notifyMajor: raw.notifyMajor !== false, lastAttempt: Number(raw.lastAttempt) || 0, promptedMajor: current === null ? 0 : Number(raw.promptedMajor) || 0 };
   } catch { return { auto: true, notifyMajor: true, lastAttempt: 0, promptedMajor: 0 }; }
 }
-export function shouldPrompt(settings: Pick<Settings, 'notifyMajor' | 'promptedMajor'>, current: string, candidate: string) {
-  return settings.notifyMajor && isMajorUpdate(current, candidate) && parseVersion(candidate)!.core[0] > settings.promptedMajor;
+export function shouldPrompt(settings: Pick<Settings, 'notifyMajor' | 'promptedMajor'>, currentReleaseVersion: string, candidate: Release) {
+  const version = releaseVersions(candidate)?.releaseVersion;
+  return Boolean(version && settings.notifyMajor && isMajorUpdate(currentReleaseVersion, version) && parseVersion(version)!.core[0] > settings.promptedMajor);
+}
+export function releaseLabel(release: Release) {
+  const versions = releaseVersions(release)!;
+  return versions.releaseVersion ? `Rev v${versions.releaseVersion}` : release.tag_name;
+}
+function majorCandidate(release: Release) {
+  const version = releaseVersions(release)?.releaseVersion;
+  return Boolean(version && isMajorUpdate(APP_RELEASE_VERSION, version));
 }
 
 let dialog: HTMLDialogElement;
@@ -54,6 +83,11 @@ let pending: { id: string; manual: boolean; timer: ReturnType<typeof setTimeout>
 let candidate: Release | null = null;
 let installSupported = false;
 let installing = false;
+let deferredPrompt: (() => void) | undefined;
+function clearDeferredPrompt() {
+  if (deferredPrompt) window.removeEventListener('focus', deferredPrompt);
+  deferredPrompt = undefined;
+}
 function element<T extends HTMLElement>(id: string) { return document.getElementById(id) as T; }
 function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
@@ -114,6 +148,7 @@ function checkUpdates(manual: boolean) {
   if (installing) return;
   if (!isDesktop) { setResult('请在桌面版中检测更新。'); return; }
   if (pending) { pending.manual ||= manual; return; }
+  clearDeferredPrompt();
   if (!manual) { settings.lastAttempt = Date.now(); saveSettings(); }
   candidate = null;
   const id = crypto.randomUUID();
@@ -131,22 +166,25 @@ export function handleUpdateMessage(message: HostMessage): boolean {
   if (!pending || pending.id !== message.requestId) return true;
   const manual = pending.manual;
   clearTimeout(pending.timer); pending = undefined;
+  clearDeferredPrompt();
   if (message.error) { setResult(message.error); return true; }
   try {
     candidate = latestRelease(message.releases, APP_VERSION);
     installSupported = message.installSupported === true;
-    const summary = candidate ? `发现${isMajorUpdate(APP_VERSION, candidate.tag_name) ? '大版本' : '新版本'} ${candidate.name || candidate.tag_name}。` : message.cacheNotice ? '缓存中没有高于当前版本的更新。' : `当前已是最新正式版本（${APP_DISPLAY_VERSION}）。`;
+    const summary = candidate ? `发现${majorCandidate(candidate) ? '大版本' : '新版本'} ${releaseLabel(candidate)}。` : message.cacheNotice ? '缓存中没有高于当前版本的更新。' : `当前已是最新正式版本（${APP_DISPLAY_VERSION}）。`;
     setResult(message.cacheNotice ? `${message.cacheNotice}\n${summary}` : summary);
-    if (candidate && !manual && !message.cacheNotice && shouldPrompt(settings, APP_VERSION, candidate.tag_name)) {
+    if (candidate && !manual && !message.cacheNotice && shouldPrompt(settings, APP_RELEASE_VERSION, candidate)) {
       // Defer the modal until this window is active, so it cannot steal focus.
+      const release = candidate;
       const show = () => {
-        if (!candidate || !shouldPrompt(settings, APP_VERSION, candidate.tag_name)) return;
-        settings.promptedMajor = parseVersion(candidate.tag_name)!.core[0]; saveSettings();
+        if (deferredPrompt === show) deferredPrompt = undefined;
+        if (candidate !== release || !shouldPrompt(settings, APP_RELEASE_VERSION, release)) return;
+        settings.promptedMajor = parseVersion(releaseVersions(release)!.releaseVersion!)!.core[0]; saveSettings();
         element('update-title').textContent = '发现大版本更新';
         openDialog();
       };
       if (document.hasFocus()) show();
-      else window.addEventListener('focus', show, { once: true });
+      else { deferredPrompt = show; window.addEventListener('focus', show, { once: true }); }
     }
   } catch (error) { setResult(error instanceof Error ? error.message : '无法读取更新信息。'); }
   return true;
