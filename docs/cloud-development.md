@@ -10,13 +10,17 @@ Mini Mark 使用 GitHub OAuth App 的设备授权流程。注册应用并启用 
 
 发布工作流会拒绝空 Client ID。真实 OAuth 登录、私有仓库创建和跨设备冲突需在发布前人工验证；模拟测试不能替代这一步。
 
+OAuth 应用可以保持 `Expire user access tokens` 开启。设备授权返回的访问令牌、刷新令牌及两者有效期一起写入系统凭据存储；旧版的单令牌记录仍可读取。令牌接近过期时按需刷新，同一进程内的并发请求共用一次刷新。刷新请求不携带 Client Secret。
+
+GitHub 刷新成功后会立即使旧令牌对失效，因此必须先保留并安全持久化新令牌对，再验证账号。网络错误不能清除已有登录；确认刷新凭据失效时才要求重新登录。退出登录或取消授权后，迟到响应不得恢复凭据。接口收到 401 时最多刷新并重试一次，不对超时、409 或 422 自动重试写入。
+
 ## 模块
 
 | 目录 | 职责 |
 | --- | --- |
 | `src/features/cloud` | 登录界面、目录浏览、文件位置选择、请求超时与取消 |
-| `native/Cloud` | GitHub 请求、Windows 凭据管理器、文档同步协调 |
-| `macos/Cloud` | GitHub 请求、macOS Keychain、文档同步协调 |
+| `native/Cloud` | GitHub 请求、令牌有效期与刷新、Windows 凭据管理器、文档同步协调 |
+| `macos/Cloud` | GitHub 请求、令牌有效期与刷新、macOS Keychain、文档同步协调 |
 | `native/Documents/DocumentWorkspace.cs` | 本地与云端基线、恢复与脏状态 |
 | `macos/Documents/DocumentStore.swift` | macOS 文档模型与会话 |
 | `tests/cloud.spec.ts` | 模拟宿主协议的界面回归 |
@@ -34,6 +38,7 @@ Mini Mark 使用 GitHub OAuth App 的设备授权流程。注册应用并启用 
 - 同步成功只更新已发送快照的基线。关闭文档前再次检查 revision 和 dirty。
 - 退出或取消登录递增会话代次，迟到结果不能变成新账号的保存成功。
 - 不自动后台重试写入，避免用户切回本地后仍然上传。
+- 目录加载完成前不能创建文件夹或提交云保存；加载失败时显示路径与内部目标保持一致，重开窗口不保留旧目录显示。
 - 网络请求不在启动阶段运行，云功能按用户操作发起；网络请求采用异步 API，macOS 解析与凭据操作位于独立队列。
 
 云端文本限制为 5 MB，允许 Markdown、YAML、HTML、TXT。文件夹用 `.gitkeep` 保留。目录路径禁止绝对路径、反斜杠、空段、`.`、`..`、`.git` 和控制字符。
@@ -41,6 +46,8 @@ Mini Mark 使用 GitHub OAuth App 的设备授权流程。注册应用并启用 
 ## macOS 免费签名
 
 默认打包使用 `codesign --sign -` 的 ad-hoc 签名，不产生 Apple 证书，也不等于公证。免费个人团队的开发签名用于本机测试，不作为公开下载包的 Developer ID 身份。此项目不会自动注册付费 Apple Developer Program。
+
+个人开发证书的前提、操作与验证见 [macOS 签名](mac-signing.md)。未在实际 Mac 钥匙串中确认有效签名身份之前，不将证书申请标为完成。
 
 ## 发布前检查
 

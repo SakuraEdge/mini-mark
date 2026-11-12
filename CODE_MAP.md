@@ -66,6 +66,7 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 | 文字选区 | `src/editor/editor.ts` 使用原生选区；`src/styles/app.css` 的 `::selection` 在有背景的代码行上仍可见 |
 | 更新、提醒、下载 | `src/features/updates/`、两平台的 `Updates/` |
 | GitHub 登录与云文档 | `src/features/cloud/`、两平台的 `Cloud/`、`docs/cloud-development.md` |
+| macOS 个人开发签名 | `docs/mac-signing.md`、`scripts/package-mac.sh`；免费开发证书不用于公开分发身份 |
 | 文档类型图标 | `public/document-icons/`、`scripts/document-icons.mjs`、`installer/Moye.iss`、`macos/Info.plist` |
 | 数据盘、单实例 | `native/Infrastructure/` |
 | 安装位置、快捷方式、旧文件清理 | `installer/Moye.iss`、`scripts/package-win.ps1` |

@@ -25,6 +25,7 @@ export function initializeCloud(options: Options) {
   let account: CloudAccount = { authenticated: false, configured: false };
   let repository: CloudRepository | undefined;
   let folder = '', intent: 'browse' | 'save' = 'browse', busy = false, authenticating = false;
+  let listingReady = false;
   let entries: CloudEntry[] = [];
   let controller = new AbortController();
   let generation = 0;
@@ -105,7 +106,7 @@ export function initializeCloud(options: Options) {
     action('save-current').disabled = busy || !snapshot.id;
     action('up').disabled = busy || !folder;
     action('refresh').disabled = busy;
-    action('new-folder').disabled = busy;
+    action('new-folder').disabled = busy || !listingReady;
     action('login').disabled = busy || !isDesktop;
     action('logout').disabled = busy;
     action('authorize').disabled = !authorizationUrl;
@@ -113,8 +114,8 @@ export function initializeCloud(options: Options) {
     dialog.setAttribute('aria-busy', String(busy));
     fileName.disabled = busy || !saveEnabled.checked;
     saveEnabled.disabled = busy;
-    saveForm.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled = busy || !account.authenticated || !repository?.exists || !saveEnabled.checked;
-    folderForm.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input,button').forEach(item => { item.disabled = busy; });
+    saveForm.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled = busy || !listingReady || !account.authenticated || !repository?.exists || !saveEnabled.checked;
+    folderForm.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input,button').forEach(item => { item.disabled = busy || !listingReady; });
     get('cloud-entries').querySelectorAll<HTMLButtonElement>('button').forEach(item => { item.disabled = busy || intent === 'save' && item.dataset.type === 'file'; });
     get('cloud-breadcrumb').querySelectorAll<HTMLButtonElement>('button').forEach(item => { item.disabled = busy; });
   }
@@ -161,10 +162,11 @@ export function initializeCloud(options: Options) {
     redraw();
   }
   async function listFolder(path: string, signal: AbortSignal) {
+    listingReady = false; redraw();
     setStatus('正在读取目录…');
     const data = await cloudRequest<unknown>('list', { owner: account.login, path }, signal);
     if (signal.aborted) return;
-    entries = readCloudEntries(data, path); folder = path;
+    entries = readCloudEntries(data, path); folder = path; listingReady = true;
     folderForm.hidden = true; folderName.value = '';
     renderEntries(); setStatus('');
   }
@@ -186,6 +188,7 @@ export function initializeCloud(options: Options) {
     else setStatus('MiniMarkDisk 尚未创建。');
   }
   async function refresh(signal: AbortSignal) {
+    listingReady = false;
     setStatus('正在连接 GitHub…');
     const result = await cloudRequest<CloudAccount>('status', {}, signal);
     if (signal.aborted) return;
@@ -260,13 +263,13 @@ export function initializeCloud(options: Options) {
   action('logout').onclick = () => void perform(async signal => {
     await cloudRequest('logout', {}, signal);
     if (signal.aborted) return;
-    account = { authenticated: false, configured: account.configured }; repository = undefined; entries = []; folder = '';
+    account = { authenticated: false, configured: account.configured }; repository = undefined; entries = []; folder = ''; listingReady = false;
     renderEntries(); setStatus('已退出 GitHub。');
   });
   action('create-repository').onclick = () => void perform(createRepository);
   action('up').onclick = () => void perform(signal => listFolder(parentCloudPath(folder), signal));
   action('refresh').onclick = () => void perform(signal => listFolder(folder, signal));
-  action('new-folder').onclick = () => { folderForm.hidden = !folderForm.hidden; if (!folderForm.hidden) folderName.focus(); };
+  action('new-folder').onclick = () => { if (!listingReady || busy) return; folderForm.hidden = !folderForm.hidden; if (!folderForm.hidden) folderName.focus(); };
   action('cancel-folder').onclick = () => { folderForm.hidden = true; folderName.value = ''; };
   action('close').onclick = closeDialog;
   action('save-current').onclick = beginSave;
@@ -280,6 +283,7 @@ export function initializeCloud(options: Options) {
   };
   folderForm.onsubmit = event => {
     event.preventDefault();
+    if (!listingReady || !account.authenticated || !account.login || !repository?.exists) return;
     void perform(async signal => {
       const path = joinCloudPath(folder, cloudFolderName(folderName.value));
       setStatus('正在创建文件夹…');
@@ -289,7 +293,7 @@ export function initializeCloud(options: Options) {
   };
   saveForm.onsubmit = event => {
     event.preventDefault();
-    if (!saveEnabled.checked || !account.login || !repository?.exists) return;
+    if (!saveEnabled.checked || !listingReady || !account.authenticated || !account.login || !repository?.exists) return;
     void perform(async signal => {
       const path = joinCloudPath(folder, cloudFileName(fileName.value));
       const snapshot = options.snapshot();
@@ -304,7 +308,8 @@ export function initializeCloud(options: Options) {
   dialog.addEventListener('close', () => { if (!dialog.open) { resetRequests(); redraw(); } });
   return {
     open(next: 'browse' | 'save' = 'browse') {
-      resetRequests(); intent = next; folder = ''; entries = []; repository = undefined;
+      resetRequests(); intent = next; folder = ''; entries = []; repository = undefined; listingReady = false;
+      folderForm.hidden = true; folderName.value = ''; renderEntries();
       currentDocumentId = ''; documentChanged();
       if (next === 'save') beginSave();
       if (!dialog.open) dialog.showModal();

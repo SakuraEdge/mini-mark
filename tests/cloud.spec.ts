@@ -9,6 +9,8 @@ interface MockOptions {
   failSaveOnce?: boolean;
   pendingLogin?: boolean;
   delayedSave?: boolean;
+  failRootListAt?: number;
+  failFolderListOnce?: string;
 }
 
 async function mockHost(page: Page, options: MockOptions = {}) {
@@ -18,6 +20,8 @@ async function mockHost(page: Page, options: MockOptions = {}) {
     let repositoryExists = options.repositoryExists ?? true;
     let failList = options.failListOnce ?? false;
     let failSave = options.failSaveOnce ?? false;
+    let rootListCount = 0;
+    let failFolderList = options.failFolderListOnce;
     const messages: any[] = [];
     const documents: any[] = [{
       id: 'local', name: '随手记.md', text: 'Local draft', baseline: 'Local draft', revision: 0,
@@ -58,7 +62,13 @@ async function mockHost(page: Page, options: MockOptions = {}) {
           if (message.action === 'cancelLogin') respond({});
           if (message.action === 'logout') { authenticated = false; respond({}); }
           if (message.action === 'list') {
-            if (failList) { failList = false; emit({ type: 'cloudResponse', requestId: message.requestId, error: 'GitHub 暂时无法连接。' }); }
+            if (message.path === '') rootListCount++;
+            const targetedFailure = options.failRootListAt === rootListCount && message.path === '' || failFolderList === message.path;
+            if (failList || targetedFailure) {
+              failList = false;
+              if (failFolderList === message.path) failFolderList = undefined;
+              emit({ type: 'cloudResponse', requestId: message.requestId, error: 'GitHub 暂时无法连接。' });
+            }
             else respond({ entries: entries.filter(entry => entry.path.slice(0, Math.max(0, entry.path.lastIndexOf('/'))) === message.path) });
           }
           if (message.action === 'folder') {
@@ -288,4 +298,47 @@ test('cloud dialog fits desktop, minimum desktop and narrow viewport', async ({ 
     expect(bounds.bottom).toBeLessThanOrEqual(viewport.height);
     await page.screenshot({ path: testInfo.outputPath(`cloud-${viewport.width}.png`) });
   }
+});
+
+test('reopening after a root listing failure clears stale directory display and blocks writes', async ({ page }) => {
+  await mockHost(page, { failRootListAt: 2 });
+  await openCloud(page);
+  await page.getByRole('button', { name: '文件夹 笔记', exact: true }).click();
+  await expect(page.locator('#cloud-breadcrumb')).toHaveText('MiniMarkDisk/笔记');
+  await expect(page.getByRole('button', { name: '打开 配置.yaml', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '关闭云文档窗口', exact: true }).click();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('menuitem', { name: '保存至云文档…', exact: true }).click();
+  await expect(page.locator('#cloud-status')).toHaveText('GitHub 暂时无法连接。');
+  await expect(page.locator('#cloud-breadcrumb')).toHaveText('MiniMarkDisk');
+  await expect(page.getByRole('button', { name: '打开 配置.yaml', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '保存到此目录', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '新建云文件夹', exact: true })).toBeDisabled();
+  await page.locator('#cloud-save-form').dispatchEvent('submit');
+  await page.locator('#cloud-folder-form').dispatchEvent('submit');
+  expect((await cloudMessages(page)).some(message => message.type === 'cloudBind' || message.action === 'folder')).toBe(false);
+  await page.getByRole('button', { name: '刷新云目录', exact: true }).click();
+  await expect(page.getByRole('button', { name: '文件夹 笔记', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '保存到此目录', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '新建云文件夹', exact: true })).toBeEnabled();
+});
+
+test('failed directory navigation preserves the displayed location and blocks writes until refreshed', async ({ page }) => {
+  await mockHost(page, { failFolderListOnce: '笔记' });
+  await openCloud(page);
+  await page.getByRole('button', { name: '保存当前文档到云端', exact: true }).click();
+  await expect(page.getByRole('button', { name: '保存到此目录', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: '文件夹 笔记', exact: true }).click();
+  await expect(page.locator('#cloud-status')).toHaveText('GitHub 暂时无法连接。');
+  await expect(page.locator('#cloud-breadcrumb')).toHaveText('MiniMarkDisk');
+  await expect(page.getByRole('button', { name: '打开 配置.yaml', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '保存到此目录', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '新建云文件夹', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '刷新云目录', exact: true }).click();
+  await expect(page.getByRole('button', { name: '保存到此目录', exact: true })).toBeEnabled();
+  const listings = (await cloudMessages(page)).filter(message => message.action === 'list');
+  expect(listings.map(message => message.path)).toEqual(['', '笔记', '']);
+  await page.getByRole('button', { name: '文件夹 笔记', exact: true }).click();
+  await expect(page.locator('#cloud-breadcrumb')).toHaveText('MiniMarkDisk/笔记');
+  await expect(page.getByRole('button', { name: '保存到此目录', exact: true })).toBeEnabled();
 });

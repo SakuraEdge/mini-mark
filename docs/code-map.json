@@ -205,6 +205,7 @@
       "path": "macos/Diagnostics",
       "purpose": "macOS 实际运行验证",
       "files": [
+        "macos/Diagnostics/CloudTests.swift",
         "macos/Diagnostics/SmokeTests.swift"
       ]
     },
@@ -234,6 +235,7 @@
       "path": "native-tests",
       "purpose": "原生单元检查",
       "files": [
+        "native-tests/CloudRefreshTests.cs",
         "native-tests/CloudTests.cs",
         "native-tests/Moye.Tests.csproj",
         "native-tests/Program.cs",
@@ -336,6 +338,7 @@
         "docs/editor-v1.png",
         "docs/editor.png",
         "docs/images.md",
+        "docs/mac-signing.md",
         "docs/mini-mark-editor.png",
         "docs/performance.md",
         "docs/plugins.md",

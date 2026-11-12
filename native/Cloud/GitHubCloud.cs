@@ -10,14 +10,18 @@ public sealed class GitHubCloud {
     private readonly HttpClient http;
     private readonly ICloudTokenStore store;
     private readonly Func<string> clientId;
-    private string? token, login;
-    private bool loaded;
+    private CloudCredential? credential;
+    private string? login;
+    private bool loaded, needsPersistence;
     private DateTimeOffset verifiedAt;
     private int generation;
     private DeviceLogin? device;
     private readonly SemaphoreSlim pollGate = new(1);
+    private readonly object authLock = new();
+    private Task<CloudCredential>? refreshing;
     private sealed record DeviceLogin(string ClientId, string Code, DateTimeOffset Expires, int Interval, DateTimeOffset NextPoll);
     private sealed class ApiError(HttpStatusCode status, string message) : IOException(message) { public HttpStatusCode Status { get; } = status; }
+    private sealed class LoginRequired() : IOException("GitHub 登录已失效，请重新登录。");
 
     public GitHubCloud(ICloudTokenStore store, Func<string> clientId, HttpClient? http = null) {
         this.store = store; this.clientId = clientId;
@@ -32,17 +36,95 @@ public sealed class GitHubCloud {
         }
         return value?.Trim() ?? "";
     }
-    private void Load() { if (!loaded) { token = store.Read(); loaded = true; } }
+    private void Load() { lock (authLock) { if (!loaded) { credential = CloudCredential.Read(store.Read()); loaded = true; } } }
     private void CheckGeneration(int value) { if (value != generation) throw new IOException("登录状态已改变，请重新操作。"); }
-    private async Task<string> Account(string? expected = null) {
+    private void AdvanceGeneration() { generation++; refreshing = null; }
+    private LoginRequired Invalidate(int epoch, CloudCredential expected) {
+        lock (authLock) {
+            CheckGeneration(epoch);
+            if (credential == expected) {
+                AdvanceGeneration(); credential = null; login = null; verifiedAt = default; loaded = true; needsPersistence = false;
+                store.Clear();
+            }
+        }
+        return new LoginRequired();
+    }
+    private async Task<CloudCredential> AccessCredential(string? rejectedToken = null) {
         Load();
-        if (string.IsNullOrEmpty(token)) throw new IOException("请先登录 GitHub。");
+        TaskCompletionSource<CloudCredential>? completion = null;
+        Task<CloudCredential> task;
+        CloudCredential current;
+        string? expectedLogin;
+        int epoch;
+        lock (authLock) {
+            current = credential ?? throw new LoginRequired();
+            if (needsPersistence) { store.Write(current.Serialize()); needsPersistence = false; }
+            epoch = generation; expectedLogin = current.Account ?? login;
+            var rejected = rejectedToken == current.AccessToken;
+            var expiring = current.AccessExpiresAt is DateTimeOffset expires && expires <= DateTimeOffset.UtcNow.AddSeconds(60);
+            if (refreshing is null && !rejected && !expiring) return current;
+            if (refreshing is null && (current.RefreshToken is null || current.RefreshExpiresAt <= DateTimeOffset.UtcNow)) {
+                if (!rejected && current.AccessExpiresAt > DateTimeOffset.UtcNow) return current;
+                throw Invalidate(epoch, current);
+            }
+            if (refreshing is null) {
+                completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                refreshing = completion.Task;
+            }
+            task = refreshing;
+        }
+        if (completion is not null) _ = CompleteRefresh(current, expectedLogin, epoch, completion);
+        var result = await task;
+        CheckGeneration(epoch);
+        return result;
+    }
+    private async Task CompleteRefresh(CloudCredential previous, string? expectedLogin, int epoch, TaskCompletionSource<CloudCredential> completion) {
+        try {
+            var id = previous.ClientId ?? clientId();
+            if (string.IsNullOrWhiteSpace(id)) throw new IOException("此安装包尚未配置 GitHub 登录。");
+            var response = await OAuth("oauth/access_token", new() { ["client_id"] = id, ["grant_type"] = "refresh_token", ["refresh_token"] = previous.RefreshToken! });
+            CheckGeneration(epoch);
+            if (response.TryGetProperty("error", out var error)) {
+                if (error.GetString() is "bad_refresh_token" or "invalid_grant") throw Invalidate(epoch, previous);
+                throw new IOException("暂时无法刷新 GitHub 登录，请稍后重试。");
+            }
+            var next = CloudCredential.FromResponse(response, id, DateTimeOffset.UtcNow, requireRefresh: true) with { Account = expectedLogin };
+            lock (authLock) {
+                CheckGeneration(epoch);
+                // Rotation invalidates the old pair; preserve the new pair before account verification can fail offline.
+                credential = next; login = null; verifiedAt = default; needsPersistence = true;
+                store.Write(next.Serialize()); needsPersistence = false;
+            }
+            JsonElement user;
+            try { user = await Request(HttpMethod.Get, "https://api.github.com/user", null, next.AccessToken); }
+            catch (ApiError rejected) when (rejected.Status == HttpStatusCode.Unauthorized) { throw Invalidate(epoch, next); }
+            lock (authLock) {
+                CheckGeneration(epoch);
+                var account = user.GetProperty("login").GetString()!;
+                if (expectedLogin is not null && !string.Equals(expectedLogin, account, StringComparison.OrdinalIgnoreCase)) throw Invalidate(epoch, next);
+                if (next.Account is null) {
+                    next = next with { Account = account }; credential = next; needsPersistence = true;
+                    store.Write(next.Serialize()); needsPersistence = false;
+                }
+                login = account; verifiedAt = DateTimeOffset.UtcNow;
+            }
+            completion.TrySetResult(next);
+        } catch (Exception error) { completion.TrySetException(error); }
+        finally { lock (authLock) { if (ReferenceEquals(refreshing, completion.Task)) refreshing = null; } }
+    }
+    private async Task<string> Account(string? expected = null) {
         var epoch = generation;
+        await AccessCredential();
+        CheckGeneration(epoch);
         if (login is null || DateTimeOffset.UtcNow - verifiedAt > TimeSpan.FromMinutes(1)) {
             var user = await Api(HttpMethod.Get, "user");
-            CheckGeneration(epoch);
-            login = user.GetProperty("login").GetString()!;
-            verifiedAt = DateTimeOffset.UtcNow;
+            lock (authLock) {
+                CheckGeneration(epoch);
+                var account = user.GetProperty("login").GetString()!;
+                if (credential?.Account is string saved && !string.Equals(saved, account, StringComparison.OrdinalIgnoreCase))
+                    throw Invalidate(epoch, credential);
+                login = account; verifiedAt = DateTimeOffset.UtcNow;
+            }
         }
         if (expected is not null && !string.Equals(expected, login, StringComparison.OrdinalIgnoreCase))
             throw new IOException($"此文档属于 GitHub 账号 {expected}，请切换账号后再保存。");
@@ -55,16 +137,18 @@ public sealed class GitHubCloud {
         switch (action) {
             case "status":
                 Load();
-                if (token is null) return new { authenticated = false, configured = clientId().Length > 0 };
+                if (credential is null) return new { authenticated = false, configured = clientId().Length > 0 };
                 verifiedAt = default;
                 try { return new { authenticated = true, configured = clientId().Length > 0, login = await Account() }; }
-                catch (ApiError error) when (error.Status == HttpStatusCode.Unauthorized) { return new { authenticated = false, configured = clientId().Length > 0 }; }
+                catch (LoginRequired) { return new { authenticated = false, configured = clientId().Length > 0 }; }
             case "startLogin": return await StartLogin();
             case "pollLogin": return await PollLogin();
-            case "cancelLogin": generation++; device = null; return new { cancelled = true };
+            case "cancelLogin": lock (authLock) { AdvanceGeneration(); device = null; } return new { cancelled = true };
             case "logout":
-                generation++; device = null; token = login = null; loaded = false;
-                store.Clear(); loaded = true;
+                lock (authLock) {
+                    AdvanceGeneration(); device = null; credential = null; login = null; loaded = false; needsPersistence = false;
+                    store.Clear(); loaded = true;
+                }
                 return new { authenticated = false, configured = clientId().Length > 0 };
             case "repository": {
                 var owner = await Account();
@@ -145,7 +229,8 @@ public sealed class GitHubCloud {
     private async Task<object> StartLogin() {
         var id = clientId();
         if (id.Length == 0) throw new IOException("此安装包尚未配置 GitHub 登录。请联系 Mini Mark 维护者。");
-        var epoch = ++generation; device = null;
+        int epoch;
+        lock (authLock) { AdvanceGeneration(); epoch = generation; device = null; }
         var result = await OAuth("device/code", new() { ["client_id"] = id, ["scope"] = "repo" });
         CheckGeneration(epoch);
         if (result.TryGetProperty("error", out _)) throw new IOException("GitHub 登录不可用，请检查应用的设备授权设置。");
@@ -173,30 +258,39 @@ public sealed class GitHubCloud {
                 }
                 device = null; throw new IOException(error.GetString() == "access_denied" ? "已拒绝 GitHub 授权。" : "GitHub 授权已失效，请重新登录。");
             }
-            var candidate = result.GetProperty("access_token").GetString()!;
-            var user = await Request(HttpMethod.Get, "https://api.github.com/user", null, candidate);
+            var candidate = CloudCredential.FromResponse(result, pending.ClientId, DateTimeOffset.UtcNow);
+            var user = await Request(HttpMethod.Get, "https://api.github.com/user", null, candidate.AccessToken);
             CheckGeneration(epoch);
             var account = user.GetProperty("login").GetString()!;
-            store.Write(candidate); token = candidate; login = account; loaded = true; device = null; verifiedAt = DateTimeOffset.UtcNow;
+            candidate = candidate with { Account = account };
+            lock (authLock) {
+                CheckGeneration(epoch);
+                store.Write(candidate.Serialize()); AdvanceGeneration(); credential = candidate; login = account; loaded = true; needsPersistence = false; device = null; verifiedAt = DateTimeOffset.UtcNow;
+            }
             return new { authenticated = true, login, configured = true };
         } finally { pollGate.Release(); }
     }
     private async Task<JsonElement> OAuth(string endpoint, Dictionary<string, string> values) {
         using var content = new FormUrlEncodedContent(values);
-        return await Request(HttpMethod.Post, "https://github.com/login/" + endpoint, content, null);
+        return await Request(HttpMethod.Post, "https://github.com/login/" + endpoint, content, null, oauth: true);
     }
     private async Task<JsonElement> Api(HttpMethod method, string path, object? body = null, string accept = "application/vnd.github+json") {
         var epoch = generation;
-        using var content = body is null ? null : new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
-        try {
-            var result = await Request(method, "https://api.github.com/" + path, content, token, accept);
-            CheckGeneration(epoch); return result;
-        } catch (ApiError error) when (error.Status == HttpStatusCode.Unauthorized) {
-            if (epoch == generation) { login = null; verifiedAt = default; }
-            throw;
+        var current = await AccessCredential();
+        for (var attempt = 0; ; attempt++) {
+            CheckGeneration(epoch);
+            using var content = body is null ? null : new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+            try {
+                var result = await Request(method, "https://api.github.com/" + path, content, current.AccessToken, accept);
+                CheckGeneration(epoch); return result;
+            } catch (ApiError error) when (error.Status == HttpStatusCode.Unauthorized) {
+                CheckGeneration(epoch);
+                if (attempt > 0) throw Invalidate(epoch, current);
+                current = await AccessCredential(current.AccessToken);
+            }
         }
     }
-    private async Task<JsonElement> Request(HttpMethod method, string url, HttpContent? content, string? bearer, string accept = "application/json") {
+    private async Task<JsonElement> Request(HttpMethod method, string url, HttpContent? content, string? bearer, string accept = "application/json", bool oauth = false) {
         using var request = new HttpRequestMessage(method, url) { Content = content };
         request.Headers.UserAgent.ParseAdd("MiniMark/1.0");
         request.Headers.Accept.ParseAdd(accept);
@@ -205,7 +299,8 @@ public sealed class GitHubCloud {
             request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
         }
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-        if (!response.IsSuccessStatusCode) {
+        var oauthError = oauth && response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized;
+        if (!response.IsSuccessStatusCode && !oauthError) {
             var message = response.StatusCode switch {
                 HttpStatusCode.Unauthorized => "GitHub 登录已失效，请退出后重新登录。",
                 HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests => "GitHub 暂时拒绝访问，请检查仓库权限或稍后重试。",
@@ -226,9 +321,11 @@ public sealed class GitHubCloud {
             buffer.Write(chunk, 0, count);
         }
         var data = buffer.ToArray();
-        return await Task.Run(() => {
+        var result = await Task.Run(() => {
             using var json = JsonDocument.Parse(data);
             return json.RootElement.Clone();
         });
+        if (oauthError && (result.ValueKind != JsonValueKind.Object || !result.TryGetProperty("error", out _))) throw new IOException("GitHub 授权请求失败，请稍后重试。");
+        return result;
     }
 }

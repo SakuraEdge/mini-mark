@@ -1,14 +1,14 @@
 import Foundation
 import Security
 
-private struct CloudFailure: LocalizedError {
+struct CloudFailure: LocalizedError {
     let status: Int
     let message: String
     var errorDescription: String? { message }
     init(_ message: String, status: Int = 0) { self.message = message; self.status = status }
 }
 
-private final class CloudTokenStore {
+private final class CloudTokenStore: CloudTokenStorage {
     private var query: [String: Any] {
         let suffix = ProcessInfo.processInfo.environment["MOYE_DATA_DIR"].map { "." + Store.hash(Data($0.utf8)) } ?? ""
         return [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "MiniMark.GitHubCloud",
@@ -61,17 +61,24 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
         var error: Error?
     }
     private let queue = DispatchQueue(label: "MiniMark.GitHubCloud")
-    private let store = CloudTokenStore()
+    private let store: CloudTokenStorage
+    private let clientIdOverride: (() -> String?)?
+    private let requestOverride: ((URLRequest, @escaping (Result<Data, Error>) -> Void) -> Void)?
+    private let now: () -> Date
     private let maximumFileSize = 5 * 1024 * 1024
     private let maximumResponseSize = 8 * 1024 * 1024
     private let supportedExtensions = ["md", "markdown", "mdown", "txt", "yaml", "yml", "html", "htm"]
     private var requests: [Int: PendingRequest] = [:]
-    private var token: String?
+    private var credentials: CloudCredentials?
+    private var token: String? { credentials?.accessToken }
     private var credentialsLoaded = false
+    private var credentialsNeedPersistence = false
     private var login: String?
     private var verifiedAt = Date.distantPast
     private var device: DeviceLogin?
     private var generation = 0
+    private var refreshCallbacks: [(Result<String, Error>) -> Void] = []
+    private var refreshInProgress: UUID?
     private lazy var network: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 30
@@ -81,6 +88,12 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         return URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
     }()
+
+    init(store: CloudTokenStorage? = nil, clientId: (() -> String?)? = nil, now: @escaping () -> Date = { Date() },
+         request: ((URLRequest, @escaping (Result<Data, Error>) -> Void) -> Void)? = nil) {
+        self.store = store ?? CloudTokenStore(); self.clientIdOverride = clientId; self.now = now; self.requestOverride = request
+        super.init()
+    }
 
     func handle(_ body: [String: Any], completion: @escaping ([String: Any]) -> Void) {
         guard let requestId = body["requestId"] as? String, !requestId.isEmpty, requestId.count <= 128 else { return }
@@ -100,7 +113,8 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
 
     private var clientId: String? {
         let configured: String?
-        if let environment = ProcessInfo.processInfo.environment["MINIMARK_GITHUB_CLIENT_ID"] { configured = environment }
+        if let override = clientIdOverride { configured = override() }
+        else if let environment = ProcessInfo.processInfo.environment["MINIMARK_GITHUB_CLIENT_ID"] { configured = environment }
         else if let file = Bundle.main.resourceURL?.appendingPathComponent("wwwroot/github-oauth.json"),
                 let data = try? Data(contentsOf: file),
                 let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { configured = value["clientId"] as? String }
@@ -114,14 +128,15 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
         guard let action = body["action"] as? String else { throw CloudFailure("云文档请求无效。") }
         switch action {
         case "logout":
-            generation += 1; device = nil; token = nil; login = nil; verifiedAt = .distantPast
+            device = nil; credentials = nil; credentialsNeedPersistence = false; login = nil; verifiedAt = .distantPast
             requests.values.forEach { $0.task.cancel() }
             credentialsLoaded = false
+            invalidatePendingAuthentication()
             try store.remove()
             credentialsLoaded = true
             finish(.success(["authenticated": false, "configured": clientId != nil]))
         case "cancelLogin":
-            generation += 1; device = nil
+            invalidatePendingAuthentication(); device = nil
             finish(.success(["cancelled": true]))
         case "startLogin": try startLogin(finish)
         case "pollLogin": pollLogin(finish)
@@ -153,12 +168,15 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
     }
 
     private func loadCredentials() throws {
-        if !credentialsLoaded { token = try store.read(); credentialsLoaded = true }
+        if !credentialsLoaded {
+            credentials = try store.read().map(CloudCredentials.decode)
+            credentialsLoaded = true
+        }
     }
 
     private func startLogin(_ finish: @escaping (Result<Any, Error>) -> Void) throws {
         guard let clientId = clientId else { throw CloudFailure("当前版本尚未配置 GitHub 登录，请联系 Mini Mark 发布者。") }
-        generation += 1; device = nil
+        invalidatePendingAuthentication(); device = nil
         let epoch = generation
         oauth("device/code", fields: ["client_id": clientId, "scope": "repo"]) { result in
             do {
@@ -172,8 +190,8 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
                     throw CloudFailure("GitHub 登录暂不可用，请确认 OAuth 应用已开启 Device Flow。")
                 }
                 let interval = max(5, min(json["interval"] as? Int ?? 5, 60))
-                self.device = DeviceLogin(clientId: clientId, code: code, expires: Date().addingTimeInterval(TimeInterval(expires)),
-                                          interval: interval, nextPoll: Date().addingTimeInterval(TimeInterval(interval)))
+                self.device = DeviceLogin(clientId: clientId, code: code, expires: self.now().addingTimeInterval(TimeInterval(expires)),
+                                          interval: interval, nextPoll: self.now().addingTimeInterval(TimeInterval(interval)))
                 finish(.success(["userCode": userCode, "verificationUri": uri, "interval": interval, "expiresIn": expires]))
             } catch { finish(.failure(error)) }
         }
@@ -181,8 +199,8 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
 
     private func pollLogin(_ finish: @escaping (Result<Any, Error>) -> Void) {
         guard var current = device else { finish(.failure(CloudFailure("请先发起 GitHub 登录。"))); return }
-        if current.expires <= Date() { device = nil; finish(.failure(CloudFailure("登录授权码已过期，请重新登录。"))); return }
-        if current.polling || current.nextPoll > Date() { finish(.success(["pending": true, "interval": current.interval])); return }
+        if current.expires <= now() { device = nil; finish(.failure(CloudFailure("登录授权码已过期，请重新登录。"))); return }
+        if current.polling || current.nextPoll > now() { finish(.success(["pending": true, "interval": current.interval])); return }
         current.polling = true; device = current
         let epoch = generation
         oauth("oauth/access_token", fields: ["client_id": current.clientId, "device_code": current.code,
@@ -195,7 +213,7 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
                     case "authorization_pending", "slow_down":
                         if code == "slow_down" { self.device?.interval += 5 }
                         let interval = self.device?.interval ?? 5
-                        self.device?.nextPoll = Date().addingTimeInterval(TimeInterval(interval))
+                        self.device?.nextPoll = self.now().addingTimeInterval(TimeInterval(interval))
                         self.device?.polling = false
                         finish(.success(["pending": true, "interval": interval])); return
                     case "access_denied": throw CloudFailure("GitHub 授权已取消。")
@@ -203,15 +221,14 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
                     default: throw CloudFailure("GitHub 登录未完成，请重新登录。")
                     }
                 }
-                guard let accessToken = json["access_token"] as? String, !accessToken.isEmpty, accessToken.count <= 8192 else {
-                    throw CloudFailure("GitHub 未返回有效登录凭据。")
-                }
-                self.verify(accessToken, epoch: epoch) { verified in
+                var candidate = try CloudCredentials.response(json, clientId: current.clientId, now: self.now())
+                self.verify(candidate.accessToken, epoch: epoch) { verified in
                     do {
                         let owner = try verified.get()
                         guard epoch == self.generation else { throw CloudFailure("登录已取消。") }
-                        try self.store.save(accessToken)
-                        self.token = accessToken; self.credentialsLoaded = true; self.login = owner; self.verifiedAt = Date(); self.device = nil
+                        candidate.account = owner
+                        try self.store.save(candidate.encode())
+                        self.credentials = candidate; self.credentialsNeedPersistence = false; self.credentialsLoaded = true; self.login = owner; self.verifiedAt = self.now(); self.device = nil
                         finish(.success(["authenticated": true, "login": owner, "configured": self.clientId != nil]))
                     } catch {
                         if epoch == self.generation { self.device = nil }
@@ -223,7 +240,7 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
                     if (error as? CloudFailure)?.status == -1 {
                         let interval = self.device?.interval ?? 5
                         self.device?.polling = false
-                        self.device?.nextPoll = Date().addingTimeInterval(TimeInterval(interval))
+                        self.device?.nextPoll = self.now().addingTimeInterval(TimeInterval(interval))
                     } else { self.device = nil }
                 }
                 finish(.failure(error))
@@ -232,33 +249,129 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
     }
 
     private func authenticate(_ completion: @escaping (Result<String, Error>) -> Void) {
-        guard let token = token else { completion(.failure(CloudFailure("请先登录 GitHub。", status: 401))); return }
-        if let login = login, Date().timeIntervalSince(verifiedAt) < 60 { completion(.success(login)); return }
         let epoch = generation
-        verify(token, epoch: epoch) { result in
-            if epoch == self.generation {
-                switch result {
-                case .success(let owner): self.login = owner; self.verifiedAt = Date()
-                case .failure(let error):
-                    if (error as? CloudFailure)?.status == 401 {
-                        self.token = nil; self.login = nil; self.verifiedAt = .distantPast
-                        try? self.store.remove()
-                    }
+        validAccessToken { result in
+            do {
+                let token = try result.get()
+                guard epoch == self.generation else { throw CloudFailure("账号连接已更改，请重试。") }
+                if let login = self.login, self.now().timeIntervalSince(self.verifiedAt) < 60 { completion(.success(login)); return }
+                self.api("user", token: token) { result in
+                    do {
+                        guard epoch == self.generation else { throw CloudFailure("账号连接已更改，请重试。") }
+                        let owner = try self.accountName(result.get())
+                        if let expected = self.credentials?.account, expected.caseInsensitiveCompare(owner) != .orderedSame {
+                            self.clearCredentials(); throw CloudFailure("GitHub 账号与已保存的登录信息不同，请重新登录。", status: 401)
+                        }
+                        self.login = owner; self.verifiedAt = self.now()
+                        completion(.success(owner))
+                    } catch { completion(.failure(error)) }
                 }
-            }
-            completion(result)
+            } catch { completion(.failure(error)) }
         }
     }
 
+    private func invalidatePendingAuthentication() {
+        generation += 1
+        let callbacks = refreshCallbacks
+        refreshCallbacks = []; refreshInProgress = nil
+        callbacks.forEach { $0(.failure(CloudFailure("账号连接已更改，请重试。"))) }
+    }
+
+    private func clearCredentials() {
+        credentials = nil; credentialsNeedPersistence = false; login = nil; verifiedAt = .distantPast
+        try? store.remove()
+    }
+
+    private func persistCredentials() throws {
+        guard let credentials = credentials else { return }
+        try store.save(credentials.encode())
+        credentialsNeedPersistence = false
+    }
+
+    private func validAccessToken(_ completion: @escaping (Result<String, Error>) -> Void) {
+        guard let credentials = credentials else { completion(.failure(CloudFailure("请先登录 GitHub。", status: 401))); return }
+        if credentialsNeedPersistence {
+            do { try persistCredentials() }
+            catch { completion(.failure(error)); return }
+        }
+        if refreshInProgress != nil || credentials.needsRefresh(now: now()) {
+            refreshAccessToken(replacing: credentials.accessToken, completion: completion)
+        } else { completion(.success(credentials.accessToken)) }
+    }
+
+    private func refreshAccessToken(replacing oldToken: String, completion: @escaping (Result<String, Error>) -> Void) {
+        guard let current = credentials else { completion(.failure(CloudFailure("请先登录 GitHub。", status: 401))); return }
+        if refreshInProgress != nil { refreshCallbacks.append(completion); return }
+        if current.accessToken != oldToken { completion(.success(current.accessToken)); return }
+        guard let refresh = current.refreshToken else {
+            clearCredentials(); completion(.failure(CloudFailure("GitHub 登录已失效，请重新登录。", status: 401))); return
+        }
+        if current.refreshExpired(now: now()) {
+            clearCredentials(); completion(.failure(CloudFailure("GitHub 登录已过期，请重新登录。", status: 401))); return
+        }
+        guard let id = current.clientId ?? clientId else { completion(.failure(CloudFailure("当前版本尚未配置 GitHub 登录，请联系 Mini Mark 发布者。"))); return }
+        let identifier = UUID(), epoch = generation
+        refreshInProgress = identifier; refreshCallbacks.append(completion)
+        oauth("oauth/access_token", fields: ["client_id": id, "grant_type": "refresh_token", "refresh_token": refresh]) { result in
+            guard self.refreshInProgress == identifier, epoch == self.generation else { return }
+            do {
+                let json = try result.get()
+                if let error = json["error"] as? String {
+                    if error == "bad_refresh_token" || error == "invalid_grant" || error == "expired_token" {
+                        self.clearCredentials()
+                        throw CloudFailure("GitHub 登录已过期，请重新登录。", status: 401)
+                    }
+                    throw CloudFailure("暂时无法续期 GitHub 登录，请稍后重试。")
+                }
+                var candidate = try CloudCredentials.response(json, clientId: id, now: self.now())
+                guard candidate.refreshToken != nil, candidate.expiresAt != nil, candidate.refreshExpiresAt != nil else { throw CloudFailure("GitHub 续期响应无效，请重新登录。") }
+                candidate.account = current.account ?? self.login
+                // A successful refresh rotates both tokens; persist it before a fallible identity request.
+                self.credentials = candidate; self.credentialsNeedPersistence = true; self.verifiedAt = .distantPast
+                try self.persistCredentials()
+                self.verify(candidate.accessToken, epoch: epoch) { result in
+                    guard self.refreshInProgress == identifier, epoch == self.generation else { return }
+                    do {
+                        let owner = try result.get()
+                        if let expected = candidate.account, expected.caseInsensitiveCompare(owner) != .orderedSame {
+                            self.clearCredentials(); throw CloudFailure("GitHub 账号与已保存的登录信息不同，请重新登录。", status: 401)
+                        }
+                        candidate.account = owner
+                        self.credentials = candidate; self.credentialsNeedPersistence = true; self.login = owner; self.verifiedAt = self.now()
+                        try self.persistCredentials()
+                        self.finishRefresh(identifier, .success(candidate.accessToken))
+                    } catch {
+                        if (error as? CloudFailure)?.status == 401 { self.clearCredentials() }
+                        self.finishRefresh(identifier, .failure(error))
+                    }
+                }
+            } catch {
+                if (error as? CloudFailure)?.status == 401 { self.clearCredentials() }
+                self.finishRefresh(identifier, .failure(error))
+            }
+        }
+    }
+
+    private func finishRefresh(_ identifier: UUID, _ result: Result<String, Error>) {
+        guard refreshInProgress == identifier else { return }
+        let callbacks = refreshCallbacks
+        refreshCallbacks = []; refreshInProgress = nil
+        callbacks.forEach { $0(result) }
+    }
+
+    private func accountName(_ value: Any) throws -> String {
+        guard let user = value as? [String: Any], let login = user["login"] as? String,
+              login.range(of: "^[A-Za-z0-9][A-Za-z0-9-]{0,38}$", options: .regularExpression) != nil else {
+            throw CloudFailure("无法确认 GitHub 账号。")
+        }
+        return login
+    }
+
     private func verify(_ token: String, epoch: Int, completion: @escaping (Result<String, Error>) -> Void) {
-        api("user", token: token) { result in
+        rawApi("user", token: token) { result in
             do {
                 guard epoch == self.generation else { throw CloudFailure("账号连接已更改，请重试。") }
-                guard let user = try result.get() as? [String: Any], let login = user["login"] as? String,
-                      login.range(of: "^[A-Za-z0-9][A-Za-z0-9-]{0,38}$", options: .regularExpression) != nil else {
-                    throw CloudFailure("无法确认 GitHub 账号。")
-                }
-                completion(.success(login))
+                completion(.success(try self.accountName(result.get())))
             } catch { completion(.failure(error)) }
         }
     }
@@ -396,8 +509,36 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
             } catch { completion(.failure(error is CloudFailure ? error : CloudFailure("GitHub 登录响应无效。"))) }
         }
     }
-    private func api(_ path: String, method: String = "GET", token: String, json: [String: Any]? = nil,
+    private func api(_ path: String, method: String = "GET", token _: String, json: [String: Any]? = nil,
                      accept: String = "application/vnd.github+json", completion: @escaping (Result<Any, Error>) -> Void) {
+        let epoch = generation
+        validAccessToken { result in
+            do {
+                let access = try result.get()
+                guard epoch == self.generation else { throw CloudFailure("账号连接已更改，请重试。") }
+                self.rawApi(path, method: method, token: access, json: json, accept: accept) { result in
+                    guard epoch == self.generation else { completion(.failure(CloudFailure("账号连接已更改，请重试。"))); return }
+                    if case .failure(let error) = result, (error as? CloudFailure)?.status == 401 {
+                        self.refreshAccessToken(replacing: access) { refreshed in
+                            do {
+                                let next = try refreshed.get()
+                                guard epoch == self.generation else { throw CloudFailure("账号连接已更改，请重试。") }
+                                self.rawApi(path, method: method, token: next, json: json, accept: accept) { retry in
+                                    guard epoch == self.generation else { completion(.failure(CloudFailure("账号连接已更改，请重试。"))); return }
+                                    if case .failure(let error) = retry, (error as? CloudFailure)?.status == 401, self.token == next {
+                                        self.clearCredentials()
+                                    }
+                                    completion(retry)
+                                }
+                            } catch { completion(.failure(error)) }
+                        }
+                    } else { completion(result) }
+                }
+            } catch { completion(.failure(error)) }
+        }
+    }
+    private func rawApi(_ path: String, method: String = "GET", token: String, json: [String: Any]? = nil,
+                        accept: String = "application/vnd.github+json", completion: @escaping (Result<Any, Error>) -> Void) {
         var request = URLRequest(url: URL(string: "https://api.github.com/" + path)!)
         request.httpMethod = method
         request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
@@ -410,19 +551,16 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
         }
         requestData(request) { result in
             do { completion(.success(try JSONSerialization.jsonObject(with: result.get()))) }
-            catch {
-                if (error as? CloudFailure)?.status == 401, self.token == token {
-                    self.token = nil; self.login = nil; self.verifiedAt = .distantPast
-                    try? self.store.remove()
-                }
-                completion(.failure(error is CloudFailure ? error : CloudFailure("GitHub 返回了无法识别的数据。")))
-            }
+            catch { completion(.failure(error is CloudFailure ? error : CloudFailure("GitHub 返回了无法识别的数据。"))) }
         }
     }
     private func requestData(_ request: URLRequest, completion: @escaping (Result<Data, Error>) -> Void) {
         var request = request
         request.timeoutInterval = 30
         request.setValue("MiniMark-Cloud/1.0", forHTTPHeaderField: "User-Agent")
+        if let requestOverride = requestOverride {
+            requestOverride(request) { result in self.queue.async { completion(result) } }; return
+        }
         let task = network.dataTask(with: request)
         requests[task.taskIdentifier] = PendingRequest(task: task, completion: completion)
         task.resume()
@@ -457,19 +595,23 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
             if let error = pending.error { pending.completion(.failure(error)); return }
             if error != nil { pending.completion(.failure(CloudFailure("无法连接 GitHub，请检查网络后重试。", status: -1))); return }
             guard let status = pending.response?.statusCode else { pending.completion(.failure(CloudFailure("GitHub 响应无效。"))); return }
-            guard (200..<300).contains(status) else {
-                let message: String
-                switch status {
-                case 401: message = "GitHub 登录已失效，请重新登录。"
-                case 403, 429: message = "GitHub 拒绝了请求，可能是权限不足或请求过于频繁，请检查授权后重试。"
-                case 404: message = "云端文件或仓库不存在，或当前账号没有访问权限。"
-                case 409, 422: message = "云端内容已变化或同名文件已存在。请重新打开云端文件，或换一个文件名保存。"
-                default: message = "GitHub 暂时无法完成请求，请稍后重试。"
-                }
-                pending.completion(.failure(CloudFailure(message, status: status))); return
-            }
-            pending.completion(.success(pending.data))
+            pending.completion(Self.responseData(status: status, url: task.originalRequest?.url, data: pending.data))
         }
+    }
+    static func responseData(status: Int, url: URL?, data: Data) -> Result<Data, Error> {
+        if (200..<300).contains(status) { return .success(data) }
+        let oauthError = [400, 401].contains(status) && url?.scheme == "https" && url?.host == "github.com" &&
+            ["/login/device/code", "/login/oauth/access_token"].contains(url?.path ?? "")
+        if oauthError, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any], json["error"] is String { return .success(data) }
+        let message: String
+        switch status {
+        case 401: message = "GitHub 登录已失效，请重新登录。"
+        case 403, 429: message = "GitHub 拒绝了请求，可能是权限不足或请求过于频繁，请检查授权后重试。"
+        case 404: message = "云端文件或仓库不存在，或当前账号没有访问权限。"
+        case 409, 422: message = "云端内容已变化或同名文件已存在。请重新打开云端文件，或换一个文件名保存。"
+        default: message = "GitHub 暂时无法完成请求，请稍后重试。"
+        }
+        return .failure(CloudFailure(message, status: status))
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {

@@ -27,6 +27,7 @@ static class CloudTests {
         Configuration(folder, check);
         await Authentication(check);
         await DeviceFlow(check);
+        await CloudRefreshTests.Run(check);
         await Contents(check);
         await Failures(check);
         await LogoutRace(check);
@@ -108,9 +109,9 @@ static class CloudTests {
         await client.Execute(Body(new { action = "status" }));
         status = Result(await client.Execute(Body(new { action = "status" })));
         check(!status.GetProperty("authenticated").GetBoolean() && !status.TryGetProperty("login", out _), "Revoked GitHub login remained authenticated after status refresh");
-        check(handler.Requests.Count == 2 && store.Token == Token && store.ClearCount == 0, "Status refresh skipped validation or silently removed stored credentials");
+        check(handler.Requests.Count == 2 && store.Token is null && store.ClearCount == 1, "Definitively revoked login was not removed from secure storage");
         await Fails(() => client.Write("alice", "note.md", "text", Sha), check, "Revoked login used a cached account for saving");
-        check(handler.Requests.Count == 3 && handler.Requests.All(request => request.Method == HttpMethod.Get), "Revoked login sent a write without reauthentication");
+        check(handler.Requests.Count == 2 && handler.Requests.All(request => request.Method == HttpMethod.Get), "Revoked login accessed GitHub after credentials were invalidated");
     }
 
     private static async Task Contents(Action<bool, string> check) {
@@ -175,7 +176,7 @@ static class CloudTests {
         const string deviceCode = "private-device-test-code";
         const string userCode = "ABCD-EFGH";
         HttpResponseMessage Start() => Json(new { device_code = deviceCode, user_code = userCode, verification_uri = "https://github.com/login/device", expires_in = 900, interval = 5 });
-        HttpResponseMessage Authorized() => Json(new { access_token = Token, token_type = "bearer", scope = "repo" });
+        HttpResponseMessage Authorized() => Json(new { access_token = Token, refresh_token = "device-refresh-test", expires_in = 28800, refresh_token_expires_in = 15897600, token_type = "bearer", scope = "repo" });
         var store = new MemoryCloudTokenStore(null);
         var verifying = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var verified = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -229,7 +230,10 @@ static class CloudTests {
         verified.SetResult(User());
         var success = Result(await successPoll);
         check(success.GetProperty("authenticated").GetBoolean() && success.GetProperty("login").GetString() == "alice", "Approved device login did not complete");
-        check(store.Token == Token && store.WriteCount == 1 && !success.GetRawText().Contains(Token), "Approved login failed secure storage or exposed the token");
+        var stored = CloudCredential.Read(store.Token);
+        check(stored?.AccessToken == Token && stored.RefreshToken == "device-refresh-test" && stored.AccessExpiresAt > DateTimeOffset.UtcNow.AddHours(7) &&
+            stored.RefreshExpiresAt > DateTimeOffset.UtcNow.AddDays(180) && stored.ClientId == "test-client-id" && stored.Account == "alice" && store.WriteCount == 1 &&
+            !success.GetRawText().Contains(Token) && !success.GetRawText().Contains("device-refresh-test"), "Approved login lost expiring credentials or exposed the token");
 
         var cancelPoll = cancelled.Execute(Body(new { action = "pollLogin" }));
         await cancelVerifying.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -252,7 +256,8 @@ static class CloudTests {
             var client = Client(handler, store);
             var error = await Fails(() => client.Write("alice", "note.md", "unsaved text", Sha), check, "Rejected cloud save reported success");
             check(handler.Requests.Count == 2, "Rejected cloud save retried and risked overwriting a newer version");
-            check(store.Token == Token && store.ClearCount == 0 && store.WriteCount == 0, "Rejected cloud save changed secure credentials");
+            check((code == HttpStatusCode.Unauthorized ? store.Token is null && store.ClearCount == 1 : store.Token == Token && store.ClearCount == 0) &&
+                store.WriteCount == 0, "Rejected cloud save mishandled secure credentials");
             check(!error.Message.Contains(Token), "Cloud API error leaked response contents or credentials");
         }
         var timeoutStore = new MemoryCloudTokenStore(Token);
@@ -350,8 +355,9 @@ sealed class MemoryCloudTokenStore(string? token) : ICloudTokenStore {
     public int ReadCount { get; private set; }
     public int WriteCount { get; private set; }
     public int ClearCount { get; private set; }
+    public int FailWrites { get; set; }
     public string? Read() { ReadCount++; return Token; }
-    public void Write(string value) { WriteCount++; Token = value; }
+    public void Write(string value) { if (FailWrites > 0) { FailWrites--; throw new IOException("Simulated secure storage failure"); } WriteCount++; Token = value; }
     public void Clear() { ClearCount++; Token = null; }
 }
 
