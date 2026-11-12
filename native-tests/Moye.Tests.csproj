@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../native/Cloud/CloudModels.cs" Link="CloudModels.cs" />
+    <Compile Include="../native/Cloud/GitHubCloud.cs" Link="GitHubCloud.cs" />
     <Compile Include="../native/Documents/DocumentStore.cs" Link="DocumentStore.cs" />
     <Compile Include="../native/Documents/DocumentWorkspace.cs" Link="DocumentWorkspace.cs" />
     <Compile Include="../native/Documents/ImageAssets.cs" Link="ImageAssets.cs" />

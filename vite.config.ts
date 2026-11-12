@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import { readFileSync } from 'node:fs';
 
+const metadata = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+
 export default defineConfig({
   plugins: [{
     name: 'replaceable-equation-converter',
@@ -11,7 +13,10 @@ export default defineConfig({
     },
   }],
   base: './',
-  define: { __APP_VERSION__: JSON.stringify(JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version) },
+  define: {
+    __APP_VERSION__: JSON.stringify(metadata.version),
+    __APP_DISPLAY_VERSION__: JSON.stringify(`Rev v${metadata.releaseVersion}`),
+  },
   build: { target: 'es2022', sourcemap: true, rollupOptions: { output: { paths: { './vendor/mathml2omml/index.js': '../vendor/mathml2omml/index.js' } } } },
   server: { port: 4173, strictPort: true, watch: { ignored: ['**/native/**', '**/native-tests/**', '**/native-pdf-tests/**'] } },
   preview: { port: 4173, strictPort: true },

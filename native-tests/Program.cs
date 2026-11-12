@@ -102,10 +102,11 @@ try {
     var normalizedRestore = DocumentWorkspace.Restore(sessionFile, draftFile).Find(windows.Id)!;
     Check(!normalizedRestore.Dirty && normalizedRestore.Text == "# Windows\nbody\n" && normalizedRestore.Newline == "\r\n", "Legacy CRLF session did not normalize while preserving save format");
     await UpdateTests.Run(folder, Check);
+    await CloudTests.Run(folder, Check);
     if (args.Contains("--live-update")) {
         var live = await new GitHubUpdates(Path.Combine(folder, "live")).Check();
         Check(!live.OfflineCache, "Live update check used an offline cache");
         Console.WriteLine($"Public static update feed: v{live.Manifest.Version}");
     }
-    Console.WriteLine($"PASS {count} native storage and update checks");
+    Console.WriteLine($"PASS {count} native storage, cloud and update checks");
 } finally { Directory.Delete(folder, true); }

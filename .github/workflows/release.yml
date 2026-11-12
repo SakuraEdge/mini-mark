@@ -28,6 +28,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ steps.build.outputs.sha }}
+      - name: Require configured GitHub login
+        run: |
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const { clientId } = JSON.parse(readFileSync('public/github-oauth.json', 'utf8'));
+            if (typeof clientId !== 'string' || !clientId.trim()) {
+              throw new Error('Configure the Mini Mark GitHub OAuth Client ID before publishing.');
+            }
+          "
       - name: Download verified packages
         run: |
           mkdir -p release-assets
@@ -38,31 +47,40 @@ jobs:
           BUILD_SHA: ${{ steps.build.outputs.sha }}
         run: |
           version=$(node -p "require('./package.json').version")
+          release_version=$(node -p "require('./package.json').releaseVersion")
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           tag="v$version"
-          notes="$PWD/docs/release-$tag.md"
+          title="Mini Mark Rev v$release_version"
+          notes="$PWD/docs/release-rev-v$release_version.md"
           test -f "$notes"
           node scripts/update-manifest.mjs "$version" release-assets
           cd release-assets
           files=("MiniMark-Setup-$version-windows-x64.exe" "MiniMark-$version-windows-x64.zip" "MiniMark-$version-macos-universal.dmg" "MiniMark-$version-macos-universal.zip" "Moye-Setup-$version-windows-x64.exe")
           for file in "${files[@]}"; do test -s "$file"; done
-          sha256sum "${files[@]}" > "SHA256SUMS-$tag.txt"
+          cp "MiniMark-Setup-$version-windows-x64.exe" "MiniMark-Rev-$release_version-Setup-windows-x64.exe"
+          cp "MiniMark-$version-windows-x64.zip" "MiniMark-Rev-$release_version-windows-x64.zip"
+          cp "MiniMark-$version-macos-universal.dmg" "MiniMark-Rev-$release_version-macos-universal.dmg"
+          cp "MiniMark-$version-macos-universal.zip" "MiniMark-Rev-$release_version-macos-universal.zip"
+          files+=("MiniMark-Rev-$release_version-Setup-windows-x64.exe" "MiniMark-Rev-$release_version-windows-x64.zip" "MiniMark-Rev-$release_version-macos-universal.dmg" "MiniMark-Rev-$release_version-macos-universal.zip")
+          checksums="SHA256SUMS-Rev-v$release_version.txt"
+          sha256sum "${files[@]}" > "$checksums"
           already_published=false
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft > existing.json 2>/dev/null; then
             if test "$(jq -r .isDraft existing.json)" = false; then
               already_published=true
               gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > published.json
-              for file in "${files[@]}" "SHA256SUMS-$tag.txt" update.json; do
+              for file in "${files[@]}" "$checksums" update.json; do
                 expected="sha256:$(sha256sum "$file" | cut -d ' ' -f 1)"
                 actual=$(jq -r --arg name "$file" '.assets[] | select(.name == $name) | .digest' published.json)
                 test "$actual" = "$expected"
               done
             fi
           else
-            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$BUILD_SHA" --title "Mini Mark $tag" --notes-file "$notes" --draft
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$BUILD_SHA" --title "$title" --notes-file "$notes" --draft
           fi
           if test "$already_published" = false; then
-            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" "${files[@]}" "SHA256SUMS-$tag.txt" update.json --clobber
+            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" "${files[@]}" "$checksums" update.json --clobber
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
           fi
           if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/updates" > /dev/null 2>&1; then

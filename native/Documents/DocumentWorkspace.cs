@@ -15,8 +15,10 @@ public sealed class OpenDocument {
     public bool Bom { get; set; }
     public string Newline { get; set; } = "\n";
     public long Revision { get; set; }
-    [JsonIgnore] public string Name => Path is null ? UntitledName : System.IO.Path.GetFileName(Path);
-    [JsonIgnore] public bool Dirty => Text != Baseline;
+    public CloudBinding? Cloud { get; set; }
+    [JsonIgnore] public string Name => Cloud is not null ? Cloud.Path.Split('/')[^1] : Path is null ? UntitledName : System.IO.Path.GetFileName(Path);
+    [JsonIgnore] public string SavedBaseline => Cloud?.Baseline ?? Baseline;
+    [JsonIgnore] public bool Dirty => Text != SavedBaseline;
     public bool Update(string text, long revision) {
         text = DocumentStore.Normalize(text);
         if (revision < Revision || (revision == Revision && text != Text)) return false;
@@ -80,7 +82,7 @@ public sealed class DocumentWorkspace {
             // Untitled numbering is recalculated for each process, not continued from an old session.
             workspace.NextUntitled = 1;
             workspace.ActiveId = workspace.Find(session.ActiveId)?.Id ?? workspace.Documents.FirstOrDefault()?.Id ?? "";
-            foreach (var document in workspace.Documents.Where(document => !document.Dirty && document.Path is not null)) {
+            foreach (var document in workspace.Documents.Where(document => !document.Dirty && document.Path is not null && document.Cloud is null)) {
                 try { document.Load(DocumentStore.Read(document.Path!)); }
                 catch (IOException) { document.UntitledName = document.Name; document.Path = null; document.Baseline = ""; }
                 catch (UnauthorizedAccessException) { document.UntitledName = document.Name; document.Path = null; document.Baseline = ""; }

@@ -1,7 +1,9 @@
+import type { CloudBinding } from '../features/cloud/model';
+
 export interface DocumentData {
-  id: string; text: string; name: string; path?: string; baseline: string; revision: number;
+  id: string; text: string; name: string; path?: string; baseline: string; revision: number; cloud?: CloudBinding | null;
 }
-export interface TabData { id: string; name: string; path?: string; dirty: boolean; revision: number }
+export interface TabData { id: string; name: string; path?: string; dirty: boolean; revision: number; cloud?: CloudBinding | null }
 export interface BrowserSession { schemaVersion: 2; documents: DocumentData[]; activeId: string; nextUntitled: number }
 
 export function normalizeText(text: string) { return text.replace(/\r\n?/g, '\n'); }

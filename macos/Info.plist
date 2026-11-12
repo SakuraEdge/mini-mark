@@ -6,8 +6,8 @@
   <key>CFBundleDisplayName</key><string>Mini Mark</string>
   <key>CFBundleExecutable</key><string>MiniMark</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>3.0.0</string>
-  <key>CFBundleVersion</key><string>3.0.0</string>
+  <key>CFBundleShortVersionString</key><string>1.0.0</string>
+  <key>CFBundleVersion</key><string>4.0.0</string>
   <key>CFBundleIconFile</key><string>Moye</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
@@ -16,27 +16,32 @@
   <key>CFBundleDocumentTypes</key><array><dict>
     <key>CFBundleTypeName</key><string>Markdown document</string>
     <key>CFBundleTypeRole</key><string>Editor</string>
+    <key>CFBundleTypeIconFile</key><string>MiniMark-Markdown.icns</string>
     <key>LSHandlerRank</key><string>Alternate</string>
     <key>LSItemContentTypes</key><array><string>net.daringfireball.markdown</string><string>public.plain-text</string></array>
   </dict><dict>
     <key>CFBundleTypeName</key><string>YAML document</string>
     <key>CFBundleTypeRole</key><string>Editor</string>
+    <key>CFBundleTypeIconFile</key><string>MiniMark-Yaml.icns</string>
     <key>LSHandlerRank</key><string>Alternate</string>
     <key>LSItemContentTypes</key><array><string>io.github.sakuraedge.moye.yaml</string></array>
   </dict><dict>
     <key>CFBundleTypeName</key><string>HTML document</string>
     <key>CFBundleTypeRole</key><string>Editor</string>
+    <key>CFBundleTypeIconFile</key><string>MiniMark-Html.icns</string>
     <key>LSHandlerRank</key><string>Alternate</string>
     <key>LSItemContentTypes</key><array><string>public.html</string></array>
   </dict></array>
   <key>UTImportedTypeDeclarations</key><array><dict>
     <key>UTTypeIdentifier</key><string>net.daringfireball.markdown</string>
     <key>UTTypeDescription</key><string>Markdown document</string>
+    <key>UTTypeIconFile</key><string>MiniMark-Markdown.icns</string>
     <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
     <key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>md</string><string>markdown</string><string>mdown</string></array><key>public.mime-type</key><string>text/markdown</string></dict>
   </dict><dict>
     <key>UTTypeIdentifier</key><string>io.github.sakuraedge.moye.yaml</string>
     <key>UTTypeDescription</key><string>YAML document</string>
+    <key>UTTypeIconFile</key><string>MiniMark-Yaml.icns</string>
     <key>UTTypeConformsTo</key><array><string>public.text</string></array>
     <key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>yaml</string><string>yml</string></array><key>public.mime-type</key><string>text/yaml</string></dict>
   </dict></array>

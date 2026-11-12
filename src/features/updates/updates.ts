@@ -1,6 +1,7 @@
 import { send, isDesktop, type HostMessage } from '../../platform/bridge';
 
 export const APP_VERSION = __APP_VERSION__;
+export const APP_DISPLAY_VERSION = __APP_DISPLAY_VERSION__;
 const SETTINGS_KEY = 'moye.updates.v1';
 const DAY = 86_400_000;
 export interface Release { tag_name: string; name?: string; draft?: boolean; prerelease?: boolean }
@@ -73,7 +74,7 @@ export function initializeUpdates() {
   const container = document.createElement('div');
   container.innerHTML = `<dialog id="update-dialog" class="update-dialog" aria-labelledby="update-title">
     <header><h2 id="update-title">软件更新</h2><button id="update-close" class="icon-button" aria-label="关闭更新窗口" title="关闭">×</button></header>
-    <p class="update-version">当前版本 ${APP_VERSION}</p>
+    <p class="update-version">当前版本 ${APP_DISPLAY_VERSION}</p>
     <p id="update-status" role="status">从 GitHub 检查正式版本。</p>
     <div class="update-options">
       <label><input id="update-auto" type="checkbox">自动检测更新</label>
@@ -134,7 +135,7 @@ export function handleUpdateMessage(message: HostMessage): boolean {
   try {
     candidate = latestRelease(message.releases, APP_VERSION);
     installSupported = message.installSupported === true;
-    const summary = candidate ? `发现${isMajorUpdate(APP_VERSION, candidate.tag_name) ? '大版本' : '新版本'} ${candidate.tag_name}。` : message.cacheNotice ? '缓存中没有高于当前版本的更新。' : `当前已是最新正式版本（${APP_VERSION}）。`;
+    const summary = candidate ? `发现${isMajorUpdate(APP_VERSION, candidate.tag_name) ? '大版本' : '新版本'} ${candidate.name || candidate.tag_name}。` : message.cacheNotice ? '缓存中没有高于当前版本的更新。' : `当前已是最新正式版本（${APP_DISPLAY_VERSION}）。`;
     setResult(message.cacheNotice ? `${message.cacheNotice}\n${summary}` : summary);
     if (candidate && !manual && !message.cacheNotice && shouldPrompt(settings, APP_VERSION, candidate.tag_name)) {
       // Defer the modal until this window is active, so it cannot steal focus.

@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 vi.mock('../../platform/bridge', () => ({ send: vi.fn(), isDesktop: false }));
 vi.stubGlobal('localStorage', { getItem: () => null });
 vi.stubGlobal('__APP_VERSION__', '1.0.0');
+vi.stubGlobal('__APP_DISPLAY_VERSION__', 'Rev v1.0.0');
 const { parseVersion, compareVersions, latestRelease, shouldPrompt } = await import('./updates');
 
 describe('release selection and reminders', () => {

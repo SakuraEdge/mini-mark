@@ -17,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     var pdfExporter: PdfExporter?
     var htmlPreviews: [UUID: HtmlPreview] = [:]
     let updates = GitHubUpdates()
+    let cloud = GitHubCloud()
+    var cloudBusy = false
     let root = Bundle.main.resourceURL!.appendingPathComponent("wwwroot")
     let dataRoot: URL = {
         if let path = ProcessInfo.processInfo.environment["MOYE_DATA_DIR"] { return URL(fileURLWithPath: path) }
@@ -112,6 +114,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             publish(recovered: session.documents.contains { $0.dirty }); persist(); return
         }
         if type == "rendered" { if smokeOutput != nil && !smokeStarted { smokeStarted = true; runSmoke() }; return }
+        if type == "cloudRequest" {
+            guard ready else { return }
+            cloud.handle(body) { self.post($0) }; return
+        }
         if type == "checkUpdates" {
             let id = body["requestId"] as? String ?? ""
             updates.check { result in
@@ -142,7 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
                       let images = body["images"] as? [[String: Any]], !images.isEmpty, images.count <= 10 else { throw Store.failure("无效的图片导入请求。") }
                 let sources = try images.map { image -> String in
                     guard let data = image["dataUrl"] as? String else { throw Store.failure("图片数据缺失。") }
-                    return try ImageAssets.importImage(data, documentPath: doc.path)
+                    return try ImageAssets.importImage(data, documentPath: doc.cloud == nil ? doc.path : nil)
                 }
                 post(["type": "imagesImported", "requestId": requestId, "sources": sources])
             } catch { post(["type": "imagesImported", "requestId": requestId, "error": error.localizedDescription]) }
@@ -170,15 +176,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             title(); draftTimer?.invalidate()
             draftTimer = Timer.scheduledTimer(withTimeInterval: 0.7, repeats: false) { _ in self.persist() }; return
         }
+        if cloudBusy { notice("云文档操作尚未完成，请稍候。"); post(["type": "operationComplete"]); return }
+        if ["cloudOpen", "cloudBind", "cloudDetach"].contains(type) {
+            performCloudDocument(type, body: body, documentId: id); return
+        }
+        if type == "save", session.documents[index].cloud != nil {
+            beginDocumentOperation { done in self.saveCloudDocument(id, completion: done) }; return
+        }
+        if type == "closeTab", let target = body["targetId"] as? String {
+            beginDocumentOperation { done in self.closeDocument(target, completion: done) }; return
+        }
+        if type == "closingText" {
+            beginDocumentOperation { done in self.finishCloudAwareClose(completion: done) }; return
+        }
         defer { post(["type": "operationComplete"]) }
         switch type {
         case "new": add(body["initialText"] as? String ?? "", body["name"] as? String); publish(); persist()
         case "activate":
             if let target = body["targetId"] as? String, session.documents.contains(where: { $0.id == target }) { session.activeId = target; publish(); persist() }
-        case "closeTab":
-            if let target = body["targetId"] as? String, let i = session.documents.firstIndex(where: { $0.id == target }) {
-                if try confirmSave(i) { remove(target); publish(); persist() }
-            }
         case "open":
             let panel = NSOpenPanel(); panel.allowedContentTypes = [.plainText, .text, .html, UTType(filenameExtension: "md") ?? .plainText, UTType(filenameExtension: "markdown") ?? .plainText, UTType(filenameExtension: "mdown") ?? .plainText, UTType(filenameExtension: "yaml") ?? .plainText, UTType(filenameExtension: "yml") ?? .plainText]; panel.allowsMultipleSelection = true
             if panel.runModal() == .OK { for url in panel.urls { try openPath(url.path) }; publish(); persist() }
@@ -189,7 +204,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
                   let target = body["target"] as? String, ["builtin", "chrome"].contains(target) else { throw Store.failure("仅 HTML 文档可运行。") }
             let chrome = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.google.Chrome")
             if target == "chrome" && chrome == nil { throw Store.failure("未找到 Google Chrome，请安装 Chrome 或使用内置浏览器。") }
-            guard try save(index, saveAs: false, allowPdf: false), let path = session.documents[index].path,
+            guard try save(index, saveAs: session.documents[index].cloud != nil, allowPdf: false), let path = session.documents[index].path,
                   ["html", "htm"].contains(documentExtension(path)) else { return }
             let file = URL(fileURLWithPath: path)
             if target == "chrome", let chrome = chrome {
@@ -204,7 +219,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         case "exportHtml":
             let panel = NSSavePanel(); panel.allowedContentTypes = [.html]; panel.nameFieldStringValue = URL(fileURLWithPath: body["name"] as? String ?? "文档").deletingPathExtension().lastPathComponent + ".html"
             if panel.runModal() == .OK, let url = panel.url, let html = body["html"] as? String { try Data(html.utf8).write(to: url, options: .atomic); notice("HTML 已导出") }
-        case "closingText": try finishClose()
         default: break
         }
     }
@@ -232,8 +246,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     func publish(recovered: Bool = false) {
         let doc = session.documents[activeIndex]
         scheme.documentFolder = doc.path.map { URL(fileURLWithPath: $0).deletingLastPathComponent() }
-        post(["type": "workspace", "recovered": recovered, "tabs": session.documents.map { ["id": $0.id, "name": $0.name, "path": $0.path as Any? ?? NSNull(), "dirty": $0.dirty, "revision": $0.revision] },
-              "document": ["id": doc.id, "name": doc.name, "path": doc.path as Any? ?? NSNull(), "text": doc.text, "baseline": doc.baseline, "revision": doc.revision]])
+        post(["type": "workspace", "recovered": recovered, "tabs": session.documents.map { ["id": $0.id, "name": $0.name, "path": $0.path as Any? ?? NSNull(), "cloud": $0.cloud?.message as Any? ?? NSNull(), "dirty": $0.dirty, "revision": $0.revision] },
+              "document": ["id": doc.id, "name": doc.name, "path": doc.path as Any? ?? NSNull(), "text": doc.text, "baseline": doc.savedText, "cloud": doc.cloud?.message as Any? ?? NSNull(), "revision": doc.revision]])
         title()
     }
     func title() { if !session.documents.isEmpty { let doc = session.documents[activeIndex]; window.title = "\(doc.dirty ? "• " : "")\(doc.name) · Mini Mark" } }
@@ -250,6 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
     func save(_ index: Int, saveAs: Bool, allowPdf: Bool) throws -> Bool {
         var doc = session.documents[index], path = doc.path
+        if doc.cloud != nil && !saveAs { throw Store.failure("云文档保存必须通过同步操作。") }
         let isHtml = ["html", "htm"].contains(documentExtension(doc.name))
         let allowPdf = allowPdf && !isHtml
         if path == nil || saveAs {
@@ -275,21 +290,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         guard let target = path else { return false }
         if session.documents.contains(where: { $0.id != doc.id && ($0.path.map { Store.samePath($0, target) } ?? false) }) { throw Store.failure("该文件已在另一个标签打开，请选择其他文件名。") }
         if !isHtml { try ImageAssets.copyForSaveAs(doc.text, previousPath: doc.path, targetPath: target) }
-        doc.fingerprint = try Store.write(doc, to: target); doc.path = target; doc.baseline = doc.text; session.documents[index] = doc
-        persist(); post(["type": "saved", "documentId": doc.id, "name": doc.name, "path": target, "text": doc.text])
+        doc.fingerprint = try Store.write(doc, to: target); doc.path = target; doc.baseline = doc.text; doc.cloud = nil; session.documents[index] = doc
+        persist(); post(["type": "saved", "documentId": doc.id, "name": doc.name, "path": target, "cloud": NSNull(), "text": doc.text])
         if doc.id == session.activeId { scheme.documentFolder = URL(fileURLWithPath: target).deletingLastPathComponent() }; title(); return true
     }
     func saveDecision(_ document: Document) -> NSApplication.ModalResponse {
         let alert = NSAlert(); alert.messageText = "是否保存对“\(document.name)”的修改？"
         alert.addButton(withTitle: "保存"); alert.addButton(withTitle: "取消"); alert.addButton(withTitle: "不保存")
         return alert.runModal()
-    }
-    func confirmSave(_ index: Int) throws -> Bool {
-        if !session.documents[index].dirty { return true }
-        let answer = saveDecision(session.documents[index])
-        if answer == .alertSecondButtonReturn { return false }
-        if answer == .alertThirdButtonReturn { return true }
-        return try save(index, saveAs: false, allowPdf: false)
     }
     func choosePdf(_ document: Document) throws {
         if pdfRequest != nil { notice("上一份 PDF 正在导出，请稍候。"); return }
@@ -314,29 +322,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
     func requestClose(_ application: Bool) {
         if pdfRequest != nil { notice("PDF 正在导出，请稍候再退出。"); return }
+        if cloudBusy { notice("云文档正在同步，请稍候再退出。"); return }
         if closingRequest != nil { return }
         closingApplication = application; closingRequest = UUID().uuidString
         post(["type": "requestClosingText", "requestId": closingRequest!])
     }
-    func finishClose() throws {
-        defer { closingRequest = nil }
-        var decisions: [(String, NSApplication.ModalResponse)] = []
-        for doc in session.documents where doc.dirty {
-            let answer = saveDecision(doc)
-            if answer == .alertSecondButtonReturn { return }
-            decisions.append((doc.id, answer))
-        }
-        for (id, answer) in decisions where answer == .alertFirstButtonReturn {
-            if let index = session.documents.firstIndex(where: { $0.id == id }), try !save(index, saveAs: false, allowPdf: false) { return }
-        }
-        for (id, answer) in decisions where answer == .alertThirdButtonReturn {
-            guard let index = session.documents.firstIndex(where: { $0.id == id }) else { continue }
-            if session.documents[index].path == nil { remove(id) } else { session.documents[index].text = session.documents[index].baseline }
-        }
-        persist(); confirmedClose = true; NSApp.terminate(nil)
-    }
     func application(_ sender: NSApplication, openFiles filenames: [String]) {
-        if !ready { queuedPaths.append(contentsOf: filenames) }
+        if !ready || cloudBusy { queuedPaths.append(contentsOf: filenames) }
         else { do { for path in filenames { try openPath(path) }; publish(); persist(); window.makeKeyAndOrderFront(nil) } catch { notice(error.localizedDescription, error: true) } }
         sender.reply(toOpenOrPrint: .success)
     }

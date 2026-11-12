@@ -10,14 +10,14 @@ using Microsoft.Web.WebView2.WinForms;
 
 namespace Moye;
 
-public sealed class MainWindow : Form {
+public sealed partial class MainWindow : Form {
     private readonly WebView2 browser = new();
     private readonly string root = Path.Combine(AppContext.BaseDirectory, "wwwroot");
     private readonly string dataRoot;
     private readonly string sessionFile;
     private readonly string[] args;
     private readonly System.Windows.Forms.Timer draftTimer = new() { Interval = 700 };
-    private readonly Queue<Action> actions = new();
+    private readonly Queue<Func<Task>> actions = new();
     private readonly Queue<string[]> pendingOpen = new();
     private readonly Dictionary<string, double> timings = new();
     private DocumentWorkspace workspace = new();
@@ -26,6 +26,7 @@ public sealed class MainWindow : Form {
     private string? closingRequest;
     private PdfRequest? pdfRequest;
     private readonly GitHubUpdates updates;
+    private readonly GitHubCloud cloud;
     private CancellationTokenSource? updateDownload;
     private DownloadedInstaller? preparedInstaller;
     public DownloadedInstaller? InstallerToRun { get; private set; }
@@ -37,6 +38,7 @@ public sealed class MainWindow : Form {
         Directory.CreateDirectory(dataRoot);
         sessionFile = Path.Combine(dataRoot, "session-v2.json");
         updates = new GitHubUpdates(dataRoot);
+        cloud = new GitHubCloud(new WindowsTokenStore(dataRoot), () => GitHubCloud.ReadClientId(root));
         Text = "Mini Mark";
         Width = 1180; Height = 840; MinimumSize = new Size(720, 520);
         StartPosition = FormStartPosition.CenterScreen; BackColor = Color.White;
@@ -117,6 +119,7 @@ public sealed class MainWindow : Form {
                 return;
             }
             if (!initialized) return;
+            if (type == "cloudRequest") { _ = CloudRequest(message.Clone()); return; }
             if (type is "pdfHtml" or "pdfError") {
                 var pending = pdfRequest;
                 if (pending is null || message.GetProperty("requestId").GetString() != pending.Id || message.GetProperty("documentId").GetString() != pending.DocumentId) return;
@@ -153,7 +156,7 @@ public sealed class MainWindow : Form {
                     var target = workspace.Find(message.GetProperty("documentId").GetString()) ?? throw new IOException("文档已关闭。");
                     var images = message.GetProperty("images").EnumerateArray().ToArray();
                     if (images.Length is < 1 or > 10) throw new IOException("一次最多插入 10 张图片。");
-                    var sources = images.Select(image => ImageAssets.Import(image.GetProperty("dataUrl").GetString()!, target.Path)).ToArray();
+                    var sources = images.Select(image => ImageAssets.Import(image.GetProperty("dataUrl").GetString()!, target.Cloud is null ? target.Path : null)).ToArray();
                     Post(new { type = "imagesImported", requestId, sources });
                 } catch (Exception error) { Post(new { type = "imagesImported", requestId, error = error.Message }); }
                 return;
@@ -174,11 +177,21 @@ public sealed class MainWindow : Form {
                 case "activate":
                     var target = message.GetProperty("targetId").GetString()!;
                     RunAction(() => { workspace.Activate(target); Publish(); Persist(); }); break;
+                case "cloudOpen":
+                    var cloudOwner = message.GetProperty("owner").GetString()!;
+                    var cloudPath = message.GetProperty("cloudPath").GetString()!;
+                    RunAsync(() => OpenCloud(cloudOwner, cloudPath)); break;
+                case "cloudBind":
+                    var bindOwner = message.GetProperty("owner").GetString()!;
+                    var bindPath = message.GetProperty("cloudPath").GetString()!;
+                    RunAsync(() => BindCloud(document, bindOwner, bindPath)); break;
+                case "cloudDetach":
+                    RunAction(() => { document.UntitledName = document.Name; document.Cloud = null; Publish(); Persist(); }); break;
                 case "closeTab":
                     var closeId = message.GetProperty("targetId").GetString()!;
-                    RunAction(() => CloseTab(closeId)); break;
+                    RunAsync(() => CloseTab(closeId)); break;
                 case "open": RunAction(Open); break;
-                case "save": RunAction(() => Save(document, false, true)); break;
+                case "save": RunAsync(async () => { if (document.Cloud is not null) await SaveCloud(document); else Save(document, false, true); }); break;
                 case "saveAs": RunAction(() => Save(document, true, true)); break;
                 case "exportPdf": RunAction(() => ChoosePdf(document)); break;
                 case "runHtml":
@@ -196,12 +209,15 @@ public sealed class MainWindow : Form {
                     var html = message.GetProperty("html").GetString()!;
                     var exportName = message.TryGetProperty("name", out var htmlName) ? htmlName.GetString()! : document.Name;
                     RunAction(() => ExportHtml(html, exportName)); break;
-                case "closingText": RunAction(FinishClose); break;
+                case "closingText": RunAsync(FinishClose); break;
             }
         } catch (Exception exception) { Post(new { type = "error", message = exception.Message }); Post(new { type = "operationComplete" }); }
     }
 
     private void RunAction(Action action) {
+        RunAsync(() => { action(); return Task.CompletedTask; });
+    }
+    private void RunAsync(Func<Task> action) {
         actions.Enqueue(action);
         DrainActions();
     }
@@ -209,9 +225,9 @@ public sealed class MainWindow : Form {
         if (busy || actions.Count == 0 || IsDisposed) return;
         busy = true;
         // Leave WebView2's callback before entering a native modal message loop.
-        BeginInvoke(() => {
-            try { actions.Dequeue()(); }
-            catch (Exception exception) { closingRequest = null; preparedInstaller = null; if (!IsDisposed) Post(new { type = "error", message = exception.Message }); }
+        BeginInvoke(async () => {
+            try { await actions.Dequeue()(); }
+            catch (Exception exception) { closingRequest = null; preparedInstaller = null; if (!IsDisposed) Post(new { type = "error", message = CloudError(exception) }); }
             finally {
                 busy = false;
                 if (!IsDisposed) {
@@ -252,8 +268,8 @@ public sealed class MainWindow : Form {
         var document = workspace.Active;
         Post(new {
             type = "workspace", recovered,
-            tabs = workspace.Documents.Select(item => new { id = item.Id, name = item.Name, path = item.Path, dirty = item.Dirty, revision = item.Revision }),
-            document = new { id = document.Id, text = document.Text, baseline = document.Baseline, name = document.Name, path = document.Path, revision = document.Revision }
+            tabs = workspace.Documents.Select(item => new { id = item.Id, name = item.Name, path = item.Path, cloud = item.Cloud, dirty = item.Dirty, revision = item.Revision }),
+            document = new { id = document.Id, text = document.Text, baseline = document.SavedBaseline, name = document.Name, path = document.Path, cloud = document.Cloud, revision = document.Revision }
         });
         UpdateTitle();
     }
@@ -269,6 +285,8 @@ public sealed class MainWindow : Form {
     private static string PreferredExtension(string name) => HtmlResources.IsHtml(name) ? Path.GetExtension(name).ToLowerInvariant() : Path.GetExtension(name).Equals(".yml", StringComparison.OrdinalIgnoreCase) ? ".yml" : IsYaml(name) ? ".yaml" : ".md";
 
     private bool Save(OpenDocument document, bool saveAs, bool allowPdf) {
+        // A cloud document's local copy must be chosen explicitly before leaving cloud mode.
+        saveAs |= document.Cloud is not null;
         allowPdf &= !HtmlResources.IsHtml(document.Name);
         var target = document.Path;
         if (target is null || saveAs) {
@@ -293,18 +311,19 @@ public sealed class MainWindow : Form {
         var saved = document.Text;
         if (!HtmlResources.IsHtml(document.Name)) ImageAssets.CopyForSaveAs(saved, document.Path, target);
         document.Fingerprint = DocumentStore.Write(target, saved, document.Bom, document.Newline);
-        document.Path = target; document.Baseline = saved;
+        document.Path = target; document.Baseline = saved; document.Cloud = null;
         Persist();
-        Post(new { type = "saved", documentId = document.Id, name = document.Name, path = document.Path, text = saved });
+        Post(new { type = "saved", documentId = document.Id, name = document.Name, path = document.Path, cloud = document.Cloud, text = saved });
         UpdateTitle(); return true;
     }
 
-    private void CloseTab(string id) {
+    private async Task CloseTab(string id) {
         var document = workspace.Find(id);
         if (document is null) return;
         if (document.Dirty) {
             var answer = AskSave(document);
-            if (answer == DialogResult.Cancel || (answer == DialogResult.Yes && !Save(document, false, false))) return;
+            if (answer == DialogResult.Cancel || (answer == DialogResult.Yes && !await SaveForClose(document))) return;
+            if (answer == DialogResult.Yes && document.Dirty) throw new IOException("同步期间文档又有修改，请保存后再关闭。");
         }
         workspace.Remove(id); Publish(); Persist();
     }
@@ -318,7 +337,8 @@ public sealed class MainWindow : Form {
         closingRequest = Guid.NewGuid().ToString("N");
         Post(new { type = "requestClosingText", requestId = closingRequest });
     }
-    private void FinishClose() {
+    private async Task FinishClose() {
+        var revisions = workspace.Documents.ToDictionary(item => item.Id, item => item.Revision);
         var decisions = new List<(OpenDocument Document, DialogResult Decision)>();
         foreach (var document in workspace.Documents.Where(item => item.Dirty)) {
             var answer = AskSave(document);
@@ -326,12 +346,15 @@ public sealed class MainWindow : Form {
             decisions.Add((document, answer));
         }
         foreach (var (document, decision) in decisions) {
-            if (decision == DialogResult.Yes && !Save(document, false, false)) { CancelClosingUpdate(); return; }
+            if (decision == DialogResult.Yes && !await SaveForClose(document)) { CancelClosingUpdate(); return; }
+            if (decision == DialogResult.Yes && document.Dirty) throw new IOException("同步期间文档又有修改，请保存后再退出。");
         }
+        if (workspace.Documents.Any(item => !revisions.TryGetValue(item.Id, out var savedRevision) || savedRevision != item.Revision))
+            throw new IOException("文档在关闭过程中发生了修改，请重试。");
         foreach (var (document, decision) in decisions) {
             if (decision != DialogResult.No) continue;
-            if (document.Path is null) workspace.Remove(document.Id);
-            else document.Text = document.Baseline;
+            if (document.Path is null && document.Cloud is null) workspace.Remove(document.Id);
+            else document.Text = document.SavedBaseline;
         }
         Persist(); InstallerToRun = preparedInstaller; closingConfirmed = true; Close();
     }
@@ -420,5 +443,6 @@ public sealed class MainWindow : Form {
         File.WriteAllText(file, JsonSerializer.Serialize(new { startupMilliseconds = Program.Startup.Elapsed.TotalMilliseconds, rendererMilliseconds = message.GetProperty("elapsed").GetDouble(), browserProcessId = browser.CoreWebView2.BrowserProcessId, timings, utc = DateTime.UtcNow }));
         if (args.Contains("--benchmark")) { closingConfirmed = true; BeginInvoke(Close); }
     }
-    private void Post(object message) => browser.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(message));
+    private static readonly JsonSerializerOptions MessageJson = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    private void Post(object message) { if (!IsDisposed) browser.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(message, MessageJson)); }
 }

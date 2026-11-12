@@ -1,6 +1,6 @@
-import { createIcons, PanelLeft, FilePlus2, FolderOpen, Save, ChevronDown, Bold, Italic, Link2, Code2, Sigma, Table2, Quote, Undo2, Redo2, Search, Sun, Moon, Focus, MoreHorizontal, FileCode2, Download, X, Check, Circle, List, PencilLine, Columns2, ImagePlus, Puzzle, Play, Globe } from 'lucide';
+import { createIcons, PanelLeft, FilePlus2, FolderOpen, Save, ChevronDown, Bold, Italic, Link2, Code2, Sigma, Table2, Quote, Undo2, Redo2, Search, Sun, Moon, Focus, MoreHorizontal, FileCode2, Download, X, Check, Circle, List, PencilLine, Columns2, ImagePlus, Puzzle, Play, Globe, Cloud } from 'lucide';
 
-const icons = { PanelLeft, FilePlus2, FolderOpen, Save, ChevronDown, Bold, Italic, Link2, Code2, Sigma, Table2, Quote, Undo2, Redo2, Search, Sun, Moon, Focus, MoreHorizontal, FileCode2, Download, X, Check, Circle, List, PencilLine, Columns2, ImagePlus, Puzzle, Play, Globe };
+const icons = { PanelLeft, FilePlus2, FolderOpen, Save, ChevronDown, Bold, Italic, Link2, Code2, Sigma, Table2, Quote, Undo2, Redo2, Search, Sun, Moon, Focus, MoreHorizontal, FileCode2, Download, X, Check, Circle, List, PencilLine, Columns2, ImagePlus, Puzzle, Play, Globe, Cloud };
 export function icon(name: string) { return `<i data-lucide="${name}"></i>`; }
 function tool(id: string, label: string, glyph: string, shortcut = '') {
   return `<button class="icon-button" id="${id}" aria-label="${label}" title="${label}${shortcut ? ` · ${shortcut}` : ''}">${icon(glyph)}</button>`;
@@ -16,7 +16,7 @@ export function mountApp(isDesktop: boolean, version: string) {
       <button class="current-file" id="current-file">${icon('file-code-2')}<span id="sidebar-filename">未命名.md</span><span class="dirty-dot" id="sidebar-dirty"></span></button>
       <div class="outline-heading"><span class="section-label">大纲</span>${icon('list')}</div>
       <nav class="outline" id="outline" aria-label="文档大纲"></nav>
-      <div class="sidebar-bottom"><span class="local-dot"></span><span>${isDesktop ? '本地文档' : '浏览器预览'}</span><span class="version">v${version}</span></div>
+      <div class="sidebar-bottom"><span class="local-dot"></span><button id="cloud-documents" title="打开云文档">${icon('cloud')}<span id="storage-mode">${isDesktop ? '本地文档' : '浏览器预览'}</span></button><span class="version">${version}</span></div>
     </aside>
     <main class="workspace">
       <header class="topbar">
@@ -49,6 +49,7 @@ export function mountApp(isDesktop: boolean, version: string) {
       <button id="save-markdown" role="menuitem">${icon('file-code-2')}<span id="save-format-label">保存 Markdown (.md)</span><kbd>Ctrl S</kbd></button>
       <button id="save-pdf" role="menuitem">${icon('download')}<span>保存为 PDF (.pdf)</span></button>
       <button id="save-markdown-as" role="menuitem">${icon('save')}<span>另存为…</span><kbd>Ctrl Shift S</kbd></button>
+      <button id="save-cloud" role="menuitem">${icon('cloud')}<span>保存至云文档…</span></button>
     </div>
     <div class="toast" id="toast" role="status" hidden></div>`;
   createIcons({ icons, attrs: { 'stroke-width': 1.65 } });

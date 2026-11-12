@@ -8,6 +8,17 @@ internal static class Program {
         var folder = Path.Combine(Path.GetTempPath(), "moye-ui-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         Environment.SetEnvironmentVariable("MOYE_DATA_DIR", folder);
+        Environment.SetEnvironmentVariable("MINIMARK_GITHUB_CLIENT_ID", "");
+        var tokenStore = new WindowsTokenStore(folder);
+        try {
+            if (tokenStore.Read() is not null) throw new Exception("Isolated cloud credential target was not empty");
+            var sentinel = Guid.NewGuid().ToString("N");
+            tokenStore.Write(sentinel);
+            if (tokenStore.Read() != sentinel) throw new Exception("Windows cloud credential did not round trip");
+            tokenStore.Clear();
+            if (tokenStore.Read() is not null) throw new Exception("Windows cloud credential was not removed");
+        } finally { tokenStore.Clear(); }
+        Console.WriteLine("PASS isolated Windows cloud credential read/write/clear");
         var fixture = new DocumentWorkspace();
         fixture.AddNew("# Windows note\r\n\r\nKeep this text.\r\n", "CRLF.md", "# Windows note\r\n\r\nKeep this text.\r\n");
         // Write the original pre-normalization session shape to cover older installations.
@@ -95,6 +106,16 @@ internal static class Program {
                 await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-mode=source]').click()");
                 await Click("save-markdown");
                 await Wait("document.getElementById('save-state').textContent === '已保存'", "Image document save failed");
+                await Click("cloud-documents");
+                await Wait("document.getElementById('cloud-dialog').open && document.getElementById('cloud-status').textContent.includes('未配置')", "Native cloud status did not report missing OAuth configuration");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('#cloud-dialog [data-action=close]').click()");
+                await Wait("!document.getElementById('cloud-dialog').open && !document.getElementById('app').classList.contains('transition-pending')", "Cloud dialog close locked the editor");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('.cm-content').focus(); document.execCommand('insertText', false, 'Cloud dialog closed. ')");
+                await Wait("document.querySelector('.cm-content').textContent.includes('Cloud dialog closed.') && document.getElementById('save-state').textContent === '未保存'", "Editor did not accept edits after cloud dialog closed");
+                await Click("save-markdown");
+                await Wait("document.getElementById('save-state').textContent === '已保存'", "Local save failed after cloud dialog closed");
+                if (!File.ReadAllText(savedFile).Contains("Cloud dialog closed.")) throw new Exception("Local save lost edit after cloud dialog closed");
+                Console.WriteLine("PASS native cloud status, missing OAuth configuration, dialog close and subsequent local edit/save");
                 await Click("manage-plugins");
                 await Click("plugins-title");
                 await browser.CoreWebView2.ExecuteScriptAsync("""

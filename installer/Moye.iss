@@ -1,5 +1,8 @@
 #ifndef AppVersion
-  #define AppVersion "3.0.0"
+  #define AppVersion "4.0.0"
+#endif
+#ifndef AppReleaseVersion
+  #define AppReleaseVersion "1.0.0"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\release\MiniMark"
@@ -9,6 +12,7 @@
 AppId={{786D8F80-3AC2-4EA1-A739-1790FC2187DE}
 AppName=Mini Mark
 AppVersion={#AppVersion}
+AppVerName=Mini Mark Rev v{#AppReleaseVersion}
 AppPublisher=Mini Mark contributors
 AppPublisherURL=https://github.com/SakuraEdge/mini-mark
 AppSupportURL=https://github.com/SakuraEdge/mini-mark/issues
@@ -57,18 +61,18 @@ Name: "{autodesktop}\Mini Mark"; Filename: "{app}\MiniMark.exe"; WorkingDir: "{a
 
 [Registry]
 Root: HKCU; Subkey: "Software\Classes\Moye.Markdown"; ValueType: string; ValueName: ""; ValueData: "Markdown 文档"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Classes\Moye.Markdown\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\MiniMark.exe,0"
+Root: HKCU; Subkey: "Software\Classes\Moye.Markdown\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\wwwroot\document-icons\markdown.ico"",0"
 Root: HKCU; Subkey: "Software\Classes\Moye.Markdown\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\MiniMark.exe"" ""%1"""
 Root: HKCU; Subkey: "Software\Classes\.md\OpenWithProgids"; ValueType: none; ValueName: "Moye.Markdown"; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.markdown\OpenWithProgids"; ValueType: none; ValueName: "Moye.Markdown"; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.mdown\OpenWithProgids"; ValueType: none; ValueName: "Moye.Markdown"; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\Moye.Yaml"; ValueType: string; ValueName: ""; ValueData: "YAML 文档"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Classes\Moye.Yaml\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\MiniMark.exe,0"
+Root: HKCU; Subkey: "Software\Classes\Moye.Yaml\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\wwwroot\document-icons\yaml.ico"",0"
 Root: HKCU; Subkey: "Software\Classes\Moye.Yaml\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\MiniMark.exe"" ""%1"""
 Root: HKCU; Subkey: "Software\Classes\.yaml\OpenWithProgids"; ValueType: none; ValueName: "Moye.Yaml"; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.yml\OpenWithProgids"; ValueType: none; ValueName: "Moye.Yaml"; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\MiniMark.Html"; ValueType: string; ValueName: ""; ValueData: "HTML 文档"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Classes\MiniMark.Html\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\MiniMark.exe,0"
+Root: HKCU; Subkey: "Software\Classes\MiniMark.Html\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\wwwroot\document-icons\html.ico"",0"
 Root: HKCU; Subkey: "Software\Classes\MiniMark.Html\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\MiniMark.exe"" ""%1"""
 Root: HKCU; Subkey: "Software\Classes\.html\OpenWithProgids"; ValueType: none; ValueName: "MiniMark.Html"; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.htm\OpenWithProgids"; ValueType: none; ValueName: "MiniMark.Html"; Flags: uninsdeletevalue

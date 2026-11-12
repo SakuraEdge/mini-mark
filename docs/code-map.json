@@ -69,7 +69,8 @@
       "path": "src/styles",
       "purpose": "视觉样式",
       "files": [
-        "src/styles/app.css"
+        "src/styles/app.css",
+        "src/styles/cloud.css"
       ]
     },
     {
@@ -218,6 +219,7 @@
       "path": "tests",
       "purpose": "界面回归",
       "files": [
+        "tests/cloud.spec.ts",
         "tests/editor.spec.ts",
         "tests/features.spec.ts",
         "tests/fixtures/pdf.md",
@@ -232,6 +234,7 @@
       "path": "native-tests",
       "purpose": "原生单元检查",
       "files": [
+        "native-tests/CloudTests.cs",
         "native-tests/Moye.Tests.csproj",
         "native-tests/Program.cs",
         "native-tests/UpdateTests.cs"
@@ -268,6 +271,7 @@
         "scripts/benchmark.ps1",
         "scripts/code-map.mjs",
         "scripts/create-icon.mjs",
+        "scripts/document-icons.mjs",
         "scripts/formula-assets.mjs",
         "scripts/icon-mac.mjs",
         "scripts/install-local.ps1",
@@ -293,6 +297,19 @@
       "path": "public",
       "purpose": "应用资源",
       "files": [
+        "public/document-icons/html.icns",
+        "public/document-icons/html.ico",
+        "public/document-icons/html.png",
+        "public/document-icons/html.svg",
+        "public/document-icons/markdown.icns",
+        "public/document-icons/markdown.ico",
+        "public/document-icons/markdown.png",
+        "public/document-icons/markdown.svg",
+        "public/document-icons/yaml.icns",
+        "public/document-icons/yaml.ico",
+        "public/document-icons/yaml.png",
+        "public/document-icons/yaml.svg",
+        "public/github-oauth.json",
         "public/mini-mark.svg",
         "public/moye.svg",
         "public/plugin-host.html",
@@ -314,6 +331,7 @@
         "docs/branding/concepts/mini-mark-icon-concepts.png",
         "docs/branding/concepts/preview.html",
         "docs/branding/mini-mark-final.png",
+        "docs/cloud-development.md",
         "docs/code-map.json",
         "docs/editor-v1.png",
         "docs/editor.png",
@@ -321,6 +339,7 @@
         "docs/mini-mark-editor.png",
         "docs/performance.md",
         "docs/plugins.md",
+        "docs/release-rev-v1.0.0.md",
         "docs/release-v1.0.0.md",
         "docs/release-v1.0.1.md",
         "docs/release-v1.0.2.md",

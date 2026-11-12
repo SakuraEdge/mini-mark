@@ -1,11 +1,13 @@
 import { sample } from '../documents/sample';
 import { BrowserWorkspace, type DocumentData, type TabData } from '../documents/workspace';
 import { documentLanguage, formatLabel } from '../documents/formats';
+import type { CloudBinding } from '../features/cloud/model';
 export type { DocumentData, TabData } from '../documents/workspace';
 
 export type HostMessage =
   | { type: 'workspace'; tabs: TabData[]; document: DocumentData; recovered?: boolean }
-  | { type: 'saved'; documentId: string; name: string; path?: string; text: string }
+  | { type: 'saved'; documentId: string; name: string; path?: string; text: string; cloud?: CloudBinding | null }
+  | { type: 'cloudResponse'; requestId: string; data?: unknown; error?: string }
   | { type: 'requestClosingText'; requestId: string }
   | { type: 'requestExportPdf'; requestId: string; documentId: string; text: string; name: string }
   | { type: 'operationComplete' }

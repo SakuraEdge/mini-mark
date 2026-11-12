@@ -22,6 +22,18 @@ func runStoreTests() throws {
     try Store.saveSession(Session(documents: [windows], activeId: windows.id), file)
     let normalized = try Store.restore(file).documents[0]
     guard normalized.text == "# Windows\nbody\n", !normalized.dirty, normalized.newline == "\r\n" else { throw Store.failure("CRLF recovery normalization failed") }
+    var cloudDoc = Document(untitledName: "local.md", path: path, text: "# Cloud\r\nbody", baseline: "local baseline",
+                            cloud: CloudBinding(owner: "octocat", path: "notes/cloud.md", sha: String(repeating: "a", count: 40), baseline: "# Cloud\r\nbody"))
+    try Store.saveSession(Session(documents: [cloudDoc], activeId: cloudDoc.id), file)
+    cloudDoc = try Store.restore(file).documents[0]
+    guard cloudDoc.name == "cloud.md", cloudDoc.text == "# Cloud\nbody", !cloudDoc.dirty,
+          cloudDoc.cloud?.baseline == "# Cloud\nbody", cloudDoc.baseline == "local baseline",
+          cloudDoc.path == path else { throw Store.failure("Cloud recovery reread local disk or lost baseline") }
+    cloudDoc.cloud = nil
+    guard cloudDoc.dirty else { throw Store.failure("Cloud detach incorrectly marked local disk saved") }
+    let cloudOnly = Document(untitledName: "draft.md", text: "saved cloud text", baseline: "",
+                             cloud: CloudBinding(owner: "octocat", path: "cloud.md", sha: String(repeating: "b", count: 40), baseline: "saved cloud text"))
+    guard !cloudOnly.dirty, cloudOnly.savedText == "saved cloud text" else { throw Store.failure("Cloud saved baseline mismatch") }
     let image = Data([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3])
     let dataUrl = "data:" + "image/png;base64," + image.base64EncodedString()
     let relative = try ImageAssets.importImage(dataUrl, documentPath: path)
@@ -30,7 +42,7 @@ func runStoreTests() throws {
     let moved = folder.appendingPathComponent("moved/note.md")
     try ImageAssets.copyForSaveAs("![](\(relative))", previousPath: path, targetPath: moved.path)
     guard try Data(contentsOf: moved.deletingLastPathComponent().appendingPathComponent(relative)) == image else { throw Store.failure("Image Save As failed") }
-    print("PASS macOS storage: UTF-8, BOM, CRLF, conflict, two-document recovery")
+    print("PASS macOS storage: UTF-8, BOM, CRLF, conflict, two-document recovery, cloud baseline and detach")
 }
 
 extension AppDelegate {

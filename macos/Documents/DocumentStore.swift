@@ -1,6 +1,14 @@
 import Foundation
 import CryptoKit
 
+struct CloudBinding: Codable {
+    var owner: String
+    var path: String
+    var sha: String?
+    var baseline: String
+    var message: [String: Any] { ["owner": owner, "path": path, "sha": sha as Any? ?? NSNull(), "baseline": baseline] }
+}
+
 struct Document: Codable {
     var id = UUID().uuidString
     var untitledName: String
@@ -11,8 +19,10 @@ struct Document: Codable {
     var bom = false
     var newline = "\n"
     var revision = 0
-    var name: String { path.map { URL(fileURLWithPath: $0).lastPathComponent } ?? untitledName }
-    var dirty: Bool { text != baseline }
+    var cloud: CloudBinding?
+    var name: String { (cloud?.path ?? path).map { URL(fileURLWithPath: $0).lastPathComponent } ?? untitledName }
+    var savedText: String { cloud?.baseline ?? baseline }
+    var dirty: Bool { text != savedText }
 }
 struct Session: Codable {
     var version = 1
@@ -54,10 +64,12 @@ enum Store {
         for i in session.documents.indices {
             session.documents[i].text = normalize(session.documents[i].text)
             session.documents[i].baseline = normalize(session.documents[i].baseline)
+            if let cloud = session.documents[i].cloud { session.documents[i].cloud?.baseline = normalize(cloud.baseline) }
         }
         // Untitled numbering is recalculated for each process, not continued from an old session.
         session.nextUntitled = 1
         for i in session.documents.indices where !session.documents[i].dirty {
+            if session.documents[i].cloud != nil { continue }
             guard let path = session.documents[i].path else { continue }
             if var disk = try? read(path) { disk.id = session.documents[i].id; session.documents[i] = disk }
             else { session.documents[i].path = nil; session.documents[i].baseline = "" }

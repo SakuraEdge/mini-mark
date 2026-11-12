@@ -13,6 +13,7 @@ src/
   markdown/            Markdown/公式渲染、HTML 与 PDF 的排版内容
   platform/            前端与原生宿主的消息桥、浏览器预览文件操作
   features/updates/    检测更新界面、版本比较、提醒偏好
+  features/cloud/      GitHub 登录、目录浏览、云文档选择与请求协议
   features/theme/      主题偏好与渐变切换
   features/images/     图片插入、粘贴与拖入
   features/formulas/   按需加载的公式编辑器、Office 公式转换与复制
@@ -26,12 +27,14 @@ native/                Windows / .NET
   Infrastructure/      数据路径和进程间通信
   Export/              原生 PDF 引擎
   Updates/             更新清单、下载、校验与缓存
+  Cloud/               GitHub 异步请求、系统凭据存储、文档同步
 macos/                 macOS / Swift
   App/                 AppKit 入口、窗口、菜单与消息协调
   Host/                WKWebView 本地资源和图片访问
   Documents/           文档存储和会话
   Export/              原生 PDF 引擎
   Updates/             更新清单和缓存
+  Cloud/               GitHub 异步请求、Keychain、文档同步
   Diagnostics/         实际 WKWebView 与存储回归
 tests/                 浏览器交互测试与宿主协议模拟
 native-tests/          无界面的 Windows 存储与更新检查
@@ -62,6 +65,8 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 | HTML 编辑与运行 | `src/documents/formats.ts`、`src/features/html/`、两平台 `Preview/`；`runHtml` 保存成功后才运行 |
 | 文字选区 | `src/editor/editor.ts` 使用原生选区；`src/styles/app.css` 的 `::selection` 在有背景的代码行上仍可见 |
 | 更新、提醒、下载 | `src/features/updates/`、两平台的 `Updates/` |
+| GitHub 登录与云文档 | `src/features/cloud/`、两平台的 `Cloud/`、`docs/cloud-development.md` |
+| 文档类型图标 | `public/document-icons/`、`scripts/document-icons.mjs`、`installer/Moye.iss`、`macos/Info.plist` |
 | 数据盘、单实例 | `native/Infrastructure/` |
 | 安装位置、快捷方式、旧文件清理 | `installer/Moye.iss`、`scripts/package-win.ps1` |
 | 网络受限时的维护安装包 | `.github/workflows/local-patch.yml`；基于已经通过验证的发行包生成差异，并校验其余程序文件 |

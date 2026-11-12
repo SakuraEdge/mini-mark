@@ -1,6 +1,7 @@
 {
   "name": "mini-mark",
-  "version": "3.0.0",
+  "version": "4.0.0",
+  "releaseVersion": "1.0.0",
   "private": true,
   "description": "Mini Mark: a local-first Markdown, YAML and HTML editor for Windows and macOS.",
   "type": "module",

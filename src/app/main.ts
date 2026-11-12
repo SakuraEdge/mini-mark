@@ -10,15 +10,17 @@ import { sample } from '../documents/sample';
 import { documentLanguage, formatLabel, type DocumentLanguage } from '../documents/formats';
 import { htmlTemplate, openBrowserPreview } from '../features/html/preview';
 import { normalizeText } from '../documents/workspace';
-import { APP_VERSION, initializeUpdates, openUpdates, scheduleUpdateCheck, handleUpdateMessage } from '../features/updates/updates';
+import { APP_DISPLAY_VERSION, initializeUpdates, openUpdates, scheduleUpdateCheck, handleUpdateMessage } from '../features/updates/updates';
 import { initializeTheme, toggleTheme } from '../features/theme/theme';
 import { initializeImages, handleImageMessage } from '../features/images/images';
 import { initializePlugins } from '../features/plugins/manager';
 import { initializeFormulas } from '../features/formulas/formulas';
 import { handleFormulaMessage } from '../features/formulas/clipboard';
+import { initializeCloud } from '../features/cloud/manager';
+import type { CloudBinding } from '../features/cloud/model';
 import '../styles/app.css';
 
-const app = mountApp(isDesktop, APP_VERSION);
+const app = mountApp(isDesktop, APP_DISPLAY_VERSION);
 initializeUpdates();
 
 let mode: EditorMode = 'live';
@@ -26,6 +28,8 @@ let name = '未命名.md';
 let language: DocumentLanguage = 'markdown';
 let baseline = '';
 let fileOnDisk = false;
+let cloudBinding: CloudBinding | null = null;
+let cloudOperation: { resolve(): void; reject(error: Error): void } | undefined;
 let loading = false;
 let activeId = '';
 let revision = 0;
@@ -104,10 +108,27 @@ const pluginActions = initializePlugins({
     });
   },
 });
+const cloudActions = initializeCloud({
+  snapshot: () => ({ id: activeId, name, cloud: cloudBinding }),
+  notice: showToast,
+  openDocument: (owner, cloudPath) => cloudDocumentAction('cloudOpen', { owner, cloudPath }),
+  bindDocument: (owner, cloudPath) => cloudDocumentAction(
+    cloudBinding?.owner.toLowerCase() === owner.toLowerCase() && cloudBinding.path === cloudPath ? 'save' : 'cloudBind', { owner, cloudPath }),
+  detachDocument: () => cloudDocumentAction('cloudDetach'),
+});
+
+function cloudDocumentAction(type: string, payload: Record<string, unknown> = {}) {
+  if (!activeId || transitionPending || cloudOperation) return Promise.reject(new Error('当前操作尚未完成，请稍候。'));
+  return new Promise<void>((resolve, reject) => {
+    cloudOperation = { resolve, reject };
+    nativeAction(type, payload);
+  });
+}
 
 function updateSaved(text = view.state.doc.toString()) {
   const dirty = text !== baseline;
-  document.querySelector('#save-state')!.textContent = dirty ? '未保存' : fileOnDisk ? '已保存' : '草稿';
+  document.querySelector('#save-state')!.textContent = cloudBinding ? dirty ? '未同步' : '已同步' : dirty ? '未保存' : fileOnDisk ? '已保存' : '草稿';
+  document.querySelector('#storage-mode')!.textContent = cloudBinding ? '云文档' : isDesktop ? '本地文档' : '浏览器预览';
   document.querySelector('#sidebar-dirty')!.classList.toggle('visible', dirty);
   document.title = `${dirty ? '• ' : ''}${name} · Mini Mark`;
   const tab = tabs.find(item => item.id === activeId);
@@ -116,16 +137,16 @@ function updateSaved(text = view.state.doc.toString()) {
 }
 
 function snapshotCurrent() { return { documentId: activeId, revision, text: view.state.doc.toString() }; }
-function setTransitionPending(pending: boolean) {
+function setTransitionPending(pending: boolean, keepEditable = false) {
   transitionPending = pending;
-  setEditorEditable(view, !pending);
+  setEditorEditable(view, !pending || keepEditable);
   app.classList.toggle('transition-pending', pending);
 }
 function cacheCurrent() {
   if (!activeId) return;
   const previous = documents.get(activeId);
   documents.set(activeId, {
-    document: { id: activeId, name, text: view.state.doc.toString(), baseline, revision, path: previous?.document.path },
+    document: { id: activeId, name, text: view.state.doc.toString(), baseline, revision, path: previous?.document.path, cloud: cloudBinding },
     state: view.state,
     mode,
     language,
@@ -307,7 +328,7 @@ function nativeAction(type: string, payload: Record<string, unknown> = {}) {
   if (!activeId || transitionPending) return;
   clearTimeout(persistTimer);
   cacheCurrent();
-  setTransitionPending(true);
+  setTransitionPending(true, type === 'save' && Boolean(cloudBinding));
   // One message carries both the latest revision and the requested transition.
   send(type, { ...snapshotCurrent(), ...payload });
 }
@@ -334,6 +355,8 @@ on('save-file', () => { const menu = document.querySelector<HTMLElement>('#save-
 on('save-markdown', () => { document.querySelector<HTMLElement>('#save-menu')!.hidden = true; nativeAction('save'); });
 on('save-pdf', () => { document.querySelector<HTMLElement>('#save-menu')!.hidden = true; nativeAction('exportPdf'); });
 on('save-markdown-as', () => { document.querySelector<HTMLElement>('#save-menu')!.hidden = true; nativeAction('saveAs'); });
+on('cloud-documents', () => cloudActions.open());
+on('save-cloud', () => { document.querySelector<HTMLElement>('#save-menu')!.hidden = true; cloudActions.open('save'); });
 on('save-as', () => { nativeAction('saveAs'); document.querySelector<HTMLElement>('#more-menu')!.hidden = true; });
 on('toggle-sidebar', toggleSidebar);
 on('current-file', () => { if (mode === 'read') setMode('live'); view.focus(); });
@@ -424,6 +447,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && act
 
 let updateScheduled = false;
 connect((message) => {
+  if (cloudActions.handleMessage(message)) return;
   if (handleFormulaMessage(message)) return;
   if (handleImageMessage(message)) return;
   if (handleUpdateMessage(message)) return;
@@ -447,6 +471,7 @@ connect((message) => {
     setImageDocument(doc.id + ':' + (doc.path ?? ''));
     name = doc.name;
     fileOnDisk = Boolean(doc.path);
+    cloudBinding = doc.cloud ?? null;
     baseline = doc.baseline;
     revision = current.revision;
     loading = true;
@@ -459,7 +484,7 @@ connect((message) => {
       if (cached.language !== language) setEditorLanguage(view, language);
     } else replaceDocument(view, current.text, mode, language);
     documents.set(doc.id, {
-      document: { ...current, name: doc.name, path: doc.path, baseline },
+      document: { ...current, name: doc.name, path: doc.path, cloud: cloudBinding, baseline },
       state: view.state,
       mode,
       language,
@@ -472,6 +497,7 @@ connect((message) => {
     document.querySelector('#sidebar-filename')!.textContent = name;
     document.querySelector('#current-file')!.setAttribute('title', doc.path || name);
     updateOutline(); updateSaved();
+    cloudActions.documentChanged();
     document.querySelector('#word-count')!.textContent = `${wordCount(current.text).toLocaleString()} 字`;
     document.querySelector('#line-count')!.textContent = `${view.state.doc.lines.toLocaleString()} 行`;
     setMode(mode);
@@ -496,11 +522,11 @@ connect((message) => {
     })));
   } else if (message.type === 'saved') {
     const cached = documents.get(message.documentId);
-    if (cached) Object.assign(cached.document, { name: message.name, path: message.path, baseline: message.text });
+    if (cached) Object.assign(cached.document, { name: message.name, path: message.path, cloud: message.cloud, baseline: message.text });
     const tab = tabs.find(tab => tab.id === message.documentId);
-    if (tab) Object.assign(tab, { name: message.name, path: message.path, dirty: cached ? cached.document.text !== message.text : false });
+    if (tab) Object.assign(tab, { name: message.name, path: message.path, cloud: message.cloud, dirty: cached ? cached.document.text !== message.text : false });
     if (message.documentId === activeId) {
-      name = message.name; baseline = message.text; fileOnDisk = true;
+      name = message.name; baseline = message.text; fileOnDisk = Boolean(message.path); cloudBinding = message.cloud ?? null;
       setImageDocument(activeId + ':' + (message.path ?? ''));
       const nextLanguage = documentLanguage(name);
       if (nextLanguage !== language) {
@@ -518,6 +544,7 @@ connect((message) => {
       document.querySelector('#sidebar-filename')!.textContent = name;
       document.querySelector('#current-file')!.setAttribute('title', message.path || name);
       updateSaved();
+      cloudActions.documentChanged();
       view.dispatch({ effects: modeCompartment.reconfigure(modeExtensions(mode === 'split' ? 'source' : mode)) });
       refreshPreview();
     } else renderTabs();
@@ -532,9 +559,12 @@ connect((message) => {
       const html = await exportHtml(message.text, message.name);
       send('pdfHtml', { requestId: message.requestId, documentId: message.documentId, html });
     }).catch(error => send('pdfError', { requestId: message.requestId, documentId: message.documentId, message: error instanceof Error ? error.message : 'PDF 排版失败' }));
-  } else if (message.type === 'operationComplete') setTransitionPending(false);
+  } else if (message.type === 'operationComplete') {
+    setTransitionPending(false);
+    cloudOperation?.resolve(); cloudOperation = undefined;
+  }
   else {
-    if (message.type === 'error') setTransitionPending(false);
+    if (message.type === 'error') { setTransitionPending(false); cloudOperation?.reject(new Error(message.message)); cloudOperation = undefined; }
     if ('message' in message) showToast(message.message);
   }
 });

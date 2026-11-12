@@ -31,6 +31,12 @@ if($htmlCommand -ne ('"' + (Join-Path $target 'MiniMark.exe') + '" "%1"')) { thr
 if((Read-Choices) -ne $before) { throw 'Installer changed protected default choice' }
 $yamlCommand = (Get-Item 'HKCU:\Software\Classes\Moye.Yaml\shell\open\command').GetValue('')
 if($yamlCommand -ne ('"' + (Join-Path $target 'MiniMark.exe') + '" "%1"')) { throw 'YAML open command does not quote paths correctly' }
+foreach($association in @(@('Moye.Markdown','markdown'), @('Moye.Yaml','yaml'), @('MiniMark.Html','html'))) {
+  $iconPath = Join-Path $target ("wwwroot\document-icons\" + $association[1] + '.ico')
+  $iconValue = (Get-Item ("HKCU:\Software\Classes\" + $association[0] + '\DefaultIcon')).GetValue('')
+  if(-not (Test-Path -LiteralPath $iconPath)) { throw "Document icon missing: $iconPath" }
+  if($iconValue -ne ('"' + $iconPath + '",0')) { throw "Document icon association is incorrect: $($association[0])" }
+}
 $shell = New-Object -ComObject WScript.Shell
 function Normalize-ShortcutPath([string]$path) {
   if([string]::IsNullOrWhiteSpace($path)) { return '' }
