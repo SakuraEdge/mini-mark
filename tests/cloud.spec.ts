@@ -8,6 +8,7 @@ interface MockOptions {
   failListOnce?: boolean;
   failSaveOnce?: boolean;
   pendingLogin?: boolean;
+  delayedSave?: boolean;
 }
 
 async function mockHost(page: Page, options: MockOptions = {}) {
@@ -22,6 +23,7 @@ async function mockHost(page: Page, options: MockOptions = {}) {
       id: 'local', name: '随手记.md', text: 'Local draft', baseline: 'Local draft', revision: 0,
       cloud: options.cloud ? { owner: 'example-user', path: '随手记.md', sha: 'sha-initial', baseline: 'Local draft' } : null,
     }];
+    if (options.delayedSave) documents.push({ id: 'second', name: '另一个文档.md', text: 'Another document', baseline: 'Another document', revision: 0, cloud: null });
     let activeId = 'local';
     const entries: any[] = [
       { name: '笔记', path: '笔记', type: 'dir' },
@@ -67,6 +69,7 @@ async function mockHost(page: Page, options: MockOptions = {}) {
         }
         const current = documents.find(doc => doc.id === message.documentId);
         if (current && typeof message.text === 'string') { current.text = message.text; current.revision = message.revision; }
+        if (message.type === 'activate') { activeId = message.targetId; publish(); emit({ type: 'operationComplete' }); }
         if (message.type === 'cloudOpen') {
           const text = message.cloudPath.endsWith('.yaml') ? 'enabled: true' : '# Cloud document';
           const document = { id: 'remote', name: message.cloudPath.split('/').at(-1), text, baseline: text, revision: 0, cloud: { owner: message.owner, path: message.cloudPath, sha: 'sha-remote', baseline: text } };
@@ -75,10 +78,15 @@ async function mockHost(page: Page, options: MockOptions = {}) {
         if (message.type === 'cloudBind' || message.type === 'save') {
           if (failSave) { failSave = false; emit({ type: 'error', message: '云端文件已修改，请先打开云端版本。' }); emit({ type: 'operationComplete' }); return; }
           if (message.type === 'cloudBind') current.cloud = { owner: message.owner, path: message.cloudPath, sha: 'sha-new', baseline: current.text };
-          current.baseline = current.text;
-          if (current.cloud) current.cloud.baseline = current.text;
-          emit({ type: 'saved', documentId: current.id, name: current.name, text: current.text, cloud: current.cloud });
-          emit({ type: 'operationComplete' });
+          const savedText = current.text;
+          const complete = () => {
+            current.baseline = savedText;
+            if (current.cloud) current.cloud = { ...current.cloud, baseline: savedText };
+            emit({ type: 'saved', documentId: current.id, name: current.name, text: savedText, cloud: current.cloud });
+            emit({ type: 'operationComplete' });
+          };
+          if (options.delayedSave) Object.assign(window, { __completeCloudSave: complete });
+          else complete();
         }
         if (message.type === 'cloudDetach') { current.cloud = null; publish(); emit({ type: 'operationComplete' }); }
       },
@@ -132,6 +140,8 @@ test('pending authorization honors slower polling and cancellation', async ({ pa
   await page.clock.fastForward(5000);
   expect((await cloudMessages(page)).filter(message => message.action === 'pollLogin')).toHaveLength(1);
   await page.getByRole('button', { name: '关闭云文档窗口', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '云文档', exact: true })).not.toBeVisible();
+  await expect.poll(async () => (await cloudMessages(page)).some(message => message.action === 'cancelLogin')).toBe(true);
   await page.clock.fastForward(20000);
   expect((await cloudMessages(page)).filter(message => message.action === 'pollLogin')).toHaveLength(1);
   expect((await cloudMessages(page)).some(message => message.action === 'cancelLogin')).toBe(true);
@@ -226,6 +236,38 @@ test('failed cloud save preserves unsynced text and permits detaching then local
   const saves = (await cloudMessages(page)).filter(message => message.type === 'save');
   expect(saves).toHaveLength(2);
   expect(saves[1].text).toBe('Unsynced edits must survive a conflict.');
+});
+
+test('editing continues during cloud save and a delayed acknowledgment preserves newer text', async ({ page }) => {
+  await mockHost(page, { cloud: true, delayedSave: true });
+  await page.getByRole('button', { name: '源码', exact: true }).click();
+  const editor = page.getByRole('textbox', { name: 'Markdown 编辑器' });
+  await editor.fill('Snapshot sent to cloud.');
+  await page.keyboard.press('Control+s');
+  await expect(page.locator('#app')).toHaveClass(/transition-pending/);
+  await expect(editor).toHaveAttribute('contenteditable', 'true');
+  const saved = (await cloudMessages(page)).find(message => message.type === 'save');
+  expect(saved.text).toBe('Snapshot sent to cloud.');
+  await page.getByRole('tab', { name: '另一个文档.md', exact: true }).click();
+  await expect(page.getByRole('tab', { name: '随手记.md', exact: true })).toHaveAttribute('aria-selected', 'true');
+  expect((await cloudMessages(page)).some(message => message.type === 'activate')).toBe(false);
+  await editor.click();
+  await page.keyboard.press('End');
+  await page.keyboard.insertText(' New input while saving.');
+  const latest = 'Snapshot sent to cloud. New input while saving.';
+  await expect(editor).toHaveText(latest);
+  await expect.poll(async () => (await cloudMessages(page)).findLast(message => message.type === 'edit')?.text).toBe(latest);
+  const edit = (await cloudMessages(page)).findLast(message => message.type === 'edit');
+  expect(edit.revision).toBeGreaterThan(saved.revision);
+  await page.evaluate(() => (window as any).__completeCloudSave());
+  await expect(page.locator('#app')).not.toHaveClass(/transition-pending/);
+  await expect(editor).toHaveText(latest);
+  await expect(page.locator('#save-state')).toHaveText('未同步');
+  await page.getByRole('tab', { name: '另一个文档.md', exact: true }).click();
+  await expect(page.getByRole('tab', { name: '另一个文档.md', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('tab', { name: '随手记.md', exact: true }).click();
+  await expect(editor).toHaveText(latest);
+  await expect(page.locator('#save-state')).toHaveText('未同步');
 });
 
 test('cloud dialog fits desktop, minimum desktop and narrow viewport', async ({ page }, testInfo) => {

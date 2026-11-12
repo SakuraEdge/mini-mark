@@ -221,8 +221,9 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
             } catch {
                 if epoch == self.generation {
                     if (error as? CloudFailure)?.status == -1 {
+                        let interval = self.device?.interval ?? 5
                         self.device?.polling = false
-                        self.device?.nextPoll = Date().addingTimeInterval(TimeInterval(self.device?.interval ?? 5))
+                        self.device?.nextPoll = Date().addingTimeInterval(TimeInterval(interval))
                     } else { self.device = nil }
                 }
                 finish(.failure(error))

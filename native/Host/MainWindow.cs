@@ -164,9 +164,16 @@ public sealed partial class MainWindow : Form {
             if (type == "closingText" && (closingRequest is null || message.GetProperty("requestId").GetString() != closingRequest)) return;
             if (!message.TryGetProperty("documentId", out var id)) return;
             var document = workspace.Find(id.GetString());
-            if (document is null) { Post(new { type = "operationComplete" }); return; }
+            if (document is null) {
+                if (type != "edit") { Post(new { type = "error", message = "文档已关闭，请重新选择文档。" }); Post(new { type = "operationComplete" }); }
+                return;
+            }
             if (message.TryGetProperty("text", out var value) && message.TryGetProperty("revision", out var revision)) {
-                if (!document.Update(value.GetString()!, revision.GetInt64())) { Publish(); return; }
+                if (!document.Update(value.GetString()!, revision.GetInt64())) {
+                    Publish();
+                    if (type != "edit") { Post(new { type = "error", message = "文档内容已变化，请重新操作。" }); Post(new { type = "operationComplete" }); }
+                    return;
+                }
             }
             if (type == "edit") { UpdateTitle(); draftTimer.Stop(); draftTimer.Start(); return; }
             switch (type) {
@@ -268,7 +275,7 @@ public sealed partial class MainWindow : Form {
         var document = workspace.Active;
         Post(new {
             type = "workspace", recovered,
-            tabs = workspace.Documents.Select(item => new { id = item.Id, name = item.Name, path = item.Path, cloud = item.Cloud, dirty = item.Dirty, revision = item.Revision }),
+            tabs = workspace.Documents.Select(item => new { id = item.Id, name = item.Name, path = item.Path, cloud = item.Cloud is null ? null : new { owner = item.Cloud.Owner, path = item.Cloud.Path, sha = item.Cloud.Sha }, dirty = item.Dirty, revision = item.Revision }),
             document = new { id = document.Id, text = document.Text, baseline = document.SavedBaseline, name = document.Name, path = document.Path, cloud = document.Cloud, revision = document.Revision }
         });
         UpdateTitle();

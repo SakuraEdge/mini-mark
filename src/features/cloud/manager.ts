@@ -141,7 +141,7 @@ export function initializeCloud(options: Options) {
         else {
           setStatus('正在打开文档…');
           await options.openDocument(account.login!, entry.path);
-          if (!signal.aborted) dialog.close();
+          if (!signal.aborted) closeDialog();
         }
       });
       list.append(button);
@@ -238,6 +238,11 @@ export function initializeCloud(options: Options) {
     generation++; controller.abort(); controller = new AbortController(); busy = false;
     cancelPendingLogin();
   }
+  function closeDialog() {
+    resetRequests();
+    dialog.close();
+    redraw();
+  }
   function documentChanged() {
     const snapshot = options.snapshot();
     if (snapshot.id !== currentDocumentId) {
@@ -263,7 +268,7 @@ export function initializeCloud(options: Options) {
   action('refresh').onclick = () => void perform(signal => listFolder(folder, signal));
   action('new-folder').onclick = () => { folderForm.hidden = !folderForm.hidden; if (!folderForm.hidden) folderName.focus(); };
   action('cancel-folder').onclick = () => { folderForm.hidden = true; folderName.value = ''; };
-  action('close').onclick = () => dialog.close();
+  action('close').onclick = closeDialog;
   action('save-current').onclick = beginSave;
   saveEnabled.onchange = redraw;
   enabled.onchange = () => {
@@ -292,10 +297,11 @@ export function initializeCloud(options: Options) {
       setStatus('正在保存云文档…');
       await options.bindDocument(account.login!, path);
       if (signal.aborted) return;
-      documentChanged(); options.notice('已保存至云文档。'); dialog.close();
+      documentChanged(); options.notice('已保存至云文档。'); closeDialog();
     });
   };
-  dialog.addEventListener('close', () => { resetRequests(); redraw(); });
+  dialog.addEventListener('cancel', event => { event.preventDefault(); closeDialog(); });
+  dialog.addEventListener('close', () => { if (!dialog.open) { resetRequests(); redraw(); } });
   return {
     open(next: 'browse' | 'save' = 'browse') {
       resetRequests(); intent = next; folder = ''; entries = []; repository = undefined;

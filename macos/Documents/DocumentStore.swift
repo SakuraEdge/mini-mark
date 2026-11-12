@@ -6,6 +6,7 @@ struct CloudBinding: Codable {
     var path: String
     var sha: String?
     var baseline: String
+    var metadataMessage: [String: Any] { ["owner": owner, "path": path, "sha": sha as Any? ?? NSNull()] }
     var message: [String: Any] { ["owner": owner, "path": path, "sha": sha as Any? ?? NSNull(), "baseline": baseline] }
 }
 

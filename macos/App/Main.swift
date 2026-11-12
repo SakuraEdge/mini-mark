@@ -166,17 +166,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             }; return
         }
         if type == "closingText", body["requestId"] as? String != closingRequest { return }
-        guard ready, let id = body["documentId"] as? String, let index = session.documents.firstIndex(where: { $0.id == id }) else { post(["type": "operationComplete"]); return }
+        guard ready, let id = body["documentId"] as? String, let index = session.documents.firstIndex(where: { $0.id == id }) else {
+            if type != "edit" {
+                if type == "closingText" { closingRequest = nil }
+                notice("文档已关闭，请重新操作。", error: true)
+                post(["type": "operationComplete"])
+            }
+            return
+        }
         if let rawText = body["text"] as? String, let revision = body["revision"] as? Int {
             let text = Store.normalize(rawText)
-            if revision < session.documents[index].revision || (revision == session.documents[index].revision && text != session.documents[index].text) { publish(); return }
+            if revision < session.documents[index].revision || (revision == session.documents[index].revision && text != session.documents[index].text) {
+                publish()
+                if type != "edit" {
+                    if type == "closingText" { closingRequest = nil }
+                    notice("文档内容已改变，请重新操作。", error: true)
+                    post(["type": "operationComplete"])
+                }
+                return
+            }
             session.documents[index].text = text; session.documents[index].revision = revision
         }
         if type == "edit" {
             title(); draftTimer?.invalidate()
             draftTimer = Timer.scheduledTimer(withTimeInterval: 0.7, repeats: false) { _ in self.persist() }; return
         }
-        if cloudBusy { notice("云文档操作尚未完成，请稍候。"); post(["type": "operationComplete"]); return }
+        if cloudBusy {
+            if type == "closingText" { closingRequest = nil }
+            notice("云文档操作尚未完成，请稍候。", error: true); post(["type": "operationComplete"]); return
+        }
         if ["cloudOpen", "cloudBind", "cloudDetach"].contains(type) {
             performCloudDocument(type, body: body, documentId: id); return
         }
@@ -246,7 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     func publish(recovered: Bool = false) {
         let doc = session.documents[activeIndex]
         scheme.documentFolder = doc.path.map { URL(fileURLWithPath: $0).deletingLastPathComponent() }
-        post(["type": "workspace", "recovered": recovered, "tabs": session.documents.map { ["id": $0.id, "name": $0.name, "path": $0.path as Any? ?? NSNull(), "cloud": $0.cloud?.message as Any? ?? NSNull(), "dirty": $0.dirty, "revision": $0.revision] },
+        post(["type": "workspace", "recovered": recovered, "tabs": session.documents.map { ["id": $0.id, "name": $0.name, "path": $0.path as Any? ?? NSNull(), "cloud": $0.cloud?.metadataMessage as Any? ?? NSNull(), "dirty": $0.dirty, "revision": $0.revision] },
               "document": ["id": doc.id, "name": doc.name, "path": doc.path as Any? ?? NSNull(), "text": doc.text, "baseline": doc.savedText, "cloud": doc.cloud?.message as Any? ?? NSNull(), "revision": doc.revision]])
         title()
     }

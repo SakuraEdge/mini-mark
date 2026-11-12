@@ -12,7 +12,7 @@ extension AppDelegate {
     }
 
     func beginDocumentOperation(_ action: (@escaping (Result<Void, Error>) -> Void) -> Void) {
-        guard !cloudBusy else { notice("云文档操作尚未完成，请稍候。"); post(["type": "operationComplete"]); return }
+        guard !cloudBusy else { notice("云文档操作尚未完成，请稍候。", error: true); post(["type": "operationComplete"]); return }
         cloudBusy = true
         action { result in
             self.cloudBusy = false
