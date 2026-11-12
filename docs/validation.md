@@ -1,8 +1,22 @@
 # 验证记录
 
+## Rev v1.0.0 正式发布
+
+2026-11-12。已发布 `Mini Mark Rev v1.0.0`，非草稿、非预发布。内部版本与 Git 标签为 `4.0.0` / `v4.0.0`，保持旧版升级兼容。
+
+- 发布源码为 `19ecdc9db5e23336f15e239d78a1f40e5e56ac5b`。`main` 构建 `43230508071` 的 Windows、macOS 全部通过，含真实 WebView2/WKWebView、安装升级、文件关联、HTML 与 PDF 回归。
+- 发布工作流 `43231653142` 成功，Release 编号 `443016612`。核对 11 个附件、9 项包校验和、5 组兼容别名哈希与大小一致；`latest` 指向本次正式版。
+- 从公开下载地址完整下载并核验 Windows Rev 安装器、macOS Rev DMG/ZIP、校验和文件与 `update.json`。Windows 安装器 SHA-256 为 `0e3384b760f61bad89fc7fbc6b005ff27948d0481929a204e01392b90e847465`，大小 55,241,500 字节。
+- macOS DMG SHA-256 为 `32dd2c66823f93b9317979fe38f3751e9782bf4aff0d890deb6fed1bb2e08a62`，ZIP 为 `473745ce3afa8ae3c65702e088ba211ff4343d37535c6cccc74e781b70378131`。ZIP 只读检查确认 arm64/x86_64 通用程序、最低 macOS 13、三类文档图标和非空公开 OAuth Client ID。
+- 静态 `updates/stable.json` 与发布的 `update.json` 内容一致，版本为 4.0.0。旧仓库名称的兼容安装器下载地址实测返回 HTTP 200，大小匹配。
+- Windows 便携 ZIP 的发布端 SHA-256 与校验清单一致，但本机补充下载因连接停滞和速度过慢未完成；残留文件改为 `.partial`，不列为本地完整下载验收。
+- 新版验证后删除此前 11 个旧 Release，保留 Git 标签和源码历史。再次查询确认只剩本次正式版。旧 Release 元数据备份位于忽略目录 `release/pre-rev-release-metadata-20261112/`；新下载与元数据位于 `release/rev-published-43230508071/`。
+- README 下载徽章显示对外版本 `Rev v1.0.0`。按照用户决定跳过证书申请，仍为 macOS ad-hoc、无 Developer ID 和公证；没有付费、创建证书或更改安全设置。
+- 本轮没有覆盖 `D:\Moye` 的实际安装、用户文档、草稿或默认文件关联。此前记录中的真实 macOS 账号登录、实际令牌过期续期等未完成项目仍不计为已验收。
+
 ## Rev v1.0.0 开发验证
 
-2026-11-12。尚未正式发布；OAuth 应用已注册并配置公开 Client ID，Windows 真实账号授权与仓库读写已验证。
+2026-11-12，以下为正式发布前的开发验证记录。OAuth 应用已注册并配置公开 Client ID，Windows 真实账号授权与仓库读写已验证。
 
 ### 真实云文档验收
 

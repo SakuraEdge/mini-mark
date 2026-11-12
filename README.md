@@ -6,7 +6,7 @@
 
 Markdown、YAML、HTML 编辑器，支持 Windows 和 macOS。
 
-[![Release](https://img.shields.io/github/v/release/SakuraEdge/mini-mark?color=286bd6&label=Download)](https://github.com/SakuraEdge/mini-mark/releases/latest)
+[![Release](https://img.shields.io/badge/release-Rev%20v1.0.0-286bd6)](https://github.com/SakuraEdge/mini-mark/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-526a85)](LICENSE)
 
 [下载正式版](https://github.com/SakuraEdge/mini-mark/releases/latest) · [版本记录](https://github.com/SakuraEdge/mini-mark/releases) · [反馈问题](https://github.com/SakuraEdge/mini-mark/issues)
