@@ -175,6 +175,28 @@ test('closing during a pending delete never claims the submitted request was und
   expect((await messages(page)).filter(message => message.action === 'delete')).toHaveLength(1);
 });
 
+test('late delete publication preserves newer edits and flushes them before the debounce', async ({ page }) => {
+  await mockDelete(page, { delayed: true, opened: true });
+  await page.clock.install();
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: '删除文件夹 资料', exact: true }).click();
+  await expect.poll(async () => (await messages(page)).filter(message => message.action === 'delete').length).toBe(1);
+  await page.getByRole('button', { name: '关闭云文档窗口', exact: true }).click();
+  await page.getByRole('button', { name: '源码', exact: true }).click();
+  const editor = page.getByRole('textbox', { name: 'Markdown 编辑器' });
+  const latest = 'New text entered while cloud deletion is still finishing.';
+  await editor.fill(latest);
+  expect((await messages(page)).filter(message => message.type === 'edit')).toHaveLength(0);
+  await page.evaluate(() => (window as any).__finishDelete());
+  await expect(editor).toHaveText(latest);
+  await expect(page.locator('#storage-mode')).toHaveText('本地文档');
+  await expect(page.locator('#save-state')).toHaveText('未保存');
+  const edits = (await messages(page)).filter(message => message.type === 'edit');
+  expect(edits).toEqual([{ type: 'edit', documentId: 'active', revision: 4, text: latest }]);
+  await page.clock.fastForward(200);
+  expect((await messages(page)).filter(message => message.type === 'edit')).toHaveLength(1);
+});
+
 test('deletion times out at 180 seconds with uncertain-result wording', async ({ page }) => {
   await mockDelete(page, { delayed: true });
   await page.clock.install();
