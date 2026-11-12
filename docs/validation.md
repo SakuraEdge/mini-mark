@@ -2,10 +2,24 @@
 
 ## Rev v1.0.0 开发验证
 
-2026-11-12。尚未正式发布；OAuth 应用已注册并配置公开 Client ID，真实账号授权与仓库写入尚未验证。
+2026-11-12。尚未正式发布；OAuth 应用已注册并配置公开 Client ID，Windows 真实账号授权与仓库读写已验证。
+
+### 真实云文档验收
+
+- 用户手动完成 GitHub Device Flow 授权，Windows 验证版确认账号 `SakuraEdge`，能读取该账号的私有 `MiniMarkDisk`。此前浏览器的授权码找不到问题在重新发起并使用本轮授权码后解决，未修改账号安全设置。
+- 通过实际界面新建独立测试目录 `MiniMark-qa-20261112-7cd6`，新建 Markdown 标签并保存为 `ui-note.md`；界面显示“已同步”。独立进程使用生产 `GitHubCloud` 读回，正文和 SHA 校验通过。
+- 独立网络验证仅允许该目录的测试文件，使用本次 OAuth 登录凭据，不使用 Git 凭据代替。凭据只由生产存储类读取，禁止刷新、写回和清除；没有输出令牌或正文。工具位于忽略目录 `release/cloud-verification/checks/`。
+- Markdown、YAML、HTML 各一份唯一文件的创建、读取、更新、旧 SHA 保存拒绝及拒绝后远端内容保留均实际通过，不删除既有文件。
+- 另一进程修改 `ui-note.md` 后，界面中的旧版本追加本地标记并保存，保持“未同步”；远端独立读回仍为新版本，本地正文和会话保留。本轮没有截获短暂的界面冲突提示，不将提示可读性列为已验收。
+- 切换为本地文档后，通过原生保存框写入 `release/cloud-verification/local-conflict-copy.md`，正文逐字匹配并保留本地标记；云端读回不变。再次打开远端时新增标签，本地副本仍保留。
+- 在重新打开的云文档中追加测试文字并按 Ctrl+S，状态恢复“已同步”，独立读回完整匹配。关闭并重启验证程序后，三个标签、正文和云绑定恢复，登录无须再次授权。仓库读取遇到一次临时网络错误，关闭重开云窗口后成功，凭据没有丢失。
+- 测试目录留下四份文档及 `.gitkeep` 供复核。现有 `D:\Moye` 安装、原有文档、仓库 `README.md` 未修改。没有创建 Release 或更改默认应用。
+- 未完成真实等待令牌过期后的续期、真实退出后重新授权、macOS 账号登录及跨物理设备读写。对应刷新和退出竞争已有模拟回归，不能代替这些实机项目。免费个人开发证书仍待用户的 Mac/Xcode 条件确认。
+
+### 构建与回归
 
 - GitHub 应用 `Mini Mark` 由 `SakuraEdge` 持有，应用编号 `4014140`。已在设置页面确认 Device Flow 开启，未生成 Client Secret。
-- 对配置中的 Client ID 实际请求设备授权入口，GitHub 返回有效授权挑战、5 秒轮询间隔及 899 秒有效期；未兑换令牌、未访问仓库。用户授权及读写测试仍待完成。
+- 初始配置探测实际请求设备授权入口，GitHub 返回有效授权挑战、5 秒轮询间隔及 899 秒有效期；该探测未兑换令牌。其后的用户授权和读写结果见上节。
 - 原生 UI 隔离测试以空格覆盖 Client ID，再由读取逻辑 Trim 为空；避免 .NET 在 Windows 将空字符串环境变量当作删除而读取真实打包配置。
 - 配置提交 `8d3fd7ab0db03419592b4830d654a7b2b36fce42` 的 Actions `43195222177` 两平台全部通过。
 - 本轮复核增加两端 OAuth 令牌自动续期：读取有效期、并发合并刷新、轮换后的安全持久化、401 一次重试、旧令牌兼容、账号核对和退出后的迟到响应保护。模拟错误不代表已完成真实账号授权。
@@ -13,7 +27,7 @@
 - 本轮生产构建、25 项单元测试、247 项 Windows 原生检查、55 项浏览器交互测试、真实 Windows WebView2 回归通过。
 - 最终代码提交 `6d68b3215c7f37cc196d792443fdb8ddd88d60aa`，Actions `43204294699` 的 Windows 与 macOS 全部成功。macOS 实际验证 Intel/Apple Silicon 通用构建、云凭据轮换与迟到身份响应、同步存储、WKWebView、HTML 和 PDF；Windows 包含安装升级和文件关联检查。
 - 验证过程中修复 macOS 异步测试入口：云回归仅在 `--self-test`、AppKit 主循环启动前执行，避免在 WebView 主队列回调内嵌套等待。原有 `--smoke` 同步存储、HTML、界面及 PDF 测试仍保留并通过。
-- 独立 Windows 验证程序位于忽略目录 `release/cloud-verification/app/`，使用单独的 `profile/`。真实 GitHub Device Flow 已由该程序发起，浏览器停在用户账号确认页；尚未批准授权、创建云仓库或写入真实文件。现有 `D:\Moye` 安装和用户文档未更改。
+- 独立 Windows 验证程序位于忽略目录 `release/cloud-verification/app/`，使用单独的 `profile/`，与实际安装的数据和单实例入口隔离。
 - 免费个人开发证书仍需用户的 Mac、Xcode 和 Apple Account；操作与核对步骤单独保存在 `docs/mac-signing.md`，未购买开发者计划、未创建或导出证书。
 
 - 内部版本 4.0.0，用户界面版本 Rev v1.0.0。旧版更新器严格校验 vSemVer 标签及安装器名称，因此保留递增的内部版本与兼容下载名。
@@ -26,7 +40,7 @@
 - 发布工作流拒绝空 OAuth Client ID。macOS 使用免费 ad-hoc 签名，不宣称已申请 Apple Developer ID 或完成公证。
 - 首次 Actions 发现 Swift 对 device 状态的排他访问编译错误，以及授权窗口关闭事件晚于下一轮轮询的问题。已拆分读写并同步取消关闭，取消专项连续 5 次通过。
 - 提交 `f2f5a0fd585973758b966675aee8bfe6ec39f191`，Actions `43186671947` 的 Windows 与 macOS 均成功。Windows 包含 53 项交互测试、真实 WebView2、安装升级和独立图标关联检查；macOS 包含 x86_64/arm64 通用构建、存储基线、真实 WKWebView、HTML 和 PDF 验证。
-- 验证过的产物保存于本地 `release/rev-validation-43186671947/`。开发分支为 `feature/rev-cloud-storage`，正式 main、更新 feed 和旧 Release 均未更改。必须补齐 OAuth 配置并完成真实登录验证后再发布。
+- 较早提交的验证产物保存于本地 `release/rev-validation-43186671947/`，不作为包含最新 OAuth 配置和刷新修复的发布产物。开发分支为 `feature/rev-cloud-storage`，正式 main、更新 feed 和旧 Release 均未更改。
 - 本地下载校验：Windows EXE SHA-256 `59531f71144b47ed0d2dd69597b0c937b72a610cd1f2066f68de6b52cb165b11`；macOS DMG `084d06380a968754ed56602e1a12feff583df6a311f093bca4db62df4f59a831`。未覆盖用户安装、文档或默认应用。
 
 ## v3.0.0
