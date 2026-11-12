@@ -26,6 +26,7 @@ static class CloudTests {
         Paths(check);
         Configuration(folder, check);
         await Authentication(check);
+        await DeviceFlow(check);
         await Contents(check);
         await Failures(check);
         await LogoutRace(check);
@@ -168,6 +169,79 @@ static class CloudTests {
             check(!json.RootElement.TryGetProperty("sha", out _), "New cloud file included an invented SHA");
         await client.Execute(Body(new { action = "folder", owner = "alice", path = "notes/new folder" }));
         check(handler.Requests[3].Url.EndsWith("/contents/notes/new%20folder/.gitkeep"), "Cloud folder creation lost its path");
+    }
+
+    private static async Task DeviceFlow(Action<bool, string> check) {
+        const string deviceCode = "private-device-test-code";
+        const string userCode = "ABCD-EFGH";
+        HttpResponseMessage Start() => Json(new { device_code = deviceCode, user_code = userCode, verification_uri = "https://github.com/login/device", expires_in = 900, interval = 5 });
+        HttpResponseMessage Authorized() => Json(new { access_token = Token, token_type = "bearer", scope = "repo" });
+        var store = new MemoryCloudTokenStore(null);
+        var verifying = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var verified = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new CloudTestHandler((request, _) => {
+            if (request.Url.EndsWith("/device/code")) return Task.FromResult(Start());
+            if (request.Url.EndsWith("/oauth/access_token")) return Task.FromResult(Authorized());
+            verifying.SetResult(); return verified.Task;
+        });
+        var client = Client(handler, store);
+        var start = Result(await client.Execute(Body(new { action = "startLogin" })));
+        var request = handler.Requests.Single();
+        check(request.Method == HttpMethod.Post && request.Url == "https://github.com/login/device/code", "Device login used an unexpected endpoint");
+        check(request.Body == "client_id=test-client-id&scope=repo" && request.Token is null && !request.Body.Contains("client_secret"), "Device login sent incorrect scopes or a secret");
+        check(start.GetProperty("userCode").GetString() == userCode && start.GetProperty("verificationUri").GetString() == "https://github.com/login/device", "Device login public instructions were lost");
+        check(!start.GetRawText().Contains(deviceCode) && !start.GetRawText().Contains(Token), "Device login exposed private authorization data");
+        var pending = Result(await client.Execute(Body(new { action = "pollLogin" })));
+        check(pending.GetProperty("pending").GetBoolean() && pending.GetProperty("interval").GetInt32() == 5 && handler.Requests.Count == 1, "Immediate device polling ignored the server interval");
+        check(store.WriteCount == 0 && store.Token is null, "Device login stored credentials before approval");
+
+        var cancelledStore = new MemoryCloudTokenStore(null);
+        var cancelVerifying = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancelVerified = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancelHandler = new CloudTestHandler((item, _) => {
+            if (item.Url.EndsWith("/device/code")) return Task.FromResult(Start());
+            if (item.Url.EndsWith("/oauth/access_token")) return Task.FromResult(Authorized());
+            cancelVerifying.SetResult(); return cancelVerified.Task;
+        });
+        var cancelled = Client(cancelHandler, cancelledStore);
+        await cancelled.Execute(Body(new { action = "startLogin" }));
+
+        var slowStore = new MemoryCloudTokenStore(null);
+        var slowHandler = new CloudTestHandler((item, _) => Task.FromResult(item.Url.EndsWith("/device/code") ? Start() : Json(new { error = "slow_down" })));
+        var slowClient = Client(slowHandler, slowStore);
+        await slowClient.Execute(Body(new { action = "startLogin" }));
+
+        var immediateHandler = new CloudTestHandler((_, _) => Task.FromResult(Start()));
+        var immediate = Client(immediateHandler, new MemoryCloudTokenStore(null));
+        await immediate.Execute(Body(new { action = "startLogin" }));
+        await immediate.Execute(Body(new { action = "cancelLogin" }));
+        await Fails(() => immediate.Execute(Body(new { action = "pollLogin" })), check, "Cancelled device login continued polling");
+        check(immediateHandler.Requests.Count == 1, "Cancelled login issued an OAuth token request");
+
+        await Task.Delay(5100);
+        var successPoll = client.Execute(Body(new { action = "pollLogin" }));
+        await verifying.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        check(store.Token is null && store.WriteCount == 0, "Candidate token was stored before account verification");
+        var exchange = handler.Requests[1];
+        check(exchange.Token is null && exchange.Body!.Contains("client_id=test-client-id") && exchange.Body.Contains("device_code=" + deviceCode) &&
+            exchange.Body.Contains("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code") && !exchange.Body.Contains("client_secret"), "OAuth token exchange omitted device grant data or included a secret");
+        check(handler.Requests[2].Url == "https://api.github.com/user" && handler.Requests[2].Token == Token, "Candidate token was not verified against the GitHub account");
+        verified.SetResult(User());
+        var success = Result(await successPoll);
+        check(success.GetProperty("authenticated").GetBoolean() && success.GetProperty("login").GetString() == "alice", "Approved device login did not complete");
+        check(store.Token == Token && store.WriteCount == 1 && !success.GetRawText().Contains(Token), "Approved login failed secure storage or exposed the token");
+
+        var cancelPoll = cancelled.Execute(Body(new { action = "pollLogin" }));
+        await cancelVerifying.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await cancelled.Execute(Body(new { action = "cancelLogin" }));
+        cancelVerified.SetResult(User());
+        await Fails(() => cancelPoll, check, "Account verification after login cancellation was accepted");
+        check(cancelledStore.Token is null && cancelledStore.WriteCount == 0, "Cancelled authorization persisted a candidate token");
+
+        var slow = Result(await slowClient.Execute(Body(new { action = "pollLogin" })));
+        check(slow.GetProperty("pending").GetBoolean() && slow.GetProperty("interval").GetInt32() == 10, "Device slow_down did not increase polling delay");
+        slow = Result(await slowClient.Execute(Body(new { action = "pollLogin" })));
+        check(slow.GetProperty("interval").GetInt32() == 10 && slowHandler.Requests.Count == 2 && slowStore.WriteCount == 0, "Device slow_down allowed an immediate request or persisted credentials");
     }
 
     private static async Task Failures(Action<bool, string> check) {
