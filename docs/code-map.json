@@ -66,6 +66,15 @@
       ]
     },
     {
+      "path": "src/features/cloud",
+      "purpose": "GitHub 登录与云文档界面",
+      "files": [
+        "src/features/cloud/client.ts",
+        "src/features/cloud/manager.ts",
+        "src/features/cloud/model.ts"
+      ]
+    },
+    {
       "path": "src/styles",
       "purpose": "视觉样式",
       "files": [
@@ -156,6 +165,17 @@
       ]
     },
     {
+      "path": "native/Cloud",
+      "purpose": "Windows GitHub 请求、凭据续期与云同步",
+      "files": [
+        "native/Cloud/CloudCredential.cs",
+        "native/Cloud/CloudDocuments.cs",
+        "native/Cloud/CloudModels.cs",
+        "native/Cloud/GitHubCloud.cs",
+        "native/Cloud/WindowsTokenStore.cs"
+      ]
+    },
+    {
       "path": "native/Preview",
       "purpose": "Windows HTML 运行与 Chrome 启动",
       "files": [
@@ -207,6 +227,15 @@
       "files": [
         "macos/Diagnostics/CloudTests.swift",
         "macos/Diagnostics/SmokeTests.swift"
+      ]
+    },
+    {
+      "path": "macos/Cloud",
+      "purpose": "macOS GitHub 请求、钥匙串凭据与云同步",
+      "files": [
+        "macos/Cloud/CloudCredentials.swift",
+        "macos/Cloud/CloudDocuments.swift",
+        "macos/Cloud/GitHubCloud.swift"
       ]
     },
     {

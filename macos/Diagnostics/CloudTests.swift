@@ -115,6 +115,33 @@ func runCloudCredentialTests() throws {
     try assertAuthenticated(result(retry, "status"))
     guard retries == 1 else { throw Store.failure("401 refresh retried more than once") }
 
+    let staleStore = TestCloudTokenStore(try stillFresh.encode())
+    var heldUsers: [(Result<Data, Error>) -> Void] = []
+    let staleCloud = GitHubCloud(store: staleStore, clientId: { "test_client_id" }, now: { time }) { request, complete in
+        if request.url?.host == "github.com" {
+            complete(GitHubCloud.responseData(status: 400, url: request.url, data: bytes(["error": "bad_refresh_token"])))
+        } else { DispatchQueue.main.async { heldUsers.append(complete) } }
+    }
+    var concurrentStatus: [String: [String: Any]] = [:]
+    var concurrentCalls: [String: Int] = [:]
+    for identifier in ["rejected-status", "late-status"] {
+        staleCloud.handle(["requestId": identifier, "action": "status"]) { response in
+            concurrentStatus[identifier] = response
+            concurrentCalls[identifier, default: 0] += 1
+        }
+    }
+    try wait { heldUsers.count == 2 }
+    heldUsers[0](.failure(CloudFailure("Unauthorized", status: 401)))
+    try wait { concurrentStatus["rejected-status"] != nil }
+    heldUsers[1](.success(bytes(["login": "octocat"])))
+    try wait { concurrentStatus["late-status"] != nil }
+    let statusAfterRejection = try result(staleCloud, "status")
+    guard (concurrentStatus["rejected-status"]?["data"] as? [String: Any])?["authenticated"] as? Bool == false,
+          concurrentStatus["late-status"]?["error"] is String,
+          (statusAfterRejection["data"] as? [String: Any])?["authenticated"] as? Bool == false,
+          concurrentCalls["rejected-status"] == 1, concurrentCalls["late-status"] == 1,
+          staleStore.value == nil else { throw Store.failure("Late user response revived invalidated login") }
+
     var owned = original
     owned.account = "octocat"
     let differentStore = TestCloudTokenStore(try owned.encode())
@@ -164,5 +191,5 @@ func runCloudCredentialTests() throws {
     _ = try result(cancelCloud, "cancelLogin")
     try wait { cancelledResponse != nil }
     guard cancelStore.value == originalEncoded, cancelStore.writes == 0 else { throw Store.failure("Late refresh changed cancelled authentication") }
-    print("PASS macOS cloud: legacy tokens, expiry, rotation, concurrent refresh, offline, invalid refresh, 401, account identity, logout and cancellation")
+    print("PASS macOS cloud: legacy tokens, expiry, rotation, concurrent refresh, offline, invalid refresh, 401, stale identity, account identity, logout and cancellation")
 }

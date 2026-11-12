@@ -257,8 +257,9 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
                 if let login = self.login, self.now().timeIntervalSince(self.verifiedAt) < 60 { completion(.success(login)); return }
                 self.api("user", token: token) { result in
                     do {
+                        let response = try result.get()
                         guard epoch == self.generation else { throw CloudFailure("账号连接已更改，请重试。") }
-                        let owner = try self.accountName(result.get())
+                        let owner = try self.accountName(response)
                         if let expected = self.credentials?.account, expected.caseInsensitiveCompare(owner) != .orderedSame {
                             self.clearCredentials(); throw CloudFailure("GitHub 账号与已保存的登录信息不同，请重新登录。", status: 401)
                         }
@@ -270,16 +271,17 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
         }
     }
 
-    private func invalidatePendingAuthentication() {
+    private func invalidatePendingAuthentication(_ error: Error = CloudFailure("账号连接已更改，请重试。")) {
         generation += 1
         let callbacks = refreshCallbacks
         refreshCallbacks = []; refreshInProgress = nil
-        callbacks.forEach { $0(.failure(CloudFailure("账号连接已更改，请重试。"))) }
+        callbacks.forEach { $0(.failure(error)) }
     }
 
     private func clearCredentials() {
         credentials = nil; credentialsNeedPersistence = false; login = nil; verifiedAt = .distantPast
         try? store.remove()
+        invalidatePendingAuthentication(CloudFailure("GitHub 登录已失效，请重新登录。", status: 401))
     }
 
     private func persistCredentials() throws {
@@ -318,7 +320,6 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
                 let json = try result.get()
                 if let error = json["error"] as? String {
                     if error == "bad_refresh_token" || error == "invalid_grant" || error == "expired_token" {
-                        self.clearCredentials()
                         throw CloudFailure("GitHub 登录已过期，请重新登录。", status: 401)
                     }
                     throw CloudFailure("暂时无法续期 GitHub 登录，请稍后重试。")
@@ -334,7 +335,7 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
                     do {
                         let owner = try result.get()
                         if let expected = candidate.account, expected.caseInsensitiveCompare(owner) != .orderedSame {
-                            self.clearCredentials(); throw CloudFailure("GitHub 账号与已保存的登录信息不同，请重新登录。", status: 401)
+                            throw CloudFailure("GitHub 账号与已保存的登录信息不同，请重新登录。", status: 401)
                         }
                         candidate.account = owner
                         self.credentials = candidate; self.credentialsNeedPersistence = true; self.login = owner; self.verifiedAt = self.now()
