@@ -10,7 +10,10 @@
 - 配置提交 `8d3fd7ab0db03419592b4830d654a7b2b36fce42` 的 Actions `43195222177` 两平台全部通过。
 - 本轮复核增加两端 OAuth 令牌自动续期：读取有效期、并发合并刷新、轮换后的安全持久化、401 一次重试、旧令牌兼容、账号核对和退出后的迟到响应保护。模拟错误不代表已完成真实账号授权。
 - 修复重开云窗口后旧目录显示残留的问题。目录读取失败时禁止保存和建文件夹，刷新成功后恢复。
-- 本轮生产构建、25 项单元测试、247 项 Windows 原生检查、55 项浏览器交互测试、真实 Windows WebView2 回归通过。新增 Swift 续期代码与模拟回归等待对应提交的 Actions，不能沿用上一提交的 macOS 结果。
+- 本轮生产构建、25 项单元测试、247 项 Windows 原生检查、55 项浏览器交互测试、真实 Windows WebView2 回归通过。
+- 最终代码提交 `6d68b3215c7f37cc196d792443fdb8ddd88d60aa`，Actions `43204294699` 的 Windows 与 macOS 全部成功。macOS 实际验证 Intel/Apple Silicon 通用构建、云凭据轮换与迟到身份响应、同步存储、WKWebView、HTML 和 PDF；Windows 包含安装升级和文件关联检查。
+- 验证过程中修复 macOS 异步测试入口：云回归仅在 `--self-test`、AppKit 主循环启动前执行，避免在 WebView 主队列回调内嵌套等待。原有 `--smoke` 同步存储、HTML、界面及 PDF 测试仍保留并通过。
+- 独立 Windows 验证程序位于忽略目录 `release/cloud-verification/app/`，使用单独的 `profile/`。真实 GitHub Device Flow 已由该程序发起，浏览器停在用户账号确认页；尚未批准授权、创建云仓库或写入真实文件。现有 `D:\Moye` 安装和用户文档未更改。
 - 免费个人开发证书仍需用户的 Mac、Xcode 和 Apple Account；操作与核对步骤单独保存在 `docs/mac-signing.md`，未购买开发者计划、未创建或导出证书。
 
 - 内部版本 4.0.0，用户界面版本 Rev v1.0.0。旧版更新器严格校验 vSemVer 标签及安装器名称，因此保留递增的内部版本与兼容下载名。
