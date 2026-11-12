@@ -367,7 +367,12 @@ extension NSSavePanel {
 enum MoyeMain {
     static func main() {
         if CommandLine.arguments.contains("--self-test") {
-            do { try runStoreTests(); exit(0) } catch { fputs("FAIL \(error)\n", stderr); exit(1) }
+            do {
+                try runStoreTests()
+                // Async cloud tests must run before AppKit owns the main dispatch queue.
+                try runCloudCredentialTests()
+                exit(0)
+            } catch { fputs("FAIL \(error)\n", stderr); exit(1) }
         }
         let application = NSApplication.shared, delegate = AppDelegate()
         application.setActivationPolicy(.regular); application.delegate = delegate
