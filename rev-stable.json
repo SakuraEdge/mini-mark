@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 2,
+  "version": "4.0.1",
+  "releaseVersion": "1.0.1",
+  "tag": "rev-v1.0.1",
+  "windows": {
+    "url": "https://github.com/SakuraEdge/mini-mark/releases/download/rev-v1.0.1/MiniMark-Rev-1.0.1-Setup-windows-x64.exe",
+    "sha256": "692343913b6158e8492267e96deb095159a3a15452fa5a0fb0c8858bb861265b",
+    "size": 55271575
+  }
+}
