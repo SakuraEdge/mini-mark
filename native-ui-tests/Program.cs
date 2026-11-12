@@ -8,7 +8,7 @@ internal static class Program {
         var folder = Path.Combine(Path.GetTempPath(), "moye-ui-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         Environment.SetEnvironmentVariable("MOYE_DATA_DIR", folder);
-        Environment.SetEnvironmentVariable("MINIMARK_GITHUB_CLIENT_ID", "");
+        Environment.SetEnvironmentVariable("MINIMARK_GITHUB_CLIENT_ID", " ");
         var tokenStore = new WindowsTokenStore(folder);
         try {
             if (tokenStore.Read() is not null) throw new Exception("Isolated cloud credential target was not empty");
