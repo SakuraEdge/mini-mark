@@ -16,6 +16,8 @@
 
 正常的 `release.yml` 不生成过渡附件，也不发布 `v4.x` 等内部版本 Release。不要再次运行过渡工作流恢复已经清理的端点。
 
+2026-11-13 已确认本机升级并完成过渡清理：删除兼容 Release，旧 `stable.json` 与 `rev-stable.json` 均为 schema 2，一次性过渡工作流已手动停用。
+
 ## 验证
 
 `npm test` 覆盖 Rev 版本与清单生成；`test:native` 和 macOS 原生自测覆盖 schema、路径、哈希与防降级；`tests/updates.spec.ts` 覆盖同主版本静默、Rev 2 弹窗、偏好迁移和下载取消。发布后核对 6 个附件及 `rev-stable.json`。安装器不超过 256 MiB。
