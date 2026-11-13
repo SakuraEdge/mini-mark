@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     var activeIndex: Int { session.documents.firstIndex { $0.id == session.activeId } ?? 0 }
     var smokeStarted = false
     var smokeDataStoreID: UUID?
+    var smokeRestoreWeb: WKWebView?
     var smokeOutput: URL? {
         guard let index = CommandLine.arguments.firstIndex(of: "--smoke"), index + 1 < CommandLine.arguments.count else { return nil }
         return URL(fileURLWithPath: CommandLine.arguments[index + 1], isDirectory: true)

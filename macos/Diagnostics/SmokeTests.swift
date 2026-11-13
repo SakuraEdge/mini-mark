@@ -212,6 +212,10 @@ extension AppDelegate {
         web?.navigationDelegate = nil
         web?.uiDelegate = nil
         web = nil
+        smokeRestoreWeb?.stopLoading()
+        smokeRestoreWeb?.navigationDelegate = nil
+        smokeRestoreWeb?.uiDelegate = nil
+        smokeRestoreWeb = nil
         DispatchQueue.main.async {
             WKWebsiteDataStore.remove(forIdentifier: identifier) { cleanupError in
                 DispatchQueue.main.async { finish(cleanupError) }

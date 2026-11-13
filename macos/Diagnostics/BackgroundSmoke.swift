@@ -106,10 +106,10 @@ extension AppDelegate {
         config.setURLSchemeHandler(AppScheme(root: root), forURLScheme: "moye")
         config.userContentController.addUserScript(WKUserScript(source: "window.chrome = { webview: { addEventListener() {}, postMessage() {} } };",
                                                                injectionTime: .atDocumentStart, forMainFrameOnly: true))
-        let restored = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: config)
-        restored.load(URLRequest(url: URL(string: "moye://app/index.html")!))
+        smokeRestoreWeb = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: config)
+        smokeRestoreWeb?.load(URLRequest(url: URL(string: "moye://app/index.html")!))
         func poll(_ remaining: Int) {
-            restored.evaluateJavaScript("""
+            self.smokeRestoreWeb?.evaluateJavaScript("""
             (() => {
               const image = document.querySelector('#theme-background');
               const ok = !!image && !image.hidden && image.complete && image.naturalWidth === 8 &&
@@ -124,10 +124,12 @@ extension AppDelegate {
             })()
             """) { value, error in
                 if let response = value as? [String: Any], response["ok"] as? Bool == true {
-                    restored.stopLoading()
+                    self.smokeRestoreWeb?.stopLoading()
+                    self.smokeRestoreWeb = nil
                     self.removeSmokeBackground(completion)
                 } else if remaining == 0 {
-                    restored.stopLoading()
+                    self.smokeRestoreWeb?.stopLoading()
+                    self.smokeRestoreWeb = nil
                     completion(Store.failure("Background restore: \(error.map { String(describing: $0 as NSError) } ?? String(describing: value))"))
                 } else { DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { poll(remaining - 1) } }
             }
