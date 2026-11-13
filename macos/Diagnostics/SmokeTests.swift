@@ -216,11 +216,16 @@ extension AppDelegate {
         smokeRestoreWeb?.navigationDelegate = nil
         smokeRestoreWeb?.uiDelegate = nil
         smokeRestoreWeb = nil
-        DispatchQueue.main.async {
+        func cleanup(_ attempt: Int) {
             WKWebsiteDataStore.remove(forIdentifier: identifier) { cleanupError in
-                DispatchQueue.main.async { finish(cleanupError) }
+                if cleanupError != nil && attempt < 20 {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { cleanup(attempt + 1) }
+                } else {
+                    DispatchQueue.main.async { finish(cleanupError) }
+                }
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { finish(Store.failure("Isolated WK smoke storage cleanup timed out")) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { cleanup(0) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) { finish(Store.failure("Isolated WK smoke storage cleanup timed out")) }
     }
 }
