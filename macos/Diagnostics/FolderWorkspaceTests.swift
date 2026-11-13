@@ -51,7 +51,12 @@ func runFolderWorkspaceTests() throws {
     guard let first = workspace.root else { throw Store.failure("Folder selection did not activate") }
     let rows = try entries(selected)
     try require((selected["root"] as? [String: Any])?["id"] as? String == first.id && selected["path"] as? String == "", "Selected folder metadata missing")
-    try require(rows.prefix(3).allSatisfy { $0["type"] as? String == "directory" } && rows[0]["name"] as? String == "aFolder", "Folders are not sorted first")
+    let actualRows = rows.map { row in
+        "\(row["name"] as? String ?? "?"):\(row["type"] as? String ?? "?"):supported=\(row["supported"] as? Bool ?? false)"
+    }.joined(separator: ", ")
+    try require(rows.prefix(3).allSatisfy { $0["type"] as? String == "directory" } &&
+                rows.prefix(3).compactMap { $0["name"] as? String } == ["aFolder", "BFolder", "directory.md"],
+                "Folders are not sorted first: " + actualRows)
     for name in [".hidden.md", "config.YAML", "page.html", "plain.txt"] {
         try require(rows.contains { $0["name"] as? String == name && $0["supported"] as? Bool == true }, "Supported or hidden workspace file missing")
     }

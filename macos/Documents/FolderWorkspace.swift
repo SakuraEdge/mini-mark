@@ -185,8 +185,8 @@ final class FolderWorkspace {
         }
         entries.sort {
             if $0.directory != $1.directory { return $0.directory }
-            let order = $0.name.compare($1.name, options: [.caseInsensitive, .literal], locale: Locale(identifier: "en_US_POSIX"))
-            return order == .orderedSame ? $0.name.compare($1.name, options: .literal) == .orderedAscending : order == .orderedAscending
+            let left = $0.name.lowercased().utf8, right = $1.name.lowercased().utf8
+            return left.elementsEqual(right) ? $0.name.utf8.lexicographicallyPrecedes($1.name.utf8) : left.lexicographicallyPrecedes(right)
         }
         let start = min(offset, entries.count), end = min(start + Self.pageSize, entries.count)
         var result: [String: Any] = ["root": root.message, "path": path, "entries": entries[start..<end].map(\.message)]
