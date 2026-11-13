@@ -192,8 +192,9 @@ extension AppDelegate {
     func smokeFinish(_ error: Error?) {
         confirmedClose = true
         if let error = error {
-            fputs("FAIL \(error.localizedDescription)\n", stderr)
-            if let output = smokeOutput { try? error.localizedDescription.write(to: output.appendingPathComponent("error.txt"), atomically: true, encoding: .utf8) }
+            let details = String(describing: error as NSError)
+            fputs("FAIL \(details)\n", stderr)
+            if let output = smokeOutput { try? details.write(to: output.appendingPathComponent("error.txt"), atomically: true, encoding: .utf8) }
             exit(1)
         }
         print("PASS macOS native smoke")

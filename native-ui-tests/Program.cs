@@ -220,9 +220,22 @@ internal static class Program {
                 await Wait("document.getElementById('document-name').textContent.startsWith('未命名') && !document.getElementById('app').classList.contains('transition-pending')", "Automatic title draft not created");
                 await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('.cm-content').focus();document.execCommand('insertText',false,'# Native auto title')");
                 await Wait("document.getElementById('document-name').textContent === 'Native auto title.md'", "First H1 did not update native draft title");
-                await Task.Delay(850);
-                var autoDraft = DocumentWorkspace.Restore(session, Path.Combine(folder, "draft.json")).Active;
-                if (autoDraft.Name != "Native auto title.md" || autoDraft.AutoName != true) throw new Exception("Native auto title did not persist");
+                OpenDocument? autoDraft = null;
+                var lastSession = "";
+                string? persistenceError = null;
+                var persistenceWait = System.Diagnostics.Stopwatch.StartNew();
+                while (persistenceWait.Elapsed < TimeSpan.FromSeconds(10)) {
+                    try {
+                        lastSession = File.ReadAllText(session);
+                        var persisted = JsonSerializer.Deserialize<WorkspaceSession>(lastSession);
+                        autoDraft = persisted?.Documents.Find(document => document.Id == persisted.ActiveId);
+                        persistenceError = null;
+                    } catch (Exception error) when (error is IOException or JsonException) { persistenceError = error.Message; }
+                    if (autoDraft?.Name == "Native auto title.md" && autoDraft.AutoName == true) break;
+                    await Task.Delay(50);
+                }
+                if (autoDraft?.Name != "Native auto title.md" || autoDraft.AutoName != true)
+                    throw new Exception($"Native auto title did not persist (read error: {persistenceError ?? "none"}; final session: {lastSession})");
                 await Rename(".document-tab.active .tab-select", "Manual title");
                 await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('.cm-content').focus();document.execCommand('selectAll');document.execCommand('insertText',false,'# Ignored title after manual rename')");
                 await Wait("document.getElementById('document-name').textContent === 'Manual title.md' && document.querySelector('.cm-content').textContent.includes('Ignored title')", "Manual rename failed to disable auto naming");
