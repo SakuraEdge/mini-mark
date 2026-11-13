@@ -10,9 +10,14 @@
     <Compile Include="../native/Cloud/CloudCredential.cs" Link="CloudCredential.cs" />
     <Compile Include="../native/Cloud/GitHubCloud.cs" Link="GitHubCloud.cs" />
     <Compile Include="../native/Cloud/GitHubCloud.Delete.cs" Link="GitHubCloud.Delete.cs" />
+    <Compile Include="../native/Cloud/GitHubCloud.TreeMutation.cs" Link="GitHubCloud.TreeMutation.cs" />
+    <Compile Include="../native/Cloud/GitHubCloud.Rename.cs" Link="GitHubCloud.Rename.cs" />
     <Compile Include="../native/Cloud/CloudDeletionWorkspace.cs" Link="CloudDeletionWorkspace.cs" />
+    <Compile Include="../native/Cloud/CloudRenameWorkspace.cs" Link="CloudRenameWorkspace.cs" />
     <Compile Include="../native/Documents/DocumentStore.cs" Link="DocumentStore.cs" />
     <Compile Include="../native/Documents/DocumentWorkspace.cs" Link="DocumentWorkspace.cs" />
+    <Compile Include="../native/Documents/DocumentNames.cs" Link="DocumentNames.cs" />
+    <Compile Include="../native/Documents/DocumentRenaming.cs" Link="DocumentRenaming.cs" />
     <Compile Include="../native/Documents/ImageAssets.cs" Link="ImageAssets.cs" />
     <Compile Include="../native/Preview/HtmlResources.cs" Link="HtmlResources.cs" />
     <Compile Include="../native/Updates/GitHubUpdates.cs" Link="GitHubUpdates.cs" />

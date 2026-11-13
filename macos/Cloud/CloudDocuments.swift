@@ -36,6 +36,7 @@ extension AppDelegate {
             if type == "cloudDetach" {
                 let name = self.session.documents[index].name
                 self.session.documents[index].cloud = nil
+                self.session.documents[index].autoName = false
                 if self.session.documents[index].path == nil { self.session.documents[index].untitledName = name }
                 self.publish(); self.persist(); done(.success(())); return
             }
@@ -59,11 +60,12 @@ extension AppDelegate {
                         guard let raw = response["text"] as? String else { throw Store.failure("云文档内容缺失。") }
                         let text = Store.normalize(raw)
                         let doc = Document(untitledName: URL(fileURLWithPath: path).lastPathComponent, text: text, baseline: "",
-                                           cloud: CloudBinding(owner: owner, path: path, sha: sha, baseline: text))
+                                           cloud: CloudBinding(owner: owner, path: path, sha: sha, baseline: text), autoName: false)
                         self.session.documents.append(doc); self.session.activeId = doc.id
                     } else {
                         guard let current = self.session.documents.firstIndex(where: { $0.id == documentId }) else { throw Store.failure("文档已关闭。") }
                         self.session.documents[current].cloud = CloudBinding(owner: owner, path: path, sha: sha, baseline: snapshot.text)
+                        self.session.documents[current].autoName = false
                     }
                     self.persist(); self.publish(); done(.success(()))
                 } catch { done(.failure(error)) }
@@ -90,7 +92,7 @@ extension AppDelegate {
                 let document = self.session.documents[index]
                 self.persist(); self.title()
                 self.post(["type": "saved", "documentId": id, "name": document.name, "path": document.path as Any? ?? NSNull(),
-                           "cloud": document.cloud!.message, "text": snapshot.text])
+                           "cloud": document.cloud!.message, "autoName": false, "text": snapshot.text])
                 completion(.success(()))
             } catch { completion(.failure(error)) }
         }

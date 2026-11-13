@@ -14,6 +14,7 @@ src/
   platform/            前端与原生宿主的消息桥、浏览器预览文件操作
   features/updates/    检测更新界面、版本比较、提醒偏好
   features/cloud/      GitHub 登录、目录浏览、云文档选择与请求协议
+  features/documents/  文档右键菜单与重命名交互
   features/theme/      主题偏好与渐变切换
   features/images/     图片插入、粘贴与拖入
   features/formulas/   按需加载的公式编辑器、Office 公式转换与复制
@@ -54,6 +55,7 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 | 按钮、菜单、快捷键 | `src/ui/layout.ts`、`src/app/main.ts` |
 | 新建、标签切换、脏状态 | `src/app/main.ts`、`src/documents/workspace.ts` |
 | 文档打开与保存 | `src/platform/bridge.ts`、`native/Host/MainWindow.cs`、`native/Documents/` |
+| 重命名与首行 H1 命名 | `src/documents/naming.ts`、`src/features/documents/rename.ts`、两平台 `Documents/DocumentNames` |
 | 中文命令与输入法 | `src/editor/commands.ts`、`src/editor/editor.ts` |
 | Markdown、YAML、公式、代码高亮 | `src/markdown/render.ts`、`src/editor/editor.ts`、`src/documents/formats.ts` |
 | PDF、HTML 导出 | `src/markdown/export.ts`、两平台的 `Export/` |
@@ -66,6 +68,7 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 | 文字选区 | `src/editor/editor.ts` 使用原生选区；`src/styles/app.css` 的 `::selection` 在有背景的代码行上仍可见 |
 | 更新、提醒、下载 | `src/features/updates/`、两平台的 `Updates/`、`docs/updates-development.md` |
 | GitHub 登录与云文档 | `src/features/cloud/`、两平台的 `Cloud/`、`docs/cloud-development.md` |
+| macOS 网页确认框 | `macos/Host/ScriptDialogs.swift`；主编辑器可信主框架才显示，HTML 预览不继承此权限 |
 | macOS 个人开发签名 | `docs/mac-signing.md`、`scripts/package-mac.sh`；免费开发证书不用于公开分发身份 |
 | 文档类型图标 | `public/document-icons/`、`scripts/document-icons.mjs`、`installer/Moye.iss`、`macos/Info.plist` |
 | 数据盘、单实例 | `native/Infrastructure/` |
@@ -83,6 +86,10 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 标题快捷键由 `src/editor/editor.ts` 以单次 CodeMirror 事务处理，当前行或选中行一起变更，并跳过代码围栏；选中可编辑行已经全部处于目标标题等级时，再按同一快捷键恢复正文。YAML 文档和阅读模式不会响应。标题跨度采用内联排版，换行高度由浏览器计算，不固定跨度高度；对应回归在 `tests/editor.spec.ts`。
 
 未命名文档从 1 开始寻找当前标签中尚未占用的编号，不沿用持久化会话的历史计数。浏览器、Windows 和 macOS 的命名入口分别在 `src/documents/workspace.ts`、`native/Documents/DocumentWorkspace.cs`、`macos/App/Main.swift`。
+
+`autoName` 随会话持久化，仅新建的未命名 Markdown 草稿启用。第一行非空 H1 自动生成 `.md` 名称；非 H1 保持最后名称。手动重命名、保存、云绑定或解绑后禁用。旧会话缺少此字段时只识别标准“未命名”名称。自动名称不增加正文 `revision`，不能改变撤销记录。编辑快照的 `autoTitle` 仅在自动命名仍启用且当前没有 H1 时作为合法名称提示，避免去抖间隔内输入后删除 H1 导致名称回退。
+
+`renameDocument` 携带当前活动文档快照，以及独立的 `targetId`、`name`。不能把活动正文写进右键选中的非活动标签。改名完成后发布工作区和操作完成回执；失败保留正文、基线和原位置，不覆盖同名目标。输入框与右键菜单独立于平台原生弹窗。
 
 实际数据目录由 `MOYE_DATA_DIR`（开发覆盖）、当前用户注册表 `Software\Moye\DataDirectory` 或默认 AppData 决定。测试必须使用隔离目录，不改写实际用户会话。
 

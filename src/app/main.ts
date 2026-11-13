@@ -10,6 +10,7 @@ import { sample } from '../documents/sample';
 import { documentLanguage, formatLabel, type DocumentLanguage } from '../documents/formats';
 import { htmlTemplate, openBrowserPreview } from '../features/html/preview';
 import { normalizeText } from '../documents/workspace';
+import { canAutoName, headingDocumentName } from '../documents/naming';
 import { APP_DISPLAY_VERSION, initializeUpdates, openUpdates, scheduleUpdateCheck, handleUpdateMessage } from '../features/updates/updates';
 import { initializeTheme, toggleTheme } from '../features/theme/theme';
 import { initializeImages, handleImageMessage } from '../features/images/images';
@@ -18,6 +19,7 @@ import { initializeFormulas } from '../features/formulas/formulas';
 import { handleFormulaMessage } from '../features/formulas/clipboard';
 import { initializeCloud } from '../features/cloud/manager';
 import type { CloudBinding } from '../features/cloud/model';
+import { initializeRename } from '../features/documents/rename';
 import '../styles/app.css';
 
 const app = mountApp(isDesktop, APP_DISPLAY_VERSION);
@@ -28,6 +30,7 @@ let name = '未命名.md';
 let language: DocumentLanguage = 'markdown';
 let baseline = '';
 let fileOnDisk = false;
+let autoName = false;
 let cloudBinding: CloudBinding | null = null;
 let cloudOperation: { resolve(): void; reject(error: Error): void } | undefined;
 let loading = false;
@@ -68,6 +71,17 @@ const view = createEditor(document.querySelector('#editor')!, (update) => {
     if (mode === 'split') {
       clearTimeout(previewTimer);
       previewTimer = setTimeout(refreshPreview, 90);
+    }
+    if (!loading && autoName && !fileOnDisk && !cloudBinding && language === 'markdown') {
+      const headingName = headingDocumentName(text);
+      if (headingName && headingName !== name) {
+        name = headingName;
+        const tab = tabs.find(item => item.id === activeId);
+        if (tab) tab.name = name;
+        document.querySelector('#document-name')!.textContent = name;
+        document.querySelector('#sidebar-filename')!.textContent = name;
+        document.querySelector('#current-file')!.setAttribute('title', name);
+      }
     }
     updateSaved(text);
     if (!loading) {
@@ -116,6 +130,13 @@ const cloudActions = initializeCloud({
     cloudBinding?.owner.toLowerCase() === owner.toLowerCase() && cloudBinding.path === cloudPath ? 'save' : 'cloudBind', { owner, cloudPath }),
   detachDocument: () => cloudDocumentAction('cloudDetach'),
 });
+const renameActions = initializeRename({
+  document: id => tabs.find(tab => tab.id === id),
+  rename: (targetId, nextName) => cloudDocumentAction('renameDocument', { targetId, name: nextName }),
+  disabled: () => transitionPending || view.composing,
+  restoreFocus: () => { if (mode !== 'read') view.focus(); },
+});
+renameActions.bind(document.querySelector<HTMLElement>('#current-file')!, () => activeId);
 
 function cloudDocumentAction(type: string, payload: Record<string, unknown> = {}) {
   if (!activeId || transitionPending || cloudOperation) return Promise.reject(new Error('当前操作尚未完成，请稍候。'));
@@ -136,7 +157,10 @@ function updateSaved(text = view.state.doc.toString()) {
   renderTabs();
 }
 
-function snapshotCurrent() { return { documentId: activeId, revision, text: view.state.doc.toString() }; }
+function snapshotCurrent() {
+  const autoTitle = autoName && !fileOnDisk && !cloudBinding ? name : undefined;
+  return { documentId: activeId, revision, text: view.state.doc.toString(), ...(autoTitle ? { autoTitle } : {}) };
+}
 function setTransitionPending(pending: boolean, keepEditable = false) {
   transitionPending = pending;
   setEditorEditable(view, !pending || keepEditable);
@@ -146,7 +170,7 @@ function cacheCurrent() {
   if (!activeId) return;
   const previous = documents.get(activeId);
   documents.set(activeId, {
-    document: { id: activeId, name, text: view.state.doc.toString(), baseline, revision, path: previous?.document.path, cloud: cloudBinding },
+    document: { id: activeId, name, text: view.state.doc.toString(), baseline, revision, path: previous?.document.path, cloud: cloudBinding, autoName },
     state: view.state,
     mode,
     language,
@@ -181,6 +205,7 @@ function renderTabs() {
       close.innerHTML = icon('x');
       close.addEventListener('click', () => nativeAction('closeTab', { targetId: tab.id }));
       item.append(button, dot, close);
+      renameActions.bind(button, () => tab.id);
       tabsContainer.insertBefore(item, tabIndicator);
       tabElements.set(tab.id, item);
       createIcons({ icons: { X }, root: item, attrs: { 'stroke-width': 1.65 } });
@@ -469,7 +494,8 @@ connect((message) => {
     const current = localIsNewer ? cached.document : doc;
     activeId = doc.id;
     setImageDocument(doc.id + ':' + (doc.path ?? ''));
-    name = doc.name;
+    autoName = canAutoName(doc);
+    name = autoName ? headingDocumentName(current.text) ?? doc.name : doc.name;
     fileOnDisk = Boolean(doc.path);
     cloudBinding = doc.cloud ?? null;
     baseline = doc.baseline;
@@ -484,7 +510,7 @@ connect((message) => {
       if (cached.language !== language) setEditorLanguage(view, language);
     } else replaceDocument(view, current.text, mode, language);
     documents.set(doc.id, {
-      document: { ...current, name: doc.name, path: doc.path, cloud: cloudBinding, baseline },
+      document: { ...current, name, path: doc.path, cloud: cloudBinding, baseline, autoName },
       state: view.state,
       mode,
       language,
@@ -493,6 +519,8 @@ connect((message) => {
     });
     applyFont();
     loading = false;
+    const activeTab = tabs.find(tab => tab.id === activeId);
+    if (activeTab) { activeTab.name = name; activeTab.autoName = autoName; }
     document.querySelector('#document-name')!.textContent = name;
     document.querySelector('#sidebar-filename')!.textContent = name;
     document.querySelector('#current-file')!.setAttribute('title', doc.path || name);
@@ -522,11 +550,11 @@ connect((message) => {
     })));
   } else if (message.type === 'saved') {
     const cached = documents.get(message.documentId);
-    if (cached) Object.assign(cached.document, { name: message.name, path: message.path, cloud: message.cloud, baseline: message.text });
+    if (cached) Object.assign(cached.document, { name: message.name, path: message.path, cloud: message.cloud, baseline: message.text, autoName: false });
     const tab = tabs.find(tab => tab.id === message.documentId);
-    if (tab) Object.assign(tab, { name: message.name, path: message.path, cloud: message.cloud, dirty: cached ? cached.document.text !== message.text : false });
+    if (tab) Object.assign(tab, { name: message.name, path: message.path, cloud: message.cloud, autoName: false, dirty: cached ? cached.document.text !== message.text : false });
     if (message.documentId === activeId) {
-      name = message.name; baseline = message.text; fileOnDisk = Boolean(message.path); cloudBinding = message.cloud ?? null;
+      name = message.name; baseline = message.text; fileOnDisk = Boolean(message.path); cloudBinding = message.cloud ?? null; autoName = false;
       setImageDocument(activeId + ':' + (message.path ?? ''));
       const nextLanguage = documentLanguage(name);
       if (nextLanguage !== language) {

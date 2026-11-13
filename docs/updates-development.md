@@ -16,6 +16,8 @@
 
 正常的 `release.yml` 不生成过渡附件，也不发布 `v4.x` 等内部版本 Release。不要再次运行过渡工作流恢复已经清理的端点。
 
+Rev v1.0.2 起，正常发布同时更新 `rev-stable.json` 和旧名称 `stable.json`，两者内容都是同一份 schema 2 清单。
+
 2026-11-13 已确认本机升级并完成过渡清理：删除兼容 Release，旧 `stable.json` 与 `rev-stable.json` 均为 schema 2，一次性过渡工作流已手动停用。
 
 ## 验证

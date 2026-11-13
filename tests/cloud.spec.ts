@@ -11,6 +11,8 @@ interface MockOptions {
   delayedSave?: boolean;
   failRootListAt?: number;
   failFolderListOnce?: string;
+  copyCodeFails?: boolean;
+  delayedCopyCode?: boolean;
 }
 
 async function mockHost(page: Page, options: MockOptions = {}) {
@@ -54,6 +56,14 @@ async function mockHost(page: Page, options: MockOptions = {}) {
           if (message.action === 'startLogin') {
             if (options.configured === false) emit({ type: 'cloudResponse', requestId: message.requestId, error: '此版本尚未配置 GitHub 登录。' });
             else respond({ userCode: 'ABCD-1234', verificationUri: 'https://github.com/login/device', interval: 5, expiresIn: 900 });
+          }
+          if (message.action === 'copyAuthorizationCode') {
+            const complete = () => {
+              if (options.copyCodeFails) emit({ type: 'cloudResponse', requestId: message.requestId, error: '剪贴板暂不可用。' });
+              else respond({ copied: true });
+            };
+            if (options.delayedCopyCode) Object.assign(window, { __completeCodeCopy: complete });
+            else complete();
           }
           if (message.action === 'pollLogin') {
             if (options.pendingLogin) respond({ pending: true, interval: 10 });
@@ -157,6 +167,59 @@ test('pending authorization honors slower polling and cancellation', async ({ pa
   expect((await cloudMessages(page)).some(message => message.action === 'cancelLogin')).toBe(true);
   await openCloud(page);
   await expect(page.getByRole('button', { name: '登录 GitHub', exact: true })).toBeEnabled();
+});
+
+test('authorization code is copied in full before opening GitHub and can be selected and recopied', async ({ page }) => {
+  await mockHost(page, { authenticated: false, pendingLogin: true });
+  await openCloud(page);
+  await page.getByRole('button', { name: '登录 GitHub', exact: true }).click();
+  await expect(page.locator('#cloud-status')).toContainText('授权码已复制');
+  const sent = await cloudMessages(page);
+  const copyIndex = sent.findIndex(message => message.action === 'copyAuthorizationCode');
+  const openIndex = sent.findIndex(message => message.type === 'openExternal');
+  expect(copyIndex).toBeGreaterThanOrEqual(0);
+  expect(openIndex).toBeGreaterThan(copyIndex);
+  expect(sent[copyIndex].code).toBe('ABCD-1234');
+  await page.locator('#cloud-user-code').click();
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('ABCD-1234');
+  await page.getByRole('button', { name: '复制授权码', exact: true }).click();
+  await expect.poll(async () => (await cloudMessages(page)).filter(message => message.action === 'copyAuthorizationCode').length).toBe(2);
+});
+
+test('copy failure is nonfatal and cancelling a pending copy never opens a stale authorization page', async ({ page }) => {
+  await mockHost(page, { authenticated: false, pendingLogin: true, copyCodeFails: true });
+  await openCloud(page);
+  await page.getByRole('button', { name: '登录 GitHub', exact: true }).click();
+  await expect(page.locator('#cloud-status')).toContainText('复制失败');
+  expect((await cloudMessages(page)).some(message => message.type === 'openExternal')).toBe(true);
+  await expect(page.getByRole('button', { name: '复制授权码', exact: true })).toBeEnabled();
+});
+
+test('cancelled authorization copy ignores late success', async ({ page }) => {
+  await mockHost(page, { authenticated: false, pendingLogin: true, delayedCopyCode: true });
+  await openCloud(page);
+  await page.getByRole('button', { name: '登录 GitHub', exact: true }).click();
+  await expect.poll(async () => (await cloudMessages(page)).some(message => message.action === 'copyAuthorizationCode')).toBe(true);
+  await page.getByRole('button', { name: '取消登录', exact: true }).click();
+  await page.evaluate(() => (window as any).__completeCodeCopy());
+  await expect(page.locator('#cloud-status')).toHaveText('已取消登录。');
+  expect((await cloudMessages(page)).some(message => message.type === 'openExternal')).toBe(false);
+  await expect(page.getByRole('button', { name: '登录 GitHub', exact: true })).toBeEnabled();
+});
+
+test('authorization code and copy controls fit desktop and narrow windows', async ({ page }, testInfo) => {
+  await mockHost(page, { authenticated: false, pendingLogin: true });
+  await openCloud(page);
+  await page.getByRole('button', { name: '登录 GitHub', exact: true }).click();
+  await expect(page.locator('#cloud-status')).toContainText('授权码已复制');
+  for (const width of [1180, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(page.getByRole('button', { name: '复制授权码', exact: true })).toBeVisible();
+    const bounds = await page.locator('#cloud-dialog').evaluate(element => ({ scroll: element.scrollWidth, width: element.clientWidth, right: element.getBoundingClientRect().right }));
+    expect(bounds.scroll).toBeLessThanOrEqual(bounds.width);
+    expect(bounds.right).toBeLessThanOrEqual(width);
+    await page.screenshot({ path: testInfo.outputPath(`cloud-authorization-${width}.png`) });
+  }
 });
 
 test('browse nested directory and open cloud file without replacing the local tab', async ({ page }) => {

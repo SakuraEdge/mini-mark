@@ -6,6 +6,11 @@ namespace Moye;
 public sealed record CloudBinding(string Owner, string Path, string? Sha, string Baseline);
 public sealed record CloudFile(string Path, string Sha, string Text);
 public sealed record CloudWrite(string Path, string Sha);
+public sealed record CloudRename(
+    [property: System.Text.Json.Serialization.JsonPropertyName("path")] string Path,
+    [property: System.Text.Json.Serialization.JsonPropertyName("previousPath")] string PreviousPath,
+    [property: System.Text.Json.Serialization.JsonPropertyName("sha")] string Sha,
+    [property: System.Text.Json.Serialization.JsonPropertyName("commit")] string Commit);
 public sealed record CloudDeletion(
     [property: System.Text.Json.Serialization.JsonPropertyName("path")] string Path,
     [property: System.Text.Json.Serialization.JsonPropertyName("type")] string Type,

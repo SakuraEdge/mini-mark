@@ -19,7 +19,7 @@ public sealed partial class GitHubCloud {
     private readonly SemaphoreSlim pollGate = new(1);
     private readonly object authLock = new();
     private Task<CloudCredential>? refreshing;
-    private sealed record DeviceLogin(string ClientId, string Code, DateTimeOffset Expires, int Interval, DateTimeOffset NextPoll);
+    private sealed record DeviceLogin(string ClientId, string Code, string UserCode, DateTimeOffset Expires, int Interval, DateTimeOffset NextPoll);
     private sealed class ApiError(HttpStatusCode status, string message) : IOException(message) { public HttpStatusCode Status { get; } = status; }
     private sealed class LoginRequired() : IOException("GitHub 登录已失效，请重新登录。");
 
@@ -181,6 +181,7 @@ public sealed partial class GitHubCloud {
             case "read": return await Read(Value("owner"), Value("path"));
             case "write": return await Write(Value("owner"), Value("path"), Value("text"), Value("sha") is "" ? null : Value("sha"));
             case "delete": return await Delete(Value("owner"), Value("path"), Value("sha"), Value("entryType"));
+            case "rename": return await Rename(Value("owner"), Value("path"), Value("sha"), Value("name"));
             case "folder": {
                 var owner = await Account(Value("owner"));
                 var path = CloudPaths.Validate(Value("path"), true);
@@ -227,6 +228,14 @@ public sealed partial class GitHubCloud {
         return new(path, next!);
     }
     private static bool IsDocument(string path) { try { CloudPaths.Validate(path); return true; } catch (IOException) { return false; } }
+    public object CopyAuthorizationCode(string code, Action<string> copy) {
+        lock (authLock) {
+            if (device is null || device.Expires <= DateTimeOffset.UtcNow || code != device.UserCode)
+                throw new IOException("授权码已失效，请重新发起 GitHub 登录。");
+            copy(device.UserCode);
+            return new { copied = true };
+        }
+    }
     private async Task<object> StartLogin() {
         var id = clientId();
         if (id.Length == 0) throw new IOException("此安装包尚未配置 GitHub 登录。请联系 Mini Mark 维护者。");
@@ -239,8 +248,11 @@ public sealed partial class GitHubCloud {
         var interval = Math.Max(5, result.GetProperty("interval").GetInt32());
         var uri = result.GetProperty("verification_uri").GetString();
         if (!Uri.TryCreate(uri, UriKind.Absolute, out var address) || address.Scheme != "https" || address.Host != "github.com") throw new IOException("GitHub 登录地址无效。");
-        device = new(id, result.GetProperty("device_code").GetString()!, DateTimeOffset.UtcNow.AddSeconds(seconds), interval, DateTimeOffset.UtcNow.AddSeconds(interval));
-        return new { userCode = result.GetProperty("user_code").GetString(), verificationUri = uri, interval, expiresIn = seconds };
+        var userCode = result.GetProperty("user_code").GetString();
+        if (string.IsNullOrWhiteSpace(userCode) || userCode.Length > 32 || !userCode.All(character => char.IsAsciiLetterOrDigit(character) || character == '-'))
+            throw new IOException("GitHub 授权码无效，请重新登录。");
+        device = new(id, result.GetProperty("device_code").GetString()!, userCode, DateTimeOffset.UtcNow.AddSeconds(seconds), interval, DateTimeOffset.UtcNow.AddSeconds(interval));
+        return new { userCode, verificationUri = uri, interval, expiresIn = seconds };
     }
     private async Task<object> PollLogin() {
         if (!await pollGate.WaitAsync(0)) throw new IOException("正在检查登录状态。");

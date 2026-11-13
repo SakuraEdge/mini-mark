@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     let updates = GitHubUpdates()
     let cloud = GitHubCloud()
     var cloudBusy = false
+    var scriptConfirmation: ScriptConfirmation?
     let root = Bundle.main.resourceURL!.appendingPathComponent("wwwroot")
     let dataRoot: URL = {
         if let path = ProcessInfo.processInfo.environment["MOYE_DATA_DIR"] { return URL(fileURLWithPath: path) }
@@ -40,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         config.userContentController.add(self, name: "bridge")
         config.userContentController.addUserScript(WKUserScript(source: bridgeScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         web = WKWebView(frame: window.contentView!.bounds, configuration: config)
-        web.autoresizingMask = [.width, .height]; web.navigationDelegate = self
+        web.autoresizingMask = [.width, .height]; web.navigationDelegate = self; web.uiDelegate = self
         window.contentView!.addSubview(web); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         web.load(URLRequest(url: URL(string: "moye://app/index.html")!))
         if smokeOutput != nil {
@@ -96,7 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
     func notice(_ message: String, error: Bool = false) { post(["type": error ? "error" : "notice", "message": message]) }
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.frameInfo.isMainFrame, message.frameInfo.request.url?.host == "app", let body = message.body as? [String: Any] else { return }
+        guard Self.trustedAppFrame(message.frameInfo), let body = message.body as? [String: Any] else { return }
         DispatchQueue.main.async {
             do { try self.receive(body) } catch { self.notice(error.localizedDescription, error: true); self.post(["type": "operationComplete"]) }
         }
@@ -116,6 +117,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         if type == "rendered" { if smokeOutput != nil && !smokeStarted { smokeStarted = true; runSmoke() }; return }
         if type == "cloudRequest" {
             guard ready else { return }
+            if body["action"] as? String == "rename" {
+                post(["type": "cloudResponse", "requestId": body["requestId"] as? String ?? "", "error": "请从文档标签重命名。"]); return
+            }
             if body["action"] as? String == "delete" { deleteCloudEntry(body); return }
             if let action = body["action"] as? String, ["write", "folder"].contains(action) { mutateCloudEntry(body); return }
             cloud.handle(body) { self.post($0) }; return
@@ -188,6 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
                 return
             }
             session.documents[index].text = text; session.documents[index].revision = revision
+            session.documents[index].updateAutomaticName(hint: body["autoTitle"] as? String)
         }
         if type == "edit" {
             title(); draftTimer?.invalidate()
@@ -199,6 +204,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         }
         if ["cloudOpen", "cloudBind", "cloudDetach"].contains(type) {
             performCloudDocument(type, body: body, documentId: id); return
+        }
+        if type == "renameDocument" {
+            renameDocument(body); return
         }
         if type == "save", session.documents[index].cloud != nil {
             beginDocumentOperation { done in self.saveCloudDocument(id, completion: done) }; return
@@ -249,8 +257,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         return "未命名 \(number).md"
     }
     func add(_ text: String = "", _ name: String? = nil, baseline: String = "") {
-        let name = name ?? nextUntitledName()
-        let doc = Document(untitledName: name, text: Store.normalize(text), baseline: Store.normalize(baseline))
+        var doc = Document(untitledName: name ?? nextUntitledName(), text: Store.normalize(text), baseline: Store.normalize(baseline), autoName: name == nil)
+        doc.updateAutomaticName()
         session.documents.append(doc); session.activeId = doc.id
     }
     func remove(_ id: String) {
@@ -266,8 +274,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     func publish(recovered: Bool = false) {
         let doc = session.documents[activeIndex]
         scheme.documentFolder = doc.path.map { URL(fileURLWithPath: $0).deletingLastPathComponent() }
-        post(["type": "workspace", "recovered": recovered, "tabs": session.documents.map { ["id": $0.id, "name": $0.name, "path": $0.path as Any? ?? NSNull(), "cloud": $0.cloud?.metadataMessage as Any? ?? NSNull(), "dirty": $0.dirty, "revision": $0.revision] },
-              "document": ["id": doc.id, "name": doc.name, "path": doc.path as Any? ?? NSNull(), "text": doc.text, "baseline": doc.savedText, "cloud": doc.cloud?.message as Any? ?? NSNull(), "revision": doc.revision]])
+        post(["type": "workspace", "recovered": recovered, "tabs": session.documents.map { ["id": $0.id, "name": $0.name, "path": $0.path as Any? ?? NSNull(), "cloud": $0.cloud?.metadataMessage as Any? ?? NSNull(), "autoName": $0.automaticNameEnabled, "dirty": $0.dirty, "revision": $0.revision] },
+              "document": ["id": doc.id, "name": doc.name, "path": doc.path as Any? ?? NSNull(), "text": doc.text, "baseline": doc.savedText, "cloud": doc.cloud?.message as Any? ?? NSNull(), "autoName": doc.automaticNameEnabled, "revision": doc.revision]])
         title()
     }
     func title() { if !session.documents.isEmpty { let doc = session.documents[activeIndex]; window.title = "\(doc.dirty ? "• " : "")\(doc.name) · Mini Mark" } }
@@ -310,8 +318,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         guard let target = path else { return false }
         if session.documents.contains(where: { $0.id != doc.id && ($0.path.map { Store.samePath($0, target) } ?? false) }) { throw Store.failure("该文件已在另一个标签打开，请选择其他文件名。") }
         if !isHtml { try ImageAssets.copyForSaveAs(doc.text, previousPath: doc.path, targetPath: target) }
-        doc.fingerprint = try Store.write(doc, to: target); doc.path = target; doc.baseline = doc.text; doc.cloud = nil; session.documents[index] = doc
-        persist(); post(["type": "saved", "documentId": doc.id, "name": doc.name, "path": target, "cloud": NSNull(), "text": doc.text])
+        doc.fingerprint = try Store.write(doc, to: target); doc.path = target; doc.baseline = doc.text; doc.cloud = nil; doc.autoName = false; session.documents[index] = doc
+        persist(); post(["type": "saved", "documentId": doc.id, "name": doc.name, "path": target, "cloud": NSNull(), "autoName": false, "text": doc.text])
         if doc.id == session.activeId { scheme.documentFolder = URL(fileURLWithPath: target).deletingLastPathComponent() }; title(); return true
     }
     func saveDecision(_ document: Document) -> NSApplication.ModalResponse {
@@ -341,6 +349,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         requestClose(true); return .terminateCancel
     }
     func requestClose(_ application: Bool) {
+        cancelScriptConfirmation()
         if pdfRequest != nil { notice("PDF 正在导出，请稍候再退出。"); return }
         if cloudBusy { notice("云文档正在同步，请稍候再退出。"); return }
         if closingRequest != nil { return }

@@ -4,6 +4,7 @@ import PDFKit
 
 func runStoreTests() throws {
     try runUpdateManifestTests()
+    try runDocumentNameTests()
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent("moye-test-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: folder) }
@@ -47,6 +48,37 @@ func runStoreTests() throws {
 }
 
 extension AppDelegate {
+    func checkConfirmationSmoke(_ completion: @escaping (Error?) -> Void) {
+        var completions = 0
+        let once = ScriptConfirmation(message: "Test") { _ in completions += 1 }
+        once.resolve(false); once.resolve(true)
+        guard completions == 1 else { completion(Store.failure("JavaScript confirmation completed more than once")); return }
+        func run(_ accepted: Bool, next: @escaping (Error?) -> Void) {
+            var finished = false
+            func finish(_ error: Error?) { if !finished { finished = true; next(error) } }
+            web.evaluateJavaScript("confirm('MAC_CONFIRM_SMOKE')") { value, error in
+                guard error == nil, value as? Bool == accepted else { finish(error ?? Store.failure("JavaScript confirm result mismatch")); return }
+                finish(nil)
+            }
+            func poll(_ remaining: Int) {
+                if finished { return }
+                if let pending = self.scriptConfirmation {
+                    guard pending.alert.buttons.count == 2, pending.alert.buttons[0].title == "取消" else { finish(Store.failure("Confirmation cancel button unavailable")); return }
+                    self.window.endSheet(pending.alert.window, returnCode: accepted ? .alertSecondButtonReturn : .alertFirstButtonReturn)
+                } else if remaining == 0 { finish(Store.failure("Native confirmation sheet did not appear")) }
+                else { DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { poll(remaining - 1) } }
+            }
+            poll(100)
+        }
+        run(false) { error in
+            if let error = error { completion(error); return }
+            run(true) { error in
+                if error == nil { print("PASS macOS trusted JavaScript confirmation sheets: cancel and accept") }
+                completion(error)
+            }
+        }
+    }
+
     func checkHtmlSmoke(_ completion: @escaping (Error?) -> Void) {
         guard let output = smokeOutput else { return }
         do {
@@ -121,6 +153,8 @@ extension AppDelegate {
                 if let error = error { self.smokeFinish(error); return }
                 self.checkHtmlSmoke { error in
                 if let error = error { self.smokeFinish(error); return }
+                self.checkConfirmationSmoke { error in
+                if let error = error { self.smokeFinish(error); return }
                 self.web.takeSnapshot(with: nil) { image, error in
                     if let image = image, let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff), let png = bitmap.representation(using: .png, properties: [:]) { try? png.write(to: output.appendingPathComponent("macos-editor.png")) }
                     do {
@@ -131,6 +165,7 @@ extension AppDelegate {
                         guard try Store.read(path).text == self.session.documents[index].text else { throw Store.failure("Native save mismatch") }
                         try self.beginPdf(self.session.documents[index], output.appendingPathComponent("macos-export.pdf"))
                     } catch { self.smokeFinish(error) }
+                }
                 }
                 }
                 }

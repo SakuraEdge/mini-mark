@@ -1,0 +1,6 @@
+.popup-menu.document-context-menu { position: fixed; right: auto; width: 176px; min-width: min(176px, calc(100vw - 16px)); max-width: calc(100vw - 16px); z-index: 100; }
+.text-input-dialog label { display: block; margin-bottom: 8px; }
+.text-input-dialog input { width: 100%; }
+.text-input-dialog input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#text-dialog-status { min-height: 20px; margin: 10px 0 14px; color: var(--soft); line-height: 1.6; overflow-wrap: anywhere; }
+.text-input-dialog input[aria-invalid="true"] { border-color: #bd3838; }

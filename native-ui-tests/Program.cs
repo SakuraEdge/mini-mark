@@ -48,6 +48,14 @@ internal static class Program {
                     throw new Exception(failure + $" (renderer messages: {received}; diagnostics: {diagnostics})");
                 }
                 Task Click(string id) => browser.CoreWebView2.ExecuteScriptAsync($"document.getElementById('{id}').click()");
+                async Task Rename(string selector, string next) {
+                    await browser.CoreWebView2.ExecuteScriptAsync($"document.querySelector({JsonSerializer.Serialize(selector)}).dispatchEvent(new MouseEvent('contextmenu', {{bubbles:true,cancelable:true,clientX:150,clientY:110}}))");
+                    await Wait("!document.querySelector('.document-context-menu').hidden", "Native rename context menu missing");
+                    await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('.document-context-menu button').click()");
+                    await Wait("document.querySelector('.text-input-dialog').open", "Native rename dialog missing");
+                    await browser.CoreWebView2.ExecuteScriptAsync($"document.getElementById('text-dialog-input').value={JsonSerializer.Serialize(next)};document.querySelector('.text-input-dialog form').requestSubmit()");
+                    await Wait("!document.querySelector('.text-input-dialog').open && !document.getElementById('app').classList.contains('transition-pending')", "Native rename did not complete");
+                }
                 await Wait("Boolean(window.__MOYE_READY__)", "Editor did not become ready");
                 await Click("new-file");
                 await Wait("document.querySelectorAll('.document-tab').length === 2 && !document.getElementById('app').classList.contains('transition-pending')", "New button stalled after CRLF restoration");
@@ -152,6 +160,13 @@ internal static class Program {
                     }
                 }
                 try {
+                    var authorization = new GitHubCloud(new EmptyClipboardTokenStore(), () => "clipboard-test-client", new HttpClient(new ClipboardAuthorizationHandler()));
+                    await authorization.Execute(JsonSerializer.SerializeToElement(new { action = "startLogin" }));
+                    authorization.CopyAuthorizationCode("ABCD-EFGH", value => Clipboard.SetText(value, TextDataFormat.UnicodeText));
+                    if (Clipboard.GetText(TextDataFormat.UnicodeText) != "ABCD-EFGH") throw new Exception("Native clipboard did not contain the complete user authorization code");
+                    try { authorization.CopyAuthorizationCode("ABCD", value => Clipboard.SetText(value)); throw new Exception("Partial authorization code copied"); }
+                    catch (IOException) { }
+                    if (Clipboard.GetText(TextDataFormat.UnicodeText) != "ABCD-EFGH") throw new Exception("Invalid code altered native clipboard");
                     await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('#formula-dialog [data-action=copy]').click()");
                     await Wait("document.getElementById('formula-status').textContent === '已复制可编辑公式'", "Native structured equation copy failed");
                     var copied = Clipboard.GetDataObject() ?? throw new Exception("Equation clipboard was empty");
@@ -195,6 +210,33 @@ internal static class Program {
                     throw new Exception("HTML preview exposes native bridge");
                 htmlWindow!.Close();
                 Console.WriteLine("PASS native HTML open/save/run, local CSS/JS and isolated preview without host bridge");
+                await Click("new-tab");
+                await Wait("document.getElementById('document-name').textContent.startsWith('未命名') && !document.getElementById('app').classList.contains('transition-pending')", "Automatic title draft not created");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('.cm-content').focus();document.execCommand('insertText',false,'# Native auto title')");
+                await Wait("document.getElementById('document-name').textContent === 'Native auto title.md'", "First H1 did not update native draft title");
+                await Task.Delay(850);
+                var autoDraft = DocumentWorkspace.Restore(session, Path.Combine(folder, "draft.json")).Active;
+                if (autoDraft.Name != "Native auto title.md" || autoDraft.AutoName != true) throw new Exception("Native auto title did not persist");
+                await Rename(".document-tab.active .tab-select", "Manual title");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('.cm-content').focus();document.execCommand('selectAll');document.execCommand('insertText',false,'# Ignored title after manual rename')");
+                await Wait("document.getElementById('document-name').textContent === 'Manual title.md' && document.querySelector('.cm-content').textContent.includes('Ignored title')", "Manual rename failed to disable auto naming");
+                await Rename(".document-tab:first-child .tab-select", "Background rename.md");
+                await Wait("document.getElementById('document-name').textContent === 'Manual title.md' && document.querySelector('.document-tab:first-child .tab-select').textContent === 'Background rename.md'", "Nonactive rename changed focus or wrong target");
+                var renameSource = Path.Combine(folder, "rename-ui.md");
+                DocumentStore.Write(renameSource, "# Stored\r\nOriginal\r\n", true, "\r\n");
+                var renameBytes = File.ReadAllBytes(renameSource);
+                window.OpenFromArguments([renameSource]);
+                await Wait("document.getElementById('document-name').textContent === 'rename-ui.md'", "Local rename fixture did not open");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('.cm-content').focus();document.execCommand('insertText',false,'Dirty edit. ')");
+                await Rename(".document-tab.active .tab-select", "renamed-ui");
+                var renameTarget = Path.Combine(folder, "renamed-ui.md");
+                if (File.Exists(renameSource) || !File.Exists(renameTarget) || !File.ReadAllBytes(renameTarget).SequenceEqual(renameBytes))
+                    throw new Exception("Native UI rename rewrote bytes or left old file");
+                await Wait("document.getElementById('save-state').textContent === '未保存' && document.querySelector('.cm-content').textContent.includes('Dirty edit.')", "Native rename discarded unsaved edits");
+                await Click("save-markdown");
+                await Wait("document.getElementById('save-state').textContent === '已保存'", "Save after local rename failed");
+                if (!File.ReadAllText(renameTarget).Contains("Dirty edit.")) throw new Exception("Renamed file save lost dirty text");
+                Console.WriteLine("PASS native H1 auto naming, persistent manual override, inactive-tab rename, local atomic rename with dirty text and original bytes");
                 if (!window.Text.Contains("Mini Mark")) throw new Exception("Window branding did not update");
                 Console.WriteLine($"PASS actual WebView2 CRLF restore, native New/Open/Save/tab buttons, view/theme/focus/menu controls, clean session, bounded messages ({received})");
                 Console.WriteLine("PASS actual WebView2 image import/render/save and plugin sandbox/network/bridge isolation");
@@ -202,5 +244,19 @@ internal static class Program {
             finally { window.Dispose(); Application.ExitThread(); }
         };
         Application.Run(window);
+    }
+}
+
+sealed class EmptyClipboardTokenStore : ICloudTokenStore {
+    public string? Read() => null;
+    public void Write(string token) => throw new InvalidOperationException("Clipboard fixture must not persist credentials");
+    public void Clear() { }
+}
+sealed class ClipboardAuthorizationHandler : HttpMessageHandler {
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+        if (request.RequestUri?.AbsoluteUri != "https://github.com/login/device/code") throw new InvalidOperationException("Unexpected clipboard fixture request");
+        return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) {
+            Content = new StringContent(JsonSerializer.Serialize(new { device_code = "private-not-copied", user_code = "ABCD-EFGH", verification_uri = "https://github.com/login/device", expires_in = 900, interval = 5 }))
+        });
     }
 }

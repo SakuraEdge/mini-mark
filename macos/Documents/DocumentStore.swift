@@ -21,6 +21,7 @@ struct Document: Codable {
     var newline = "\n"
     var revision = 0
     var cloud: CloudBinding?
+    var autoName: Bool?
     var name: String { (cloud?.path ?? path).map { URL(fileURLWithPath: $0).lastPathComponent } ?? untitledName }
     var savedText: String { cloud?.baseline ?? baseline }
     var dirty: Bool { text != savedText }
@@ -41,7 +42,7 @@ enum Store {
         let data = try Data(contentsOf: url)
         let bom = data.starts(with: [0xef, 0xbb, 0xbf])
         guard let raw = String(data: bom ? data.dropFirst(3) : data, encoding: .utf8), !raw.contains("\0") else { throw failure("文件不是 UTF-8 文本文档。") }
-        return Document(untitledName: url.lastPathComponent, path: url.path, text: normalize(raw), baseline: normalize(raw), fingerprint: hash(data), bom: bom, newline: raw.contains("\r\n") ? "\r\n" : "\n")
+        return Document(untitledName: url.lastPathComponent, path: url.path, text: normalize(raw), baseline: normalize(raw), fingerprint: hash(data), bom: bom, newline: raw.contains("\r\n") ? "\r\n" : "\n", autoName: false)
     }
     static func write(_ document: Document, to path: String) throws -> String {
         let text = normalize(document.text).replacingOccurrences(of: "\n", with: document.newline)
@@ -66,6 +67,8 @@ enum Store {
             session.documents[i].text = normalize(session.documents[i].text)
             session.documents[i].baseline = normalize(session.documents[i].baseline)
             if let cloud = session.documents[i].cloud { session.documents[i].cloud?.baseline = normalize(cloud.baseline) }
+            session.documents[i].autoName = session.documents[i].automaticNameEnabled
+            session.documents[i].updateAutomaticName()
         }
         // Untitled numbering is recalculated for each process, not continued from an old session.
         session.nextUntitled = 1

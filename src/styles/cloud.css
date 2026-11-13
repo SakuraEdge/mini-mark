@@ -8,6 +8,8 @@
 .cloud-account button { flex-shrink: 0; }
 .cloud-authorization { display: flex; align-items: center; flex-direction: column; gap: 12px; padding: 22px 10px; border-bottom: 1px solid var(--line); }
 .cloud-authorization output { display: block; padding: 10px 14px; border: 1px solid var(--line); background: var(--bg); border-radius: 4px; font: 600 25px/1.2 Consolas, monospace; overflow-wrap: anywhere; }
+.cloud-authorization output { cursor: text; user-select: all; }
+.cloud-authorization output:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .cloud-authorization > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .cloud-document-mode { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; }
 #cloud-current-document { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

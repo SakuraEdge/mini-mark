@@ -192,6 +192,13 @@ static class CloudTests {
         check(request.Body == "client_id=test-client-id&scope=repo" && request.Token is null && !request.Body.Contains("client_secret"), "Device login sent incorrect scopes or a secret");
         check(start.GetProperty("userCode").GetString() == userCode && start.GetProperty("verificationUri").GetString() == "https://github.com/login/device", "Device login public instructions were lost");
         check(!start.GetRawText().Contains(deviceCode) && !start.GetRawText().Contains(Token), "Device login exposed private authorization data");
+        string? copied = null;
+        var copy = Result(client.CopyAuthorizationCode(userCode, value => copied = value));
+        check(copied == userCode && copy.GetProperty("copied").GetBoolean(), "Whole active user authorization code was not copied");
+        foreach (var invalidCode in new[] { userCode[..4], deviceCode, Token, "OTHER-CODE" }) {
+            try { client.CopyAuthorizationCode(invalidCode, _ => throw new Exception("Unsafe clipboard write")); throw new Exception("Noncurrent code was accepted"); }
+            catch (IOException) { check(true, "Noncurrent or secret code rejected before clipboard access"); }
+        }
         var pending = Result(await client.Execute(Body(new { action = "pollLogin" })));
         check(pending.GetProperty("pending").GetBoolean() && pending.GetProperty("interval").GetInt32() == 5 && handler.Requests.Count == 1, "Immediate device polling ignored the server interval");
         check(store.WriteCount == 0 && store.Token is null, "Device login stored credentials before approval");
@@ -216,6 +223,8 @@ static class CloudTests {
         var immediate = Client(immediateHandler, new MemoryCloudTokenStore(null));
         await immediate.Execute(Body(new { action = "startLogin" }));
         await immediate.Execute(Body(new { action = "cancelLogin" }));
+        try { immediate.CopyAuthorizationCode(userCode, _ => throw new Exception("Cancelled code copied")); throw new Exception("Cancelled code was accepted"); }
+        catch (IOException) { check(true, "Cancelled authorization code was not copied"); }
         await Fails(() => immediate.Execute(Body(new { action = "pollLogin" })), check, "Cancelled device login continued polling");
         check(immediateHandler.Requests.Count == 1, "Cancelled login issued an OAuth token request");
 

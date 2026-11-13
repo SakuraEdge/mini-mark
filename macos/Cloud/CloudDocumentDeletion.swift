@@ -8,6 +8,7 @@ enum CloudDocumentDeletion {
                   binding.path == path || (type == "dir" && binding.path.hasPrefix(path + "/")) else { continue }
             let name = documents[index].name
             documents[index].cloud = nil
+            documents[index].autoName = false
             if documents[index].path == nil { documents[index].untitledName = name }
             changed += 1
         }

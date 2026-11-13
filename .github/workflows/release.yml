@@ -91,8 +91,10 @@ jobs:
           if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/updates" > /dev/null 2>&1; then
             gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/heads/updates -f sha="$BUILD_SHA"
           fi
-          if ! old_sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/rev-stable.json?ref=updates" --jq .sha 2>/dev/null); then old_sha=''; fi
-          jq -n --arg message "Publish update feed $tag" --arg content "$(base64 -w 0 update.json)" --arg sha "$old_sha" \
-            '{message:$message,content:$content,branch:"updates"} + (if $sha == "" then {} else {sha:$sha} end)' > feed-request.json
-          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/rev-stable.json" --input feed-request.json > /dev/null
+          for feed in rev-stable.json stable.json; do
+            if ! old_sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/$feed?ref=updates" --jq .sha 2>/dev/null); then old_sha=''; fi
+            jq -n --arg message "Publish $feed for $tag" --arg content "$(base64 -w 0 update.json)" --arg sha "$old_sha" \
+              '{message:$message,content:$content,branch:"updates"} + (if $sha == "" then {} else {sha:$sha} end)' > feed-request.json
+            gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/$feed" --input feed-request.json > /dev/null
+          done
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url,isDraft,isPrerelease,assets

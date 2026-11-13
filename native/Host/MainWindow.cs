@@ -121,7 +121,7 @@ public sealed partial class MainWindow : Form {
             if (!initialized) return;
             if (type == "cloudRequest") {
                 var request = message.Clone();
-                if (request.TryGetProperty("action", out var cloudAction) && cloudAction.GetString() is "delete" or "write" or "folder") {
+                if (request.TryGetProperty("action", out var cloudAction) && cloudAction.GetString() is "delete" or "write" or "folder" or "rename") {
                     long? queuedDeletion = cloudAction.GetString() == "delete" ? null : cloudDeletionRevision;
                     RunAsync(() => CloudRequest(request, queuedDeletion));
                 } else _ = CloudRequest(request);
@@ -176,7 +176,8 @@ public sealed partial class MainWindow : Form {
                 return;
             }
             if (message.TryGetProperty("text", out var value) && message.TryGetProperty("revision", out var revision)) {
-                if (!document.Update(value.GetString()!, revision.GetInt64())) {
+                var autoTitle = message.TryGetProperty("autoTitle", out var titleValue) && titleValue.ValueKind == JsonValueKind.String ? titleValue.GetString() : null;
+                if (!document.Update(value.GetString()!, revision.GetInt64(), autoTitle)) {
                     Publish();
                     if (type != "edit") { Post(new { type = "error", message = "文档内容已变化，请重新操作。" }); Post(new { type = "operationComplete" }); }
                     return;
@@ -191,6 +192,12 @@ public sealed partial class MainWindow : Form {
                 case "activate":
                     var target = message.GetProperty("targetId").GetString()!;
                     RunAction(() => { workspace.Activate(target); Publish(); Persist(); }); break;
+                case "renameDocument":
+                    var renameId = message.GetProperty("targetId").GetString()!;
+                    var renameName = message.GetProperty("name").GetString()!;
+                    var renameBinding = workspace.Find(renameId)?.Cloud;
+                    var renameMutation = cloudDeletionRevision;
+                    RunAsync(() => RenameDocument(renameId, renameName, renameMutation, renameBinding)); break;
                 case "cloudOpen":
                     var cloudOwner = message.GetProperty("owner").GetString()!;
                     var cloudPath = message.GetProperty("cloudPath").GetString()!;
@@ -201,7 +208,7 @@ public sealed partial class MainWindow : Form {
                     var bindRevision = cloudDeletionRevision;
                     RunAsync(() => BindCloud(document, bindOwner, bindPath, bindRevision)); break;
                 case "cloudDetach":
-                    RunAction(() => { document.UntitledName = document.Name; document.Cloud = null; Publish(); Persist(); }); break;
+                    RunAction(() => { document.UntitledName = document.Name; document.Cloud = null; document.AutoName = false; Publish(); Persist(); }); break;
                 case "closeTab":
                     var closeId = message.GetProperty("targetId").GetString()!;
                     RunAsync(() => CloseTab(closeId)); break;
@@ -288,8 +295,8 @@ public sealed partial class MainWindow : Form {
         var document = workspace.Active;
         Post(new {
             type = "workspace", recovered,
-            tabs = workspace.Documents.Select(item => new { id = item.Id, name = item.Name, path = item.Path, cloud = item.Cloud is null ? null : new { owner = item.Cloud.Owner, path = item.Cloud.Path, sha = item.Cloud.Sha }, dirty = item.Dirty, revision = item.Revision }),
-            document = new { id = document.Id, text = document.Text, baseline = document.SavedBaseline, name = document.Name, path = document.Path, cloud = document.Cloud, revision = document.Revision }
+            tabs = workspace.Documents.Select(item => new { id = item.Id, name = item.Name, path = item.Path, autoName = item.AutoName == true, cloud = item.Cloud is null ? null : new { owner = item.Cloud.Owner, path = item.Cloud.Path, sha = item.Cloud.Sha }, dirty = item.Dirty, revision = item.Revision }),
+            document = new { id = document.Id, text = document.Text, baseline = document.SavedBaseline, name = document.Name, path = document.Path, autoName = document.AutoName == true, cloud = document.Cloud, revision = document.Revision }
         });
         UpdateTitle();
     }
@@ -331,9 +338,9 @@ public sealed partial class MainWindow : Form {
         var saved = document.Text;
         if (!HtmlResources.IsHtml(document.Name)) ImageAssets.CopyForSaveAs(saved, document.Path, target);
         document.Fingerprint = DocumentStore.Write(target, saved, document.Bom, document.Newline);
-        document.Path = target; document.Baseline = saved; document.Cloud = null;
+        document.Path = target; document.Baseline = saved; document.Cloud = null; document.AutoName = false;
         Persist();
-        Post(new { type = "saved", documentId = document.Id, name = document.Name, path = document.Path, cloud = document.Cloud, text = saved });
+        Post(new { type = "saved", documentId = document.Id, name = document.Name, path = document.Path, autoName = false, cloud = document.Cloud, text = saved });
         UpdateTitle(); return true;
     }
 

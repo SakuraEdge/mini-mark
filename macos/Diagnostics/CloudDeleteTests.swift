@@ -21,14 +21,17 @@ private final class DeleteFixture {
     var targetMode: String?
     var parentMode: String?
     var branch = "main"
+    var parentName = "docs"
+    var sourceName: String?
+    var renameCollision = false
     var calls: [String] = []
     var treePayloads: [[String: Any]] = []
     var commitPayload: [String: Any]?
     var patchPayload: [String: Any]?
     var holdRoot: ((Result<Data, Error>) -> Void)?
     var holdRootRequest = false
-    var target: String { folder ? "archive" : "note.md" }
-    var path: String { "docs/" + target }
+    var target: String { sourceName ?? (folder ? "archive" : "note.md") }
+    var path: String { parentName + "/" + target }
     var targetSha: String { Self.sha(folder ? "5" : "3") }
     static func sha(_ char: String) -> String { String(repeating: char, count: 40) }
     static func entry(_ path: String, _ type: String, _ mode: String, _ sha: String) -> [String: Any] {
@@ -36,7 +39,7 @@ private final class DeleteFixture {
     }
     func root() -> [String: Any] {
         ["sha": Self.sha("1"), "truncated": truncated, "tree": [
-            Self.entry("docs", parentMode == nil ? "tree" : "blob", parentMode ?? "040000", Self.sha("2")),
+            Self.entry(parentName, parentMode == nil ? "tree" : "blob", parentMode ?? "040000", Self.sha("2")),
             Self.entry("binary.dat", "blob", "100644", Self.sha("9")),
             Self.entry("link", "blob", "120000", Self.sha("a")),
             Self.entry("module", "commit", "160000", Self.sha("b"))
@@ -64,6 +67,7 @@ private final class DeleteFixture {
             let mode = targetMode ?? (folder ? "040000" : "100644")
             var items = [Self.entry(target, folder ? "tree" : "blob", mode, changedTarget ? Self.sha("f") : targetSha)]
             if !onlyTarget { items.append(Self.entry("keep.md", "blob", "100755", Self.sha("8"))) }
+            if renameCollision { items.append(Self.entry("renamed#1.md", "blob", "100644", Self.sha("7"))) }
             done(["sha": Self.sha("2"), "truncated": false, "tree": items]); return
         }
         let payload = request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
@@ -176,6 +180,30 @@ func runCloudDeleteTests() throws {
     var typeRequest = body(invalidType); typeRequest["entryType"] = "symlink"; try rejected(invalidType, typeRequest)
     let invalidSha = DeleteFixture()
     var shaRequest = body(invalidSha); shaRequest["sha"] = invalidSha.targetSha + "\n"; try rejected(invalidSha, shaRequest)
+
+    let rename = DeleteFixture(); rename.parentName = "docs#1"; rename.sourceName = "note#1.md"; rename.targetMode = "100755"
+    let renameBody: [String: Any] = ["requestId": "rename", "action": "rename", "owner": "octocat",
+                                    "path": rename.path, "sha": rename.targetSha, "name": "renamed#1.md"]
+    let renamed = try response(rename.client(), renameBody)
+    guard let renameData = renamed["data"] as? [String: Any],
+          renameData["path"] as? String == "docs#1/renamed#1.md", renameData["previousPath"] as? String == rename.path,
+          renameData["sha"] as? String == rename.targetSha,
+          let renameTree = rename.treePayloads.first?["tree"] as? [[String: Any]],
+          renameTree.first(where: { $0["path"] as? String == "renamed#1.md" })?["sha"] as? String == rename.targetSha,
+          renameTree.first(where: { $0["path"] as? String == "renamed#1.md" })?["mode"] as? String == "100755",
+          !renameTree.contains(where: { $0["path"] as? String == rename.target }),
+          !rename.calls.contains(where: { $0.contains("/git/blobs") }),
+          rename.patchPayload?["force"] as? Bool == false else { throw Store.failure("Cloud rename changed blob bytes/mode or failed hash paths") }
+    let renameExisting = DeleteFixture(); renameExisting.renameCollision = true
+    var collisionBody = renameBody; collisionBody["path"] = renameExisting.path
+    try rejected(renameExisting, collisionBody)
+    let renameChanged = DeleteFixture(); renameChanged.changedTarget = true
+    var changedBody = renameBody; changedBody["path"] = renameChanged.path
+    try rejected(renameChanged, changedBody)
+    let renameBranch = DeleteFixture(); renameBranch.finalHead = DeleteFixture.sha("f")
+    var branchBody = renameBody; branchBody["path"] = renameBranch.path
+    try rejected(renameBranch, branchBody, writes: true)
+    guard renameBranch.patchPayload == nil else { throw Store.failure("Cloud rename ignored branch change") }
 
     let pending = DeleteFixture(); pending.holdRootRequest = true
     let pendingClient = pending.client()

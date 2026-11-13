@@ -6,7 +6,7 @@ export type { DocumentData, TabData } from '../documents/workspace';
 
 export type HostMessage =
   | { type: 'workspace'; tabs: TabData[]; document: DocumentData; recovered?: boolean }
-  | { type: 'saved'; documentId: string; name: string; path?: string; text: string; cloud?: CloudBinding | null }
+  | { type: 'saved'; documentId: string; name: string; path?: string; text: string; cloud?: CloudBinding | null; autoName?: boolean }
   | { type: 'cloudResponse'; requestId: string; data?: unknown; error?: string }
   | { type: 'requestClosingText'; requestId: string }
   | { type: 'requestExportPdf'; requestId: string; documentId: string; text: string; name: string }
@@ -80,11 +80,16 @@ export function send(type: string, payload: Record<string, unknown> = {}) {
   }
   if (type === 'exportPlugin') { download(String(payload.name), String(payload.source), 'text/javascript;charset=utf-8'); return; }
   const id = typeof payload.documentId === 'string' ? payload.documentId : workspace.activeId;
-  if (typeof payload.text === 'string' && typeof payload.revision === 'number') workspace.update(id, payload.text, payload.revision);
+  if (typeof payload.text === 'string' && typeof payload.revision === 'number') workspace.update(id, payload.text, payload.revision, typeof payload.autoTitle === 'string' ? payload.autoTitle : undefined);
   const doc = workspace.documents.find(item => item.id === id);
   if (type === 'edit') { persist(); return; }
   if (type === 'new') { workspace.add(String(payload.initialText ?? ''), typeof payload.name === 'string' ? payload.name : undefined); publish(); }
   if (type === 'activate') { workspace.activate(String(payload.targetId)); publish(); }
+  if (type === 'renameDocument') {
+    try { workspace.rename(String(payload.targetId), String(payload.name)); publish(); }
+    catch (error) { onMessage({ type: 'error', message: error instanceof Error ? error.message : '重命名失败。' }); }
+    onMessage({ type: 'operationComplete' });
+  }
   if (type === 'closeTab') {
     const target = workspace.documents.find(item => item.id === payload.targetId);
     if (!target || target.text === target.baseline || confirm(`“${target.name}”尚未保存。确定关闭并丢弃修改吗？`)) {
@@ -112,6 +117,7 @@ export function send(type: string, payload: Record<string, unknown> = {}) {
       const fileName = documentFileName(name, doc.name);
       const mime = documentLanguage(fileName) === 'html' ? 'text/html;charset=utf-8' : documentLanguage(fileName) === 'yaml' ? 'application/yaml;charset=utf-8' : 'text/markdown;charset=utf-8';
       download(fileName, doc.text, mime);
+      doc.name = fileName; doc.autoName = false; publish();
       onMessage({ type: 'notice', message: `已发起 ${formatLabel(fileName)} 下载；草稿仍保留。` });
     }
   }

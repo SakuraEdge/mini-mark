@@ -27,6 +27,7 @@ static class CloudDeleteTests {
         await Rejections(check);
         await Workspace(folder, check);
         await LogoutRace(check);
+        await Renaming(check);
     }
     private static async Task Files(Action<bool, string> check) {
         var fixture = new Fixture {
@@ -157,6 +158,38 @@ static class CloudDeleteTests {
         release.SetResult();
         await Fails(() => pending, check, "Deletion continued after logout");
         check(fixture.Patches.Count == 0 && fixture.Commits.Count == 0, "Logged-out deletion updated a branch");
+    }
+    private static async Task Renaming(Action<bool, string> check) {
+        var fixture = new Fixture { Trees = {
+            [Root] = [Entry("notes", "tree", Folder), Entry("root.txt", "blob", Sibling)],
+            [Folder] = [Entry("before.md", "blob", Target, "100755"), Entry("before.md.backup", "blob", Sibling)]
+        } };
+        var renamed = await Client(fixture).Rename("alice", "notes/before.md", Target, "after");
+        check(renamed.Path == "notes/after.md" && renamed.PreviousPath == "notes/before.md" && renamed.Sha == Target && renamed.Commit == NextCommit,
+            "Cloud rename lost source blob version or location");
+        var entries = fixture.CreatedTrees[0].GetProperty("tree").EnumerateArray().ToArray();
+        check(entries.Length == 2 && entries.Any(item => item.GetProperty("path").GetString() == "after.md" &&
+            item.GetProperty("sha").GetString() == Target && item.GetProperty("mode").GetString() == "100755") &&
+            entries.All(item => item.GetProperty("path").GetString() != "before.md"), "Cloud rename did not preserve original blob and mode");
+        check(fixture.Commits.Count == 1 && fixture.Patches.Count == 1 && fixture.CreatedTrees.All(tree =>
+            tree.GetProperty("tree").EnumerateArray().All(item => !item.TryGetProperty("content", out _))), "Cloud rename uploaded text or was not atomic");
+        foreach (var variant in new[] { "exists", "stale", "conflict", "same", "invalid" }) {
+            fixture = new Fixture { Trees = { [Root] = variant == "exists" ?
+                [Entry("before.md", "blob", Target), Entry("after.md", "blob", Sibling)] : [Entry("before.md", "blob", Target)] },
+                PatchStatus = variant == "conflict" ? HttpStatusCode.Conflict : HttpStatusCode.OK };
+            await Fails(() => Client(fixture).Rename("alice", "before.md", variant == "stale" ? Sibling : Target,
+                variant == "same" ? "before.md" : variant == "invalid" ? "../after.md" : "after.md"), check, "Unsafe cloud rename accepted");
+            check(variant == "conflict" ? fixture.Patches.Count == 1 : fixture.Patches.Count == 0, "Unsafe rename changed or retried branch update");
+        }
+        var workspace = new DocumentWorkspace();
+        var document = workspace.AddNew("dirty text", "before.md", "local baseline");
+        document.Path = "C:\\local\\before.md"; document.Cloud = new("alice", "notes/before.md", Target, "cloud baseline"); document.Revision = 9;
+        var unrelated = workspace.AddNew("keep", "other.md"); unrelated.Cloud = new("bob", "notes/before.md", Target, "keep");
+        CloudRenameWorkspace.Apply(workspace, "ALICE", renamed);
+        check(document.Cloud?.Path == renamed.Path && document.Cloud.Sha == Target && document.Cloud.Baseline == "cloud baseline" &&
+            document.Text == "dirty text" && document.Baseline == "local baseline" && document.Path == "C:\\local\\before.md" && document.Revision == 9,
+            "Cloud rename changed dirty text, baseline or local path");
+        check(unrelated.Cloud?.Path == "notes/before.md", "Cloud rename changed another account's binding");
     }
 
     private sealed class Fixture {

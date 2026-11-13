@@ -9,10 +9,17 @@ public sealed partial class MainWindow {
         try {
             if (queuedDeletionRevision is long queued && queued != cloudDeletionRevision)
                 throw new IOException("云端目录已变化，请刷新后重新操作。");
-            var data = await cloud.Execute(message);
+            var data = message.GetProperty("action").GetString() == "copyAuthorizationCode"
+                ? cloud.CopyAuthorizationCode(message.GetProperty("code").GetString()!, value => System.Windows.Forms.Clipboard.SetText(value, System.Windows.Forms.TextDataFormat.UnicodeText))
+                : await cloud.Execute(message);
             if (data is CloudDeletion deletion) {
                 cloudDeletionRevision++;
                 CloudDeletionWorkspace.Detach(workspace, message.GetProperty("owner").GetString()!, deletion);
+                Publish(); Persist();
+            }
+            if (data is CloudRename renamed) {
+                cloudDeletionRevision++;
+                CloudRenameWorkspace.Apply(workspace, message.GetProperty("owner").GetString()!, renamed);
                 Publish(); Persist();
             }
             Post(new { type = "cloudResponse", requestId, data });
@@ -30,6 +37,7 @@ public sealed partial class MainWindow {
         var file = await cloud.Read(owner, path);
         var document = workspace.AddNew(file.Text, path.Split('/')[^1]);
         document.Cloud = new(owner, path, file.Sha, file.Text);
+        document.AutoName = false;
         Publish(); Persist();
     }
     private async Task BindCloud(OpenDocument document, string owner, string path, long queuedDeletionRevision) {
@@ -41,6 +49,7 @@ public sealed partial class MainWindow {
         var text = document.Text;
         var saved = await cloud.Write(owner, path, text, null);
         document.Cloud = new(owner, path, saved.Sha, text);
+        document.AutoName = false;
         Publish(); Persist();
     }
     private async Task SaveCloud(OpenDocument document) {
@@ -50,7 +59,7 @@ public sealed partial class MainWindow {
         if (workspace.Find(document.Id) != document || document.Cloud != binding) throw new IOException("文档状态已改变，请核对云端保存结果。");
         document.Cloud = binding with { Sha = saved.Sha, Baseline = text };
         Persist();
-        Post(new { type = "saved", documentId = document.Id, name = document.Name, path = document.Path, cloud = document.Cloud, text });
+        Post(new { type = "saved", documentId = document.Id, name = document.Name, path = document.Path, autoName = false, cloud = document.Cloud, text });
         UpdateTitle();
     }
     private async Task<bool> SaveForClose(OpenDocument document) {

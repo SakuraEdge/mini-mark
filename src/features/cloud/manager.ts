@@ -1,4 +1,4 @@
-import { ArrowUp, Cloud, ExternalLink, FileText, Folder, FolderPlus, LogIn, LogOut, RefreshCw, Save, Trash2, X, createIcons } from 'lucide';
+import { ArrowUp, Cloud, Copy, ExternalLink, FileText, Folder, FolderPlus, LogIn, LogOut, RefreshCw, Save, Trash2, X, createIcons } from 'lucide';
 import { isDesktop, send } from '../../platform/bridge';
 import { cloudRequest, handleCloudResponse } from './client';
 import { cloudFileName, cloudFolderName, isCloudSha, joinCloudPath, parentCloudPath, readCloudDeletion, readCloudEntries, type CloudAccount, type CloudBinding, type CloudEntry, type CloudRepository, type DeviceAuthorization, type LoginPoll } from './model';
@@ -31,6 +31,7 @@ export function initializeCloud(options: Options) {
   let generation = 0;
   let currentDocumentId = '';
   let authorizationUrl = '';
+  let authorizationCode = '', copyingCode = false;
   let deletingPath: string | undefined;
   const dialog = document.createElement('dialog');
   dialog.id = 'cloud-dialog'; dialog.className = 'feature-dialog cloud-dialog';
@@ -43,8 +44,8 @@ export function initializeCloud(options: Options) {
       <button data-action="logout" hidden><i data-lucide="log-out"></i>退出登录</button>
     </div>
     <section class="cloud-authorization" aria-label="GitHub 授权" hidden>
-      <span>GitHub 授权码</span><output id="cloud-user-code"></output>
-      <div><button data-action="authorize"><i data-lucide="external-link"></i>前往 GitHub 授权</button><button data-action="cancel-login">取消登录</button></div>
+      <span>GitHub 授权码</span><output id="cloud-user-code" tabindex="0" aria-label="GitHub 授权码"></output>
+      <div><button data-action="copy-code"><i data-lucide="copy"></i>复制授权码</button><button data-action="authorize"><i data-lucide="external-link"></i>前往 GitHub 授权</button><button data-action="cancel-login">取消登录</button></div>
     </section>
     <div class="cloud-document-mode">
       <span id="cloud-current-document"></span>
@@ -68,7 +69,7 @@ export function initializeCloud(options: Options) {
     <div id="cloud-status" role="status" aria-live="polite"></div>
     <footer><span id="cloud-document-path"></span><button data-action="save-current"><i data-lucide="save"></i>保存当前文档到云端</button></footer>`;
   document.body.append(dialog);
-  const icons = { ArrowUp, Cloud, ExternalLink, FileText, Folder, FolderPlus, LogIn, LogOut, RefreshCw, Save, Trash2, X };
+  const icons = { ArrowUp, Cloud, Copy, ExternalLink, FileText, Folder, FolderPlus, LogIn, LogOut, RefreshCw, Save, Trash2, X };
   createIcons({ icons, root: dialog, attrs: { 'stroke-width': 1.65 } });
   const get = <T extends HTMLElement>(id: string) => dialog.querySelector<T>(`#${id}`)!;
   const action = (name: string) => dialog.querySelector<HTMLButtonElement>(`[data-action="${name}"]`)!;
@@ -111,6 +112,7 @@ export function initializeCloud(options: Options) {
     action('login').disabled = busy || !isDesktop;
     action('logout').disabled = busy;
     action('authorize').disabled = !authorizationUrl;
+    action('copy-code').disabled = !authorizationCode || copyingCode;
     action('create-repository').disabled = busy;
     dialog.setAttribute('aria-busy', String(busy));
     fileName.disabled = busy || !saveEnabled.checked;
@@ -250,25 +252,27 @@ export function initializeCloud(options: Options) {
   }
   async function login(signal: AbortSignal) {
     setStatus('正在发起 GitHub 登录…');
-    authenticating = true; authorizationUrl = '';
+    authenticating = true; authorizationUrl = ''; authorizationCode = '';
     get('cloud-user-code').textContent = '';
     redraw();
     const auth = await cloudRequest<DeviceAuthorization>('startLogin', {}, signal);
     if (signal.aborted) return;
     const url = new URL(auth.verificationUri);
     if (url.protocol !== 'https:' || url.hostname !== 'github.com' || url.username || url.password) throw new Error('GitHub 授权地址无效。');
-    authorizationUrl = url.href; authenticating = true;
+    authorizationUrl = url.href; authorizationCode = auth.userCode; authenticating = true;
     get('cloud-user-code').textContent = auth.userCode; redraw();
-    send('openExternal', { url: authorizationUrl });
     let interval = Math.max(5, Number(auth.interval) || 5);
     const expiresAt = Date.now() + Math.min(1800, Math.max(1, Number(auth.expiresIn) || 900)) * 1000;
-    setStatus('等待 GitHub 授权…');
+    const copied = await copyAuthorizationCode(signal);
+    if (signal.aborted || authorizationCode !== auth.userCode) return;
+    send('openExternal', { url: authorizationUrl });
+    if (copied) setStatus('授权码已复制，等待 GitHub 授权…');
     while (!signal.aborted && Date.now() < expiresAt) {
       await wait(interval * 1000, signal);
       const poll = await cloudRequest<LoginPoll>('pollLogin', {}, signal);
       if (signal.aborted) return;
       if (poll.authenticated && poll.login) {
-        authenticating = false; authorizationUrl = '';
+        authenticating = false; authorizationUrl = ''; authorizationCode = '';
         account = { authenticated: true, login: poll.login, configured: true }; folder = '';
         redraw(); await loadRepository(signal, true); return;
       }
@@ -277,9 +281,33 @@ export function initializeCloud(options: Options) {
     }
     if (!signal.aborted) throw new Error('GitHub 授权码已过期，请重新登录。');
   }
+  async function copyAuthorizationCode(signal: AbortSignal) {
+    if (!authorizationCode || copyingCode || signal.aborted) return false;
+    const code = authorizationCode, stamp = generation;
+    copyingCode = true; redraw();
+    try {
+      const result = await cloudRequest<{ copied?: boolean }>('copyAuthorizationCode', { code }, signal);
+      if (signal.aborted || stamp !== generation || authorizationCode !== code) return false;
+      if (result?.copied !== true) throw new Error('未收到剪贴板确认。');
+      setStatus('授权码已复制，等待 GitHub 授权…'); return true;
+    } catch (error) {
+      if (!signal.aborted && stamp === generation) setStatus('授权码自动复制失败，请点击授权码全选后复制，或重试复制按钮。', true);
+      return false;
+    } finally {
+      if (stamp === generation) { copyingCode = false; redraw(); }
+    }
+  }
+  const codeOutput = get('cloud-user-code');
+  function selectAuthorizationCode() {
+    if (!authorizationCode) return;
+    const selection = window.getSelection(), range = document.createRange();
+    range.selectNodeContents(codeOutput); selection?.removeAllRanges(); selection?.addRange(range);
+  }
+  codeOutput.onclick = selectAuthorizationCode;
+  codeOutput.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectAuthorizationCode(); } };
   function cancelPendingLogin() {
     if (!authenticating) return;
-    authenticating = false; authorizationUrl = '';
+    authenticating = false; authorizationUrl = ''; authorizationCode = ''; copyingCode = false;
     void cloudRequest('cancelLogin').catch(() => {});
   }
   function resetRequests() {
@@ -308,6 +336,7 @@ export function initializeCloud(options: Options) {
     finally { if (!signal.aborted) { cancelPendingLogin(); redraw(); } }
   });
   action('authorize').onclick = () => { if (authorizationUrl) send('openExternal', { url: authorizationUrl }); };
+  action('copy-code').onclick = () => { void copyAuthorizationCode(controller.signal); };
   action('cancel-login').onclick = () => { resetRequests(); setStatus('已取消登录。'); redraw(); };
   action('logout').onclick = () => void perform(async signal => {
     await cloudRequest('logout', {}, signal);

@@ -1,9 +1,10 @@
 import type { CloudBinding } from '../features/cloud/model';
+import { automaticDocumentName, canAutoName, documentName, headingDocumentName } from './naming';
 
 export interface DocumentData {
-  id: string; text: string; name: string; path?: string; baseline: string; revision: number; cloud?: CloudBinding | null;
+  id: string; text: string; name: string; path?: string; baseline: string; revision: number; cloud?: CloudBinding | null; autoName?: boolean;
 }
-export interface TabData { id: string; name: string; path?: string; dirty: boolean; revision: number; cloud?: Omit<CloudBinding, 'baseline'> | null }
+export interface TabData { id: string; name: string; path?: string; dirty: boolean; revision: number; cloud?: Omit<CloudBinding, 'baseline'> | null; autoName?: boolean }
 export interface BrowserSession { schemaVersion: 2; documents: DocumentData[]; activeId: string; nextUntitled: number }
 
 export function normalizeText(text: string) { return text.replace(/\r\n?/g, '\n'); }
@@ -13,9 +14,10 @@ export class BrowserWorkspace {
   activeId = '';
   nextUntitled = 1;
   get active() { return this.documents.find(document => document.id === this.activeId)!; }
-  get tabs(): TabData[] { return this.documents.map(document => ({ id: document.id, name: document.name, path: document.path, dirty: document.text !== document.baseline, revision: document.revision })); }
+  get tabs(): TabData[] { return this.documents.map(document => ({ id: document.id, name: document.name, path: document.path, dirty: document.text !== document.baseline, revision: document.revision, autoName: document.autoName, cloud: document.cloud })); }
   add(text = '', name?: string, baseline = '') {
-    const document: DocumentData = { id: crypto.randomUUID(), text: normalizeText(text), name: name ?? this.nextUntitledName(), baseline: normalizeText(baseline), revision: 0 };
+    const document: DocumentData = { id: crypto.randomUUID(), text: normalizeText(text), name: name ?? this.nextUntitledName(), baseline: normalizeText(baseline), revision: 0, autoName: name === undefined };
+    if (canAutoName(document)) document.name = headingDocumentName(document.text) ?? document.name;
     this.documents.push(document); this.activeId = document.id; return document;
   }
   private nextUntitledName() {
@@ -24,11 +26,20 @@ export class BrowserWorkspace {
     this.nextUntitled = number + 1;
     return `未命名 ${number}.md`;
   }
-  update(id: string, text: string, revision: number) {
+  update(id: string, text: string, revision: number, autoTitle?: string) {
     text = normalizeText(text);
     const document = this.documents.find(item => item.id === id);
     if (!document || revision < document.revision || (revision === document.revision && text !== document.text)) return false;
-    document.text = text; document.revision = revision; return true;
+    document.text = text; document.revision = revision;
+    if (canAutoName(document)) document.name = automaticDocumentName(text, document.name, autoTitle);
+    return true;
+  }
+  rename(id: string, value: string) {
+    const document = this.documents.find(item => item.id === id);
+    if (!document) throw new Error('文档已关闭。');
+    const name = documentName(value, document.name);
+    if (this.documents.some(item => item.id !== id && item.name.toLowerCase() === name.toLowerCase())) throw new Error('已有同名文档，请选择其他名称。');
+    document.name = name; document.autoName = false;
   }
   activate(id: string) { if (this.documents.some(document => document.id === id)) this.activeId = id; }
   remove(id: string) {
@@ -46,7 +57,7 @@ export class BrowserWorkspace {
       if (session.schemaVersion !== 2 || !Array.isArray(session.documents) || !session.documents.length || session.documents.some(document => !document.id || typeof document.text !== 'string' || typeof document.baseline !== 'string' || !Number.isSafeInteger(document.revision))) return null;
       if (new Set(session.documents.map(document => document.id)).size !== session.documents.length) return null;
       const workspace = new BrowserWorkspace();
-      workspace.documents = session.documents.map(document => ({ ...document, text: normalizeText(document.text), baseline: normalizeText(document.baseline) }));
+      workspace.documents = session.documents.map(document => ({ ...document, text: normalizeText(document.text), baseline: normalizeText(document.baseline), autoName: canAutoName(document) }));
       workspace.activeId = session.documents.some(document => document.id === session.activeId) ? session.activeId : session.documents[0].id;
       // Untitled numbering is a per-launch convenience, not durable document state.
       workspace.nextUntitled = 1;

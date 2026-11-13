@@ -48,6 +48,7 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
     private struct DeviceLogin {
         let clientId: String
         let code: String
+        let userCode: String
         let expires: Date
         var interval: Int
         var nextPoll: Date
@@ -127,6 +128,18 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
     private func perform(_ body: [String: Any], _ finish: @escaping (Result<Any, Error>) -> Void) throws {
         guard let action = body["action"] as? String else { throw CloudFailure("云文档请求无效。") }
         switch action {
+        case "copyAuthorizationCode":
+            guard let code = body["code"] as? String,
+                  AuthorizationCode.matches(code, current: device?.userCode, expires: device?.expires, now: now()) else {
+                throw CloudFailure("授权码已失效，请重新发起登录。")
+            }
+            let epoch = generation
+            var copyError: Error?
+            // Queue serialization holds the authorization generation while AppKit writes the public code.
+            DispatchQueue.main.sync { do { try AuthorizationCode.copy(code) } catch { copyError = error } }
+            guard epoch == generation else { throw CloudFailure("授权已取消。") }
+            if let error = copyError { throw error }
+            finish(.success(["copied": true]))
         case "logout":
             device = nil; credentials = nil; credentialsNeedPersistence = false; login = nil; verifiedAt = .distantPast
             requests.values.forEach { $0.task.cancel() }
@@ -152,7 +165,7 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
                     else { finish(.failure(error)) }
                 }
             }
-        case "repository", "createRepository", "list", "read", "write", "folder", "delete":
+        case "repository", "createRepository", "list", "read", "write", "folder", "delete", "rename":
             try loadCredentials()
             authenticate { result in
                 do {
@@ -190,7 +203,7 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
                     throw CloudFailure("GitHub 登录暂不可用，请确认 OAuth 应用已开启 Device Flow。")
                 }
                 let interval = max(5, min(json["interval"] as? Int ?? 5, 60))
-                self.device = DeviceLogin(clientId: clientId, code: code, expires: self.now().addingTimeInterval(TimeInterval(expires)),
+                self.device = DeviceLogin(clientId: clientId, code: code, userCode: userCode, expires: self.now().addingTimeInterval(TimeInterval(expires)),
                                           interval: interval, nextPoll: self.now().addingTimeInterval(TimeInterval(interval)))
                 finish(.success(["userCode": userCode, "verificationUri": uri, "interval": interval, "expiresIn": expires]))
             } catch { finish(.failure(error)) }
@@ -386,12 +399,31 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
             finish(result)
         }
         switch action {
+        case "rename":
+            let path = try checkedPath(body["path"] as? String ?? "")
+            guard isDocument(path), let expected = body["sha"] as? String, validSha(expected),
+                  let name = body["name"] as? String, try DocumentNames.validate(name, current: path) == name else {
+                throw CloudFailure("重命名目标无效。")
+            }
+            let components = path.split(separator: "/").dropLast().map(String.init)
+            let destination = (components + [name]).joined(separator: "/")
+            _ = try checkedPath(destination)
+            let mutation = try CloudTreeMutation(path: path, expectedSha: expected, entryType: "file", renameTo: name) { route, method, payload, completion in
+                guard epoch == self.generation else { completion(.failure(CloudFailure("账号连接已更改，重命名已停止。"))); return }
+                self.api(prefix + route, method: method, token: token, json: payload, completion: completion)
+            }
+            mutation.run { result in
+                switch result {
+                case .success(let commit): complete(.success(["path": destination, "previousPath": path, "sha": expected, "commit": commit]))
+                case .failure(let error): complete(.failure(error))
+                }
+            }
         case "delete":
             let path = try checkedPath(body["path"] as? String ?? "")
             guard let expected = body["sha"] as? String, validSha(expected),
                   let entryType = body["entryType"] as? String, ["file", "dir"].contains(entryType),
                   entryType == "dir" || isDocument(path) else { throw CloudFailure("删除目标无效，请刷新云文档后重试。") }
-            let deletion = try CloudDeletion(path: path, expectedSha: expected, entryType: entryType) { route, method, payload, completion in
+            let deletion = try CloudTreeMutation(path: path, expectedSha: expected, entryType: entryType) { route, method, payload, completion in
                 guard epoch == self.generation else { completion(.failure(CloudFailure("账号连接已更改，删除已停止。"))); return }
                 self.api(prefix + route, method: method, token: token, json: payload, completion: completion)
             }
@@ -496,7 +528,7 @@ final class GitHubCloud: NSObject, URLSessionDataDelegate {
         if allowRoot && path.isEmpty { return path }
         let parts = path.split(separator: "/", omittingEmptySubsequences: false)
         guard !path.isEmpty, path.utf8.count <= 1024, !path.contains("\\"), !path.contains(":"),
-              !path.contains("?"), !path.contains("#"),
+              !path.contains("?"),
               !path.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
               parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && $0.lowercased() != ".git" }) else {
             throw CloudFailure("文件路径无效。")

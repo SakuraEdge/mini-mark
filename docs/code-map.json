@@ -19,7 +19,8 @@
       "path": "src/ui",
       "purpose": "界面布局",
       "files": [
-        "src/ui/layout.ts"
+        "src/ui/layout.ts",
+        "src/ui/text-dialog.ts"
       ]
     },
     {
@@ -37,6 +38,8 @@
       "purpose": "文档模型与示例",
       "files": [
         "src/documents/formats.ts",
+        "src/documents/naming.test.ts",
+        "src/documents/naming.ts",
         "src/documents/sample.ts",
         "src/documents/workspace.test.ts",
         "src/documents/workspace.ts"
@@ -80,7 +83,8 @@
       "purpose": "视觉样式",
       "files": [
         "src/styles/app.css",
-        "src/styles/cloud.css"
+        "src/styles/cloud.css",
+        "src/styles/document-actions.css"
       ]
     },
     {
@@ -126,9 +130,17 @@
       ]
     },
     {
+      "path": "src/features/documents",
+      "purpose": "文档右键菜单与重命名",
+      "files": [
+        "src/features/documents/rename.ts"
+      ]
+    },
+    {
       "path": "native/Host",
       "purpose": "Windows 宿主",
       "files": [
+        "native/Host/DocumentRenaming.cs",
         "native/Host/MainWindow.cs"
       ]
     },
@@ -136,6 +148,8 @@
       "path": "native/Documents",
       "purpose": "Windows 文件与会话",
       "files": [
+        "native/Documents/DocumentNames.cs",
+        "native/Documents/DocumentRenaming.cs",
         "native/Documents/DocumentStore.cs",
         "native/Documents/DocumentWorkspace.cs",
         "native/Documents/ImageAssets.cs"
@@ -173,7 +187,10 @@
         "native/Cloud/CloudDeletionWorkspace.cs",
         "native/Cloud/CloudDocuments.cs",
         "native/Cloud/CloudModels.cs",
+        "native/Cloud/CloudRenameWorkspace.cs",
         "native/Cloud/GitHubCloud.Delete.cs",
+        "native/Cloud/GitHubCloud.Rename.cs",
+        "native/Cloud/GitHubCloud.TreeMutation.cs",
         "native/Cloud/GitHubCloud.cs",
         "native/Cloud/WindowsTokenStore.cs"
       ]
@@ -198,13 +215,16 @@
       "path": "macos/Host",
       "purpose": "macOS 资源宿主",
       "files": [
-        "macos/Host/AppScheme.swift"
+        "macos/Host/AppScheme.swift",
+        "macos/Host/ScriptDialogs.swift"
       ]
     },
     {
       "path": "macos/Documents",
       "purpose": "macOS 文件与会话",
       "files": [
+        "macos/Documents/DocumentNames.swift",
+        "macos/Documents/DocumentRenaming.swift",
         "macos/Documents/DocumentStore.swift",
         "macos/Documents/ImageAssets.swift"
       ]
@@ -230,6 +250,7 @@
       "files": [
         "macos/Diagnostics/CloudDeleteTests.swift",
         "macos/Diagnostics/CloudTests.swift",
+        "macos/Diagnostics/DocumentNameTests.swift",
         "macos/Diagnostics/SmokeTests.swift",
         "macos/Diagnostics/UpdateTests.swift"
       ]
@@ -238,10 +259,11 @@
       "path": "macos/Cloud",
       "purpose": "macOS GitHub 请求、钥匙串凭据与云同步",
       "files": [
+        "macos/Cloud/AuthorizationCode.swift",
         "macos/Cloud/CloudCredentials.swift",
-        "macos/Cloud/CloudDeletion.swift",
         "macos/Cloud/CloudDocumentDeletion.swift",
         "macos/Cloud/CloudDocuments.swift",
+        "macos/Cloud/CloudTreeMutation.swift",
         "macos/Cloud/GitHubCloud.swift"
       ]
     },
@@ -258,6 +280,7 @@
       "files": [
         "tests/cloud-delete.spec.ts",
         "tests/cloud.spec.ts",
+        "tests/document-names.spec.ts",
         "tests/editor.spec.ts",
         "tests/features.spec.ts",
         "tests/fixtures/pdf.md",
@@ -275,6 +298,7 @@
         "native-tests/CloudDeleteTests.cs",
         "native-tests/CloudRefreshTests.cs",
         "native-tests/CloudTests.cs",
+        "native-tests/DocumentNameTests.cs",
         "native-tests/Moye.Tests.csproj",
         "native-tests/Program.cs",
         "native-tests/UpdateTests.cs"
@@ -384,6 +408,7 @@
         "docs/plugins.md",
         "docs/release-rev-v1.0.0.md",
         "docs/release-rev-v1.0.1.md",
+        "docs/release-rev-v1.0.2.md",
         "docs/release-v1.0.0.md",
         "docs/release-v1.0.1.md",
         "docs/release-v1.0.2.md",

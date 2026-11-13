@@ -11,6 +11,7 @@ public static class CloudDeletionWorkspace {
             if (document.Cloud is null || !Includes(document.Cloud, owner, deletion.Path, deletion.Type)) continue;
             document.UntitledName = document.Name;
             document.Cloud = null;
+            document.AutoName = false;
             count++;
         }
         return count;

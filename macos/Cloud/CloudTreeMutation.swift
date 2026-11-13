@@ -1,6 +1,6 @@
 import Foundation
 
-final class CloudDeletion {
+final class CloudTreeMutation {
     typealias Request = (String, String, [String: Any]?, @escaping (Result<Any, Error>) -> Void) -> Void
     private struct TreeEntry {
         let path: String
@@ -12,21 +12,28 @@ final class CloudDeletion {
     private let path: String
     private let expectedSha: String
     private let entryType: String
+    private let renameTo: String?
     private let segments: [String]
     private let request: Request
     private var parents: [[TreeEntry]] = []
     private var branch = ""
     private var head = ""
     private var updatingReference = false
+    private var targetEntry: TreeEntry?
     private var complete: ((Result<String, Error>) -> Void)?
 
-    init(path: String, expectedSha: String, entryType: String, request: @escaping Request) throws {
+    init(path: String, expectedSha: String, entryType: String, renameTo: String? = nil, request: @escaping Request) throws {
         let segments = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         guard !path.isEmpty, segments.count <= 16, segments.allSatisfy(Self.validSegment),
               Self.validSha(expectedSha), ["file", "dir"].contains(entryType) else {
-            throw CloudFailure("删除路径或版本无效，目录最多支持 16 层。")
+            throw CloudFailure("操作路径或版本无效，目录最多支持 16 层。")
         }
         self.path = path; self.expectedSha = expectedSha; self.entryType = entryType
+        if let renameTo = renameTo {
+            guard entryType == "file", try DocumentNames.validate(renameTo, current: segments.last!) == renameTo,
+                  renameTo != segments.last else { throw CloudFailure("云文档新名称无效。") }
+        }
+        self.renameTo = renameTo
         self.segments = segments; self.request = request
     }
 
@@ -58,7 +65,7 @@ final class CloudDeletion {
         fetch("/git/trees/" + tree) { response in
             guard try Self.sha(response) == tree, response["truncated"] as? Bool == false,
                   let items = response["tree"] as? [[String: Any]] else {
-                throw CloudFailure("云端目录未完整返回，删除已停止。")
+                throw CloudFailure("云端目录未完整返回，操作已停止。")
             }
             let entries = try items.map(Self.entry)
             guard Set(entries.map(\.path)).count == entries.count,
@@ -75,8 +82,12 @@ final class CloudDeletion {
             let directory = target.type == "tree" && target.mode == "040000"
             guard (self.entryType == "file" ? regularFile : directory),
                   target.sha.caseInsensitiveCompare(self.expectedSha) == .orderedSame else {
-                throw CloudFailure("云端目标已经变化，未删除。请刷新后重试。")
+                throw CloudFailure("云端目标已经变化，操作未提交。请刷新后重试。")
             }
+            if let destination = self.renameTo, entries.contains(where: { $0.path == destination }) {
+                throw CloudFailure("云端已有同名文件，未重命名。")
+            }
+            self.targetEntry = target
             self.rebuild(depth: depth, child: nil)
         }
     }
@@ -85,6 +96,9 @@ final class CloudDeletion {
         let removedName = segments[depth]
         var entries = parents[depth].filter { $0.path != removedName }.map(\.payload)
         if let child = child { entries.append(["path": removedName, "mode": "040000", "type": "tree", "sha": child]) }
+        else if let destination = renameTo, let target = targetEntry {
+            entries.append(["path": destination, "mode": target.mode, "type": target.type, "sha": target.sha])
+        }
         if entries.isEmpty { entries.append(["path": ".gitkeep", "mode": "100644", "type": "blob", "content": ""]) }
         // Rebuild the complete parent tree without base_tree; retaining it would retain the deleted subtree.
         fetch("/git/trees", method: "POST", payload: ["tree": entries]) { response in
@@ -96,18 +110,19 @@ final class CloudDeletion {
 
     private func commit(tree: String) {
         fetch("/git/commits", method: "POST",
-              payload: ["message": "Delete \(path) via Mini Mark", "tree": tree, "parents": [head]]) { response in
+              payload: ["message": self.renameTo.map { "Rename \(self.path) to \($0) via Mini Mark" } ?? "Delete \(path) via Mini Mark",
+                        "tree": tree, "parents": [head]]) { response in
             let created = try Self.sha(response)
             guard let createdTree = response["tree"] as? [String: Any], try Self.sha(createdTree) == tree,
                   let createdParents = response["parents"] as? [[String: Any]], createdParents.count == 1,
                   try Self.sha(createdParents[0]) == self.head else {
-                throw CloudFailure("新提交内容无法确认，删除未提交。")
+                throw CloudFailure("新提交内容无法确认，操作未提交。")
             }
             self.fetch("/git/ref/heads/" + Self.encode(self.branch)) { latest in
                 guard latest["ref"] as? String == "refs/heads/" + self.branch,
                       let object = latest["object"] as? [String: Any], object["type"] as? String == "commit",
                       try Self.sha(object) == self.head else {
-                    throw CloudFailure("云端分支已经变化，删除未提交，请刷新后重试。", status: 409)
+                    throw CloudFailure("云端分支已经变化，操作未提交，请刷新后重试。", status: 409)
                 }
                 self.updatingReference = true
                 self.fetch("/git/refs/heads/" + Self.encode(self.branch), method: "PATCH", payload: ["sha": created, "force": false]) { reference in
@@ -130,8 +145,8 @@ final class CloudDeletion {
                 if self.updatingReference {
                     let status = (error as? CloudFailure)?.status ?? 0
                     let message = [409, 422].contains(status)
-                        ? "云端分支已经变化，删除未提交，请刷新后重试。"
-                        : "无法确认云端删除结果。请刷新仓库核对，不要直接重复删除。"
+                        ? "云端分支已经变化，操作未提交，请刷新后重试。"
+                        : self.renameTo == nil ? "无法确认云端删除结果。请刷新仓库核对，不要直接重复删除。" : "无法确认云端重命名结果。请刷新仓库核对，不要直接重复操作。"
                     self.finish(.failure(CloudFailure(message, status: status)))
                 } else { self.finish(.failure(error)) }
             }
@@ -146,7 +161,7 @@ final class CloudDeletion {
               let mode = value["mode"] as? String, let type = value["type"] as? String,
               (type == "blob" && ["100644", "100755", "120000"].contains(mode)) ||
                 (type == "tree" && mode == "040000") || (type == "commit" && mode == "160000") else {
-            throw CloudFailure("云端目录包含无法识别的条目，删除已停止。")
+            throw CloudFailure("云端目录包含无法识别的条目，操作已停止。")
         }
         return TreeEntry(path: path, mode: mode, type: type, sha: try sha(value))
     }
@@ -158,7 +173,7 @@ final class CloudDeletion {
         value.range(of: #"\A(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})\z"#, options: .regularExpression) != nil
     }
     private static func validSegment(_ value: String) -> Bool {
-        validTreeName(value) && !value.contains("\\") && !value.contains(":") && !value.contains("?") && !value.contains("#")
+        validTreeName(value) && !value.contains("\\") && !value.contains(":") && !value.contains("?")
     }
     private static func validTreeName(_ value: String) -> Bool {
         !value.isEmpty && value != "." && value != ".." && value.lowercased() != ".git" && !value.contains("/") && !value.contains("\0")

@@ -10,6 +10,7 @@ const areas = [
   ['src/features/theme', '主题过渡'], ['src/features/images', '图片插入'],
   ['src/features/plugins', '自定义插件与隔离执行'],
   ['src/features/formulas', '可视化公式与 Office 复制'], ['src/features/html', 'HTML 编辑入口与隔离运行'],
+  ['src/features/documents', '文档右键菜单与重命名'],
   ['native/Host', 'Windows 宿主'], ['native/Documents', 'Windows 文件与会话'],
   ['native/Infrastructure', 'Windows 路径与进程'], ['native/Export', 'Windows PDF'], ['native/Updates', 'Windows 更新'],
   ['native/Cloud', 'Windows GitHub 请求、凭据续期与云同步'],

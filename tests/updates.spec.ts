@@ -60,7 +60,7 @@ async function finishAutomaticCheck(page: Page) {
 test('Rev update links and installer use the real tag without displaying the internal version', async ({ page }) => {
   await mockUpdates(page, { releases: [rev('1.1.0', '9.1.0')], legacySettings: { auto: false } });
   await openUpdates(page);
-  await expect(page.locator('.update-version')).toHaveText('当前版本 Rev v1.0.1');
+  await expect(page.locator('.update-version')).toHaveText('当前版本 Rev v1.0.2');
   await expect(page.locator('#update-status')).toHaveText('发现新版本 Rev v1.1.0。');
   await expect(page.locator('#update-dialog')).not.toContainText('9.1.0');
   await page.getByRole('button', { name: '查看新版 / 下载' }).click();
