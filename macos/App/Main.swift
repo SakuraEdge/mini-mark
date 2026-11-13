@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     var sessionFile: URL { dataRoot.appendingPathComponent("session-mac-v1.json") }
     var activeIndex: Int { session.documents.firstIndex { $0.id == session.activeId } ?? 0 }
     var smokeStarted = false
+    var smokeDataStoreID: UUID?
     var smokeOutput: URL? {
         guard let index = CommandLine.arguments.firstIndex(of: "--smoke"), index + 1 < CommandLine.arguments.count else { return nil }
         return URL(fileURLWithPath: CommandLine.arguments[index + 1], isDirectory: true)
@@ -42,7 +43,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 800), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "Mini Mark"; window.minSize = NSSize(width: 720, height: 520); window.center(); window.delegate = self
         let config = WKWebViewConfiguration()
-        if smokeOutput != nil { config.websiteDataStore = .nonPersistent() }
+        if smokeOutput != nil {
+            guard #available(macOS 14.0, *) else {
+                smokeFinish(Store.failure("Isolated persistent WK smoke requires macOS 14 or newer"))
+                return
+            }
+            let identifier = UUID()
+            smokeDataStoreID = identifier
+            config.websiteDataStore = WKWebsiteDataStore(forIdentifier: identifier)
+        }
         scheme = AppScheme(root: root); config.setURLSchemeHandler(scheme, forURLScheme: "moye")
         config.userContentController.add(self, name: "bridge")
         config.userContentController.addUserScript(WKUserScript(source: bridgeScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))

@@ -190,14 +190,33 @@ extension AppDelegate {
         } catch { smokeFinish(error) }
     }
     func smokeFinish(_ error: Error?) {
+        guard !confirmedClose else { return }
         confirmedClose = true
-        if let error = error {
-            let details = String(describing: error as NSError)
-            fputs("FAIL \(details)\n", stderr)
-            if let output = smokeOutput { try? details.write(to: output.appendingPathComponent("error.txt"), atomically: true, encoding: .utf8) }
-            exit(1)
+        var finished = false
+        func finish(_ cleanupError: Error? = nil) {
+            guard !finished else { return }
+            finished = true
+            if let failure = error ?? cleanupError {
+                let details = String(describing: failure as NSError)
+                fputs("FAIL \(details)\n", stderr)
+                if let output = self.smokeOutput { try? details.write(to: output.appendingPathComponent("error.txt"), atomically: true, encoding: .utf8) }
+                exit(1)
+            }
+            print("PASS macOS native smoke")
+            NSApp.terminate(nil)
         }
-        print("PASS macOS native smoke")
-        NSApp.terminate(nil)
+        guard #available(macOS 14.0, *), let identifier = smokeDataStoreID else { finish(); return }
+        web?.stopLoading()
+        web?.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
+        web?.removeFromSuperview()
+        web?.navigationDelegate = nil
+        web?.uiDelegate = nil
+        web = nil
+        DispatchQueue.main.async {
+            WKWebsiteDataStore.remove(forIdentifier: identifier) { cleanupError in
+                DispatchQueue.main.async { finish(cleanupError) }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { finish(Store.failure("Isolated WK smoke storage cleanup timed out")) }
     }
 }
