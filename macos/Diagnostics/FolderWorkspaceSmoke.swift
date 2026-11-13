@@ -6,8 +6,9 @@ extension AppDelegate {
         guard let output = smokeOutput else { completion(Store.failure("Workspace smoke output missing")); return }
         let original = session
         do {
-            let folder = output.appendingPathComponent("workspace-fixture").resolvingSymlinksInPath()
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let fixture = output.appendingPathComponent("workspace-fixture")
+            try FileManager.default.createDirectory(at: fixture, withIntermediateDirectories: true)
+            let folder = try physicalWorkspaceFixture(fixture)
             try Data("# Workspace disk\n".utf8).write(to: folder.appendingPathComponent("workspace.md"))
             try Data("not editable".utf8).write(to: folder.appendingPathComponent("unsupported.exe"))
             folderQueue.async {
