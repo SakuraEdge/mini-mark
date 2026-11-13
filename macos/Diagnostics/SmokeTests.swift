@@ -205,7 +205,7 @@ extension AppDelegate {
             print("PASS macOS native smoke")
             NSApp.terminate(nil)
         }
-        guard #available(macOS 14.0, *), let identifier = smokeDataStoreID else { finish(); return }
+        guard smokeDataStoreID != nil, let store = web?.configuration.websiteDataStore else { finish(); return }
         web?.stopLoading()
         web?.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
         web?.removeFromSuperview()
@@ -216,16 +216,12 @@ extension AppDelegate {
         smokeRestoreWeb?.navigationDelegate = nil
         smokeRestoreWeb?.uiDelegate = nil
         smokeRestoreWeb = nil
-        func cleanup(_ attempt: Int) {
-            WKWebsiteDataStore.remove(forIdentifier: identifier) { cleanupError in
-                if cleanupError != nil && attempt < 20 {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { cleanup(attempt + 1) }
-                } else {
-                    DispatchQueue.main.async { finish(cleanupError) }
-                }
+        let types = WKWebsiteDataStore.allWebsiteDataTypes()
+        store.removeData(ofTypes: types, modifiedSince: .distantPast) {
+            store.fetchDataRecords(ofTypes: types) { records in
+                finish(records.isEmpty ? nil : Store.failure("Isolated WK smoke storage retained data"))
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { cleanup(0) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 15) { finish(Store.failure("Isolated WK smoke storage cleanup timed out")) }
     }
 }
