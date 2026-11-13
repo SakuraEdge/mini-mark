@@ -20,6 +20,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     let cloud = GitHubCloud()
     var cloudBusy = false
     var scriptConfirmation: ScriptConfirmation?
+    let folderQueue = DispatchQueue(label: "MiniMark.WorkspaceFolder", qos: .userInitiated)
+    lazy var folders = FolderWorkspace(stateFile: dataRoot.appendingPathComponent("workspace-folder.json"))
+    var folderPanel: NSOpenPanel?
+    var folderGeneration = 0
+    var folderChanging = false
     let root = Bundle.main.resourceURL!.appendingPathComponent("wwwroot")
     let dataRoot: URL = {
         if let path = ProcessInfo.processInfo.environment["MOYE_DATA_DIR"] { return URL(fileURLWithPath: path) }
@@ -37,6 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 800), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "Mini Mark"; window.minSize = NSSize(width: 720, height: 520); window.center(); window.delegate = self
         let config = WKWebViewConfiguration()
+        if smokeOutput != nil { config.websiteDataStore = .nonPersistent() }
         scheme = AppScheme(root: root); config.setURLSchemeHandler(scheme, forURLScheme: "moye")
         config.userContentController.add(self, name: "bridge")
         config.userContentController.addUserScript(WKUserScript(source: bridgeScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -115,6 +121,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             publish(recovered: session.documents.contains { $0.dirty }); persist(); return
         }
         if type == "rendered" { if smokeOutput != nil && !smokeStarted { smokeStarted = true; runSmoke() }; return }
+        if type == "folderRequest" {
+            guard ready else { return }
+            handleFolderRequest(body); return
+        }
         if type == "cloudRequest" {
             guard ready else { return }
             if body["action"] as? String == "rename" {
@@ -207,6 +217,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         }
         if type == "renameDocument" {
             renameDocument(body); return
+        }
+        if type == "openWorkspaceFile" {
+            openWorkspaceFile(body); return
         }
         if type == "save", session.documents[index].cloud != nil {
             beginDocumentOperation { done in self.saveCloudDocument(id, completion: done) }; return
@@ -350,6 +363,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
     func requestClose(_ application: Bool) {
         cancelScriptConfirmation()
+        folderPanel?.cancel(nil)
+        if folderChanging { notice("工作区正在切换，请稍候再退出。"); return }
         if pdfRequest != nil { notice("PDF 正在导出，请稍候再退出。"); return }
         if cloudBusy { notice("云文档正在同步，请稍候再退出。"); return }
         if closingRequest != nil { return }

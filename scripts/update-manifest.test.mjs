@@ -34,3 +34,13 @@ test('invalid versions and empty installers cannot generate a release manifest',
   }
   assert.throws(() => createUpdateManifest('4.0.1', '1.0.1', Buffer.alloc(0)));
 });
+
+test('release notes remain bounded optional text in compatible schema 2 manifests', () => {
+  const notes = '# Rev v1.0.3\n\n- 工作区目录\n- 自定义背景';
+  const manifest = createUpdateManifest('4.0.3', '1.0.3', Buffer.from('installer'), notes);
+  assert.equal(manifest.schemaVersion, 2);
+  assert.equal(manifest.notes, notes);
+  for (const invalid of [null, {}, ['text'], 'a'.repeat(16001), 'a\0b']) {
+    assert.throws(() => createUpdateManifest('4.0.3', '1.0.3', Buffer.from('installer'), invalid));
+  }
+});

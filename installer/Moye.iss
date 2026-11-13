@@ -1,8 +1,8 @@
 #ifndef AppVersion
-  #define AppVersion "4.0.2"
+  #define AppVersion "4.0.3"
 #endif
 #ifndef AppReleaseVersion
-  #define AppReleaseVersion "1.0.2"
+  #define AppReleaseVersion "1.0.3"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\release\MiniMark"

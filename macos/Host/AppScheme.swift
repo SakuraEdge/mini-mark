@@ -22,7 +22,7 @@ final class AppScheme: NSObject, WKURLSchemeHandler {
             let pluginHost = url.host == "app" && url.path == "/plugin-host.html"
             let policy = pluginHost
                 ? "default-src 'none'; script-src 'self' moye://app blob:; worker-src blob:; child-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none';"
-                : "default-src 'self' data: blob: moye:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' moye: data: https:; connect-src 'self' moye:;"
+                : "default-src 'self' data: blob: moye:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' moye: data: blob: https:; connect-src 'self' moye:;"
             let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": type, "Access-Control-Allow-Origin": "*", "Content-Length": String(data.count), "Content-Security-Policy": policy])!
             task.didReceive(response); task.didReceive(data); task.didFinish()
         } catch { task.didFailWithError(error) }

@@ -17,6 +17,11 @@ public static class DocumentStore {
         var info = new FileInfo(path);
         if (info.Length > MaxFileBytes) throw new IOException("文件超过 20 MB，请使用适合大文件的文本工具。");
         var bytes = File.ReadAllBytes(path);
+        return Decode(path, bytes);
+    }
+
+    public static LoadedDocument Decode(string path, byte[] bytes) {
+        if (bytes.LongLength > MaxFileBytes) throw new IOException("文件超过 20 MB，请使用适合大文件的文本工具。");
         var bom = bytes.AsSpan().StartsWith(new byte[] { 0xef, 0xbb, 0xbf });
         var raw = new UTF8Encoding(false, true).GetString(bytes, bom ? 3 : 0, bytes.Length - (bom ? 3 : 0));
         if (raw.Contains('\0')) throw new IOException("此文件不是 UTF-8 文本文档。");

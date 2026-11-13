@@ -8,6 +8,7 @@ struct UpdateManifest: Codable {
     let windowsV2: UpdateAsset?
     let releaseVersion: String?
     let tag: String?
+    let notes: String?
     private static func validVersion(_ value: String) -> Bool {
         let pattern = #"\A(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z"#
         let numbers = value.components(separatedBy: ".").compactMap(Int.init)
@@ -15,7 +16,7 @@ struct UpdateManifest: Codable {
             numbers.count == 3 && numbers.allSatisfy { $0 <= Int32.max }
     }
     func validate() throws {
-        guard Self.validVersion(version), windows.size > 0, windows.size <= 256 * 1024 * 1024,
+        guard (notes?.utf16.count ?? 0) <= 16000, Self.validVersion(version), windows.size > 0, windows.size <= 256 * 1024 * 1024,
               windows.sha256.range(of: #"\A[a-fA-F0-9]{64}\z"#, options: .regularExpression) != nil else { throw Store.failure("更新清单无效。") }
         switch schemaVersion {
         case 1:
@@ -38,6 +39,7 @@ struct UpdateManifest: Codable {
             result["releaseVersion"] = releaseVersion
             result["name"] = "Mini Mark Rev v" + releaseVersion
         }
+        if let notes = notes { result["notes"] = notes }
         return result
     }
 }

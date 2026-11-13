@@ -19,6 +19,8 @@
     <Compile Include="../native/Documents/DocumentNames.cs" Link="DocumentNames.cs" />
     <Compile Include="../native/Documents/DocumentRenaming.cs" Link="DocumentRenaming.cs" />
     <Compile Include="../native/Documents/ImageAssets.cs" Link="ImageAssets.cs" />
+    <Compile Include="../native/Folders/FolderAccess.cs" Link="FolderAccess.cs" />
+    <Compile Include="../native/Folders/FolderWorkspace.cs" Link="FolderWorkspace.cs" />
     <Compile Include="../native/Preview/HtmlResources.cs" Link="HtmlResources.cs" />
     <Compile Include="../native/Updates/GitHubUpdates.cs" Link="GitHubUpdates.cs" />
     <Compile Include="../native/Updates/UpdateManifest.cs" Link="UpdateManifest.cs" />

@@ -1,0 +1,28 @@
+.update-dialog.rev-update-dialog { width: min(600px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; }
+.update-dialog.rev-update-dialog > header { padding: 22px 24px 10px; justify-content: flex-start; align-items: center; gap: 13px; }
+.rev-update-dialog > header > img { width: 44px; height: 44px; }
+.rev-update-dialog > header > div { flex: 1; min-width: 0; }
+.rev-update-dialog > header strong { display: block; font-size: 20px; margin-bottom: 4px; }
+.update-dialog.rev-update-dialog h2 { font-size: 12px; font-weight: 400; color: var(--soft); }
+.update-version-row { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 0 24px; }
+.update-version-row p { margin: 8px 0 0; font-size: 12px; }
+#update-next-version { color: var(--accent); font-weight: 600; }
+.update-dialog.rev-update-dialog #update-status { min-height: 44px; padding: 8px 24px 12px; margin: 0; color: var(--soft); font-size: 12px; line-height: 1.6; }
+.update-dialog.rev-update-dialog[data-state="checking"] #update-status, .update-dialog.rev-update-dialog[data-state="installing"] #update-status { color: var(--accent); }
+.update-release-notes { border-top: 1px solid var(--line); padding: 17px 24px; }
+.update-release-notes h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
+#update-notes { min-height: 120px; max-height: min(270px, 32dvh); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.85; color: var(--soft); padding-right: 8px; }
+.update-bottom { padding: 0 24px 20px; }
+.update-dialog.rev-update-dialog .update-options { border-bottom: 0; padding: 14px 0; gap: 9px; font-size: 12px; }
+.update-dialog.rev-update-dialog footer { margin-top: 4px; gap: 7px; }
+.update-dialog.rev-update-dialog footer button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; font-size: 12px; }
+.update-dialog.rev-update-dialog footer svg { width: 14px; height: 14px; }
+@media (max-width: 480px) {
+  .update-dialog.rev-update-dialog > header { padding: 18px 18px 8px; }
+  .update-version-row { padding: 0 18px; }
+  .update-dialog.rev-update-dialog #update-status { padding: 8px 18px 12px; }
+  .update-release-notes { padding: 14px 18px; }
+  .update-bottom { padding: 0 18px 18px; }
+  .update-dialog.rev-update-dialog footer button { flex: 1 1 130px; }
+  #update-notes { max-height: 28dvh; }
+}

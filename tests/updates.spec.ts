@@ -11,6 +11,7 @@ interface UpdateMock {
   legacySettings?: Record<string, unknown>;
   subsequentReleases?: unknown[];
   subsequentCacheNotice?: string;
+  delayed?: boolean;
 }
 
 async function mockUpdates(page: Page, options: UpdateMock) {
@@ -30,10 +31,12 @@ async function mockUpdates(page: Page, options: UpdateMock) {
         });
         if (message.type === 'checkUpdates') {
           checks++;
-          emit({
+          const respond = () => emit({
             type: 'updateResult', requestId: message.requestId, releases: checks > 1 ? options.subsequentReleases ?? options.releases : options.releases,
             cacheNotice: checks > 1 ? options.subsequentCacheNotice ?? options.cacheNotice : options.cacheNotice, installSupported: true,
           });
+          if (options.delayed) Object.assign(window, { __finishUpdateCheck: respond });
+          else respond();
         }
         if (message.type === 'installUpdate') emit({ type: 'updateInstallStatus', message: '正在下载更新… 30%', downloading: true });
         if (message.type === 'cancelUpdate') emit({ type: 'updateInstallStatus', message: '下载已取消或超时，可以重新尝试。', downloading: false });
@@ -60,7 +63,7 @@ async function finishAutomaticCheck(page: Page) {
 test('Rev update links and installer use the real tag without displaying the internal version', async ({ page }) => {
   await mockUpdates(page, { releases: [rev('1.1.0', '9.1.0')], legacySettings: { auto: false } });
   await openUpdates(page);
-  await expect(page.locator('.update-version')).toHaveText('当前版本 Rev v1.0.2');
+  await expect(page.locator('.update-version')).toHaveText('当前版本 Rev v1.0.3');
   await expect(page.locator('#update-status')).toHaveText('发现新版本 Rev v1.1.0。');
   await expect(page.locator('#update-dialog')).not.toContainText('9.1.0');
   await page.getByRole('button', { name: '查看新版 / 下载' }).click();
@@ -171,4 +174,52 @@ test('a deferred automatic reminder cannot reopen after a newer manual cached re
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(page.locator('#update-dialog')).not.toBeVisible();
   expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!).promptedMajor, REV_SETTINGS)).toBe(0);
+});
+
+test('brand opens the shared update dialog and shows bundled notes while checking', async ({ page }) => {
+  await mockUpdates(page, { releases: [], delayed: true, legacySettings: { auto: false } });
+  await page.getByRole('button', { name: 'Mini Mark 版本与更新', exact: true }).click();
+  await expect(page.locator('#update-dialog')).toBeVisible();
+  await expect(page.locator('#update-dialog')).toHaveAttribute('data-state', 'checking');
+  await expect(page.locator('#update-dialog')).toHaveAttribute('aria-busy', 'true');
+  await expect(page.locator('#update-notes-title')).toContainText('Rev v1.0.3');
+  await expect(page.locator('#update-notes')).not.toBeEmpty();
+  await page.evaluate(() => (window as any).__finishUpdateCheck());
+  await expect(page.locator('#update-dialog')).toHaveAttribute('data-state', 'current');
+  await page.getByRole('button', { name: '关闭更新窗口', exact: true }).click();
+  await openUpdates(page);
+  expect(await page.locator('#update-dialog').count()).toBe(1);
+});
+
+test('fresh candidate notes render as inert text and offline results return to bundled notes', async ({ page }) => {
+  const dangerous = '<script>window.__unsafeNotes=true</script>\n- Added workspace support\n![image](https://example.com/tracker.png)';
+  await mockUpdates(page, {
+    releases: [{ ...rev('1.1.0'), notes: dangerous }], legacySettings: { auto: false },
+    subsequentCacheNotice: '网络暂不可用，显示缓存。', subsequentReleases: [{ ...rev('1.1.0'), notes: 'Cached candidate notes' }],
+  });
+  await openUpdates(page);
+  await expect(page.locator('#update-notes')).toHaveText(dangerous);
+  expect(await page.locator('#update-notes script,#update-notes img').count()).toBe(0);
+  expect(await page.evaluate(() => (window as any).__unsafeNotes)).toBeUndefined();
+  await page.locator('#update-check').click();
+  await expect(page.locator('#update-dialog')).toHaveAttribute('data-state', 'offline');
+  await expect(page.locator('#update-notes-title')).toContainText('Rev v1.0.3');
+  await expect(page.locator('#update-notes')).not.toContainText('Cached candidate notes');
+});
+
+test('update notes and controls remain scrollable and on screen across viewports', async ({ page }, testInfo) => {
+  await mockUpdates(page, { releases: [{ ...rev('1.1.0'), notes: Array.from({ length: 60 }, (_, index) => `- 更新内容 ${index + 1}`).join('\n') }], legacySettings: { auto: false } });
+  await openUpdates(page);
+  for (const width of [1180, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const bounds = await page.locator('#update-dialog').evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      return { width: element.clientWidth, scroll: element.scrollWidth, right: rect.right, bottom: rect.bottom };
+    });
+    expect(bounds.scroll).toBeLessThanOrEqual(bounds.width);
+    expect(bounds.right).toBeLessThanOrEqual(width); expect(bounds.bottom).toBeLessThanOrEqual(844);
+    expect(await page.locator('#update-notes').evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+    await expect(page.getByRole('button', { name: '下载并覆盖更新', exact: true })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath(`updates-notes-${width}.png`) });
+  }
 });

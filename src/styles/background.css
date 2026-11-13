@@ -1,0 +1,21 @@
+#app:has(#theme-background) { position: relative; isolation: isolate; }
+#theme-background { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; z-index: -1; }
+.has-theme-background .sidebar { background: color-mix(in srgb, var(--sidebar) 94%, transparent); }
+.has-theme-background .document-tabs, .has-theme-background .toolbar, .has-theme-background .topbar,
+.has-theme-background .statusbar { background: color-mix(in srgb, var(--bg) 91%, transparent); }
+.has-theme-background .document-surface, .has-theme-background #editor .cm-editor,
+.has-theme-background .document-surface > .reading-view { background: transparent; }
+.background-dialog .background-preview { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 8; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--muted); }
+.background-preview img { position: absolute; inset: 0; height: 100%; width: 100%; object-fit: cover; }
+.background-file { display: flex; align-items: center; gap: 12px; margin: 14px 0 18px; }
+#background-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; color: var(--soft); }
+.background-dialog button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex-shrink: 0; }
+.background-dialog button svg { width: 16px; height: 16px; }
+.background-enabled { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); padding: 17px 0; }
+.background-enabled input { width: 17px; height: 17px; accent-color: var(--accent); }
+.background-range-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+#background-value { min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; color: var(--soft); }
+.background-dialog #background-transparency { width: 100%; height: 28px; padding: 0; border: 0; accent-color: var(--accent); background: none; }
+#background-status { min-height: 22px; color: var(--soft); line-height: 1.6; overflow-wrap: anywhere; }
+.background-dialog footer { justify-content: space-between; }
+@media print { #theme-background { display: none !important; } }

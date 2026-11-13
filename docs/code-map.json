@@ -64,6 +64,7 @@
       "path": "src/features/updates",
       "purpose": "更新界面与版本",
       "files": [
+        "src/features/updates/current-release.json",
         "src/features/updates/updates.test.ts",
         "src/features/updates/updates.ts"
       ]
@@ -83,14 +84,21 @@
       "purpose": "视觉样式",
       "files": [
         "src/styles/app.css",
+        "src/styles/background.css",
         "src/styles/cloud.css",
-        "src/styles/document-actions.css"
+        "src/styles/document-actions.css",
+        "src/styles/updates.css",
+        "src/styles/workspace.css"
       ]
     },
     {
       "path": "src/features/theme",
       "purpose": "主题过渡",
       "files": [
+        "src/features/theme/background-image.test.ts",
+        "src/features/theme/background-image.ts",
+        "src/features/theme/background-storage.ts",
+        "src/features/theme/background.ts",
         "src/features/theme/theme.ts"
       ]
     },
@@ -137,10 +145,22 @@
       ]
     },
     {
+      "path": "src/features/workspace",
+      "purpose": "工作区目录树、分页和文件夹协议",
+      "files": [
+        "src/features/workspace/browser.ts",
+        "src/features/workspace/client.ts",
+        "src/features/workspace/manager.ts",
+        "src/features/workspace/model.test.ts",
+        "src/features/workspace/model.ts"
+      ]
+    },
+    {
       "path": "native/Host",
       "purpose": "Windows 宿主",
       "files": [
         "native/Host/DocumentRenaming.cs",
+        "native/Host/FolderRequests.cs",
         "native/Host/MainWindow.cs"
       ]
     },
@@ -196,6 +216,14 @@
       ]
     },
     {
+      "path": "native/Folders",
+      "purpose": "Windows 工作区根目录授权与安全读取",
+      "files": [
+        "native/Folders/FolderAccess.cs",
+        "native/Folders/FolderWorkspace.cs"
+      ]
+    },
+    {
       "path": "native/Preview",
       "purpose": "Windows HTML 运行与 Chrome 启动",
       "files": [
@@ -216,6 +244,7 @@
       "purpose": "macOS 资源宿主",
       "files": [
         "macos/Host/AppScheme.swift",
+        "macos/Host/FolderWorkspaceBridge.swift",
         "macos/Host/ScriptDialogs.swift"
       ]
     },
@@ -226,6 +255,7 @@
         "macos/Documents/DocumentNames.swift",
         "macos/Documents/DocumentRenaming.swift",
         "macos/Documents/DocumentStore.swift",
+        "macos/Documents/FolderWorkspace.swift",
         "macos/Documents/ImageAssets.swift"
       ]
     },
@@ -248,9 +278,12 @@
       "path": "macos/Diagnostics",
       "purpose": "macOS 实际运行验证",
       "files": [
+        "macos/Diagnostics/BackgroundSmoke.swift",
         "macos/Diagnostics/CloudDeleteTests.swift",
         "macos/Diagnostics/CloudTests.swift",
         "macos/Diagnostics/DocumentNameTests.swift",
+        "macos/Diagnostics/FolderWorkspaceSmoke.swift",
+        "macos/Diagnostics/FolderWorkspaceTests.swift",
         "macos/Diagnostics/SmokeTests.swift",
         "macos/Diagnostics/UpdateTests.swift"
       ]
@@ -278,17 +311,21 @@
       "path": "tests",
       "purpose": "界面回归",
       "files": [
+        "tests/background.spec.ts",
         "tests/cloud-delete.spec.ts",
         "tests/cloud.spec.ts",
         "tests/document-names.spec.ts",
         "tests/editor.spec.ts",
         "tests/features.spec.ts",
         "tests/fixtures/pdf.md",
+        "tests/fixtures/workspace-tree/docs/note.md",
+        "tests/fixtures/workspace-tree/program.bin",
         "tests/formulas.spec.ts",
         "tests/host-sync.spec.ts",
         "tests/html-selection.spec.ts",
         "tests/tab-motion.spec.ts",
-        "tests/updates.spec.ts"
+        "tests/updates.spec.ts",
+        "tests/workspace.spec.ts"
       ]
     },
     {
@@ -299,6 +336,7 @@
         "native-tests/CloudRefreshTests.cs",
         "native-tests/CloudTests.cs",
         "native-tests/DocumentNameTests.cs",
+        "native-tests/FolderWorkspaceTests.cs",
         "native-tests/Moye.Tests.csproj",
         "native-tests/Program.cs",
         "native-tests/UpdateTests.cs"
@@ -409,6 +447,7 @@
         "docs/release-rev-v1.0.0.md",
         "docs/release-rev-v1.0.1.md",
         "docs/release-rev-v1.0.2.md",
+        "docs/release-rev-v1.0.3.md",
         "docs/release-v1.0.0.md",
         "docs/release-v1.0.1.md",
         "docs/release-v1.0.2.md",
@@ -423,6 +462,7 @@
         "docs/updates-development.md",
         "docs/updates.png",
         "docs/validation.md",
+        "docs/workspace-development.md",
         "docs/写下一个好想法.md"
       ]
     }

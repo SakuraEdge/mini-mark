@@ -24,6 +24,12 @@ internal static class Program {
         // Write the original pre-normalization session shape to cover older installations.
         var session = Path.Combine(folder, "session-v2.json");
         File.WriteAllText(session, JsonSerializer.Serialize(new WorkspaceSession(2, new List<OpenDocument> { fixture.Active }, fixture.ActiveId, 2)).Replace("Windows note\\n\\nKeep this text.\\n", "Windows note\\r\\n\\r\\nKeep this text.\\r\\n"));
+        var treeRoot = Path.Combine(folder, "folder-workspace");
+        Directory.CreateDirectory(Path.Combine(treeRoot, "nested"));
+        DocumentStore.Write(Path.Combine(treeRoot, "nested", "工作区.yml"), "name: native workspace\n", true, "\r\n");
+        File.WriteAllText(Path.Combine(treeRoot, ".unsupported"), "visible but not opened");
+        File.WriteAllText(Path.Combine(treeRoot, "preview.html"), "<script>throw new Error('Must not execute')</script>");
+        var seededRoot = new FolderWorkspace(folder).SelectRoot(treeRoot);
         ApplicationConfiguration.Initialize();
         using var window = new MainWindow([]) { ShowInTaskbar = false, Opacity = 0 };
         var browser = window.Controls.OfType<WebView2>().Single();
@@ -237,6 +243,113 @@ internal static class Program {
                 await Wait("document.getElementById('save-state').textContent === '已保存'", "Save after local rename failed");
                 if (!File.ReadAllText(renameTarget).Contains("Dirty edit.")) throw new Exception("Renamed file save lost dirty text");
                 Console.WriteLine("PASS native H1 auto naming, persistent manual override, inactive-tab rename, local atomic rename with dirty text and original bytes");
+                await browser.CoreWebView2.ExecuteScriptAsync("""
+                (() => {
+                    window.__folderReplies = {};
+                    window.__folderSnapshot = null;
+                    window.chrome.webview.addEventListener('message', event => {
+                        if (event.data.type === 'folderResponse') window.__folderReplies[event.data.requestId] = event.data;
+                        if (event.data.type === 'workspace') window.__folderSnapshot = event.data.document;
+                    });
+                })()
+                """);
+                async Task<JsonElement> FolderRequest(string id, string action, string? rootId = null, string? relative = null) {
+                    await browser.CoreWebView2.ExecuteScriptAsync($"window.chrome.webview.postMessage({JsonSerializer.Serialize(new { type = "folderRequest", requestId = id, action, rootId, path = relative })})");
+                    await Wait($"Boolean(window.__folderReplies[{JsonSerializer.Serialize(id)}])", "Folder request did not complete: " + action);
+                    using var reply = JsonDocument.Parse(await browser.CoreWebView2.ExecuteScriptAsync($"window.__folderReplies[{JsonSerializer.Serialize(id)}]"));
+                    return reply.RootElement.Clone();
+                }
+                var unrequested = await FolderRequest("not-restored", "list", seededRoot.Id, "");
+                if (!unrequested.TryGetProperty("error", out _)) throw new Exception("Saved workspace was authorized before explicit restore");
+                var folderReply = await FolderRequest("restore-tree", "restore");
+                if (folderReply.TryGetProperty("error", out _)) throw new Exception("Native workspace restore failed: " + folderReply);
+                var authorized = folderReply.GetProperty("data").GetProperty("root").GetProperty("id").GetString()!;
+                if (authorized == seededRoot.Id || folderReply.GetProperty("data").GetProperty("entries").GetArrayLength() != 3)
+                    throw new Exception("Native restored tree reused authorization or omitted unsupported entries");
+                var childReply = await FolderRequest("list-child", "list", authorized, "nested");
+                if (childReply.GetProperty("data").GetProperty("entries")[0].GetProperty("path").GetString() != "nested/工作区.yml")
+                    throw new Exception("Native folder lazy traversal failed");
+                await Click("new-tab");
+                await Wait("window.__folderSnapshot?.name.startsWith('未命名') && !document.getElementById('app').classList.contains('transition-pending')", "Workspace draft fixture did not open");
+                await browser.CoreWebView2.ExecuteScriptAsync($$"""
+                (() => {
+                    const draft = window.__folderSnapshot;
+                    window.__folderDraftId = draft.id;
+                    window.chrome.webview.postMessage({
+                        type:'openWorkspaceFile', documentId:draft.id, revision:draft.revision+1,
+                        text:'Pending workspace draft', rootId:{{JsonSerializer.Serialize(authorized)}}, path:'nested/工作区.yml'
+                    });
+                })()
+                """);
+                await Wait("document.getElementById('document-name').textContent === '工作区.yml' && !document.getElementById('app').classList.contains('transition-pending')", "Native folder open stalled");
+                var treeSession = DocumentWorkspace.Restore(session, Path.Combine(folder, "draft.json"));
+                if (!treeSession.Documents.Any(document => document.Text == "Pending workspace draft") ||
+                    treeSession.Active.Text != "name: native workspace\n" || !treeSession.Active.Bom || treeSession.Active.Newline != "\r\n")
+                    throw new Exception("Workspace opening lost the pending active draft or document encoding");
+                await browser.CoreWebView2.ExecuteScriptAsync($$"""
+                (() => {
+                    const current = window.__folderSnapshot;
+                    window.chrome.webview.postMessage({type:'openWorkspaceFile', documentId:current.id,
+                        text:'Unsaved workspace text', revision:current.revision+1,
+                        rootId:{{JsonSerializer.Serialize(authorized)}}, path:'nested/工作区.yml'});
+                })()
+                """);
+                await Wait("document.querySelector('.cm-content').textContent === 'Unsaved workspace text' && document.getElementById('save-state').textContent === '未保存'", "Reopening an existing workspace file replaced dirty text");
+                await browser.CoreWebView2.ExecuteScriptAsync($$"""
+                (() => {
+                    const current = window.__folderSnapshot;
+                    window.chrome.webview.postMessage({type:'openWorkspaceFile', documentId:current.id,
+                        text:current.text, revision:current.revision,
+                        rootId:{{JsonSerializer.Serialize(authorized)}}, path:'preview.html'});
+                })()
+                """);
+                await Wait("document.getElementById('document-name').textContent === 'preview.html'", "Workspace HTML did not open in source mode");
+                if (window.OwnedForms.OfType<HtmlPreviewWindow>().Any()) throw new Exception("Workspace HTML executed without explicit Run");
+                var treeClosed = await FolderRequest("close-tree", "close");
+                if (treeClosed.GetProperty("data").GetProperty("root").ValueKind != JsonValueKind.Null || File.Exists(Path.Combine(folder, "workspace-folder.json")))
+                    throw new Exception("Closing native workspace did not revoke persistence");
+                var stale = await FolderRequest("stale-tree", "list", authorized);
+                if (!stale.TryGetProperty("error", out _) || !await Evaluate("document.getElementById('document-name').textContent === 'preview.html'"))
+                    throw new Exception("Stale workspace request changed the active document");
+                new FolderWorkspace(folder).SelectRoot(treeRoot);
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-sidebar-mode=workspace]').click()");
+                await Wait("!document.getElementById('workspace-document-panel').hidden && Boolean(document.querySelector('.workspace-entry[data-path=nested]'))", "Native workspace sidebar did not restore its folder");
+                if (!await Evaluate("document.querySelector('.workspace-entry[data-path=\".unsupported\"]').disabled"))
+                    throw new Exception("Unsupported workspace entry was interactive");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('.workspace-entry[data-path=nested]').click()");
+                await Wait("Boolean(document.querySelector('.workspace-entry[data-path=\"nested/工作区.yml\"]'))", "Native directory expansion did not load children");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('.workspace-entry[data-path=\"nested/工作区.yml\"]').click()");
+                await Wait("document.getElementById('document-name').textContent === '工作区.yml' && document.querySelector('.cm-content').textContent === 'Unsaved workspace text'", "Workspace tree click lost the existing dirty tab");
+                await Click("close-workspace");
+                await Wait("document.getElementById('workspace-root-tools').hidden && document.getElementById('document-name').textContent === '工作区.yml'", "Closing workspace sidebar closed the active document");
+                Console.WriteLine("PASS native folder opt-in restore, lazy traversal, unsupported files, source-only HTML, stale root rejection and pending/dirty draft preservation");
+                await browser.CoreWebView2.ExecuteScriptAsync("window.__beforeBackground=document.querySelector('.cm-content').textContent");
+                await Click("custom-background");
+                await Wait("document.getElementById('background-dialog').open", "Background settings did not open");
+                await browser.CoreWebView2.ExecuteScriptAsync($$"""
+                (() => {
+                    const data = new DataTransfer();
+                    data.items.add(new File([Uint8Array.from(atob('{{base64}}'), value => value.charCodeAt(0))], 'native-background.png', {type:'image/png'}));
+                    const input = document.getElementById('background-file-input');
+                    input.files = data.files;
+                    input.dispatchEvent(new Event('change',{bubbles:true}));
+                })()
+                """);
+                await Wait("document.getElementById('theme-background').naturalWidth === 24 && document.getElementById('background-enabled').checked", "Background image did not persist/render in actual WebView2");
+                await browser.CoreWebView2.ExecuteScriptAsync("""
+                (() => {
+                    const range=document.getElementById('background-transparency');
+                    window.__beforeBackgroundOpacity=getComputedStyle(document.getElementById('theme-background')).opacity;
+                    range.value='40';range.dispatchEvent(new Event('input',{bubbles:true}));
+                    range.dispatchEvent(new Event('change',{bubbles:true}));
+                })()
+                """);
+                await Wait("getComputedStyle(document.getElementById('theme-background')).opacity !== window.__beforeBackgroundOpacity", "Background transparency did not change opacity");
+                if (!await Evaluate("document.querySelector('.cm-content').textContent === window.__beforeBackground")) throw new Exception("Appearance setting changed document text");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.getElementById('background-enabled').click()");
+                await Wait("!document.getElementById('background-enabled').checked", "Background disable did not respond");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.getElementById('background-dialog').close()");
+                Console.WriteLine("PASS actual WebView2 background image import/render, opacity and disable without document changes");
                 if (!window.Text.Contains("Mini Mark")) throw new Exception("Window branding did not update");
                 Console.WriteLine($"PASS actual WebView2 CRLF restore, native New/Open/Save/tab buttons, view/theme/focus/menu controls, clean session, bounded messages ({received})");
                 Console.WriteLine("PASS actual WebView2 image import/render/save and plugin sandbox/network/bridge isolation");

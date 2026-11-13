@@ -7,7 +7,7 @@ namespace Moye;
 public sealed record UpdateAsset(string Url, string Sha256, long Size);
 public sealed record DownloadedInstaller(string Path, UpdateAsset Asset);
 public sealed record UpdateManifest(int SchemaVersion, string Version, UpdateAsset Windows, UpdateAsset? WindowsV2 = null,
-    string? ReleaseVersion = null, string? Tag = null) {
+    string? ReleaseVersion = null, string? Tag = null, string? Notes = null) {
     public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     public const long MaximumInstallerBytes = 256 * 1024 * 1024;
     public static UpdateManifest Parse(byte[] bytes) {
@@ -16,6 +16,7 @@ public sealed record UpdateManifest(int SchemaVersion, string Version, UpdateAss
     }
     public void Validate() {
         if (SchemaVersion is not (1 or 2) || !IsStableVersion(Version)) throw new IOException("更新版本格式无效。");
+        if (Notes?.Length > 16000) throw new IOException("更新说明过长。");
         if (SchemaVersion == 2) {
             if (!IsStableVersion(ReleaseVersion) || Tag != "rev-v" + ReleaseVersion || WindowsV2 is not null)
                 throw new IOException("Rev 发布版本信息无效。");
@@ -43,8 +44,8 @@ public sealed record UpdateManifest(int SchemaVersion, string Version, UpdateAss
     public string ReleaseTag => SchemaVersion == 2 ? Tag! : "v" + Version;
     [JsonIgnore]
     public JsonElement Releases => SchemaVersion == 2
-        ? JsonSerializer.SerializeToElement(new[] { new { tag_name = ReleaseTag, version = Version, releaseVersion = ReleaseVersion, name = "Mini Mark Rev v" + ReleaseVersion, draft = false, prerelease = false } })
-        : JsonSerializer.SerializeToElement(new[] { new { tag_name = ReleaseTag, version = Version, draft = false, prerelease = false } });
+        ? JsonSerializer.SerializeToElement(new[] { new { tag_name = ReleaseTag, version = Version, releaseVersion = ReleaseVersion, name = "Mini Mark Rev v" + ReleaseVersion, notes = Notes, draft = false, prerelease = false } })
+        : JsonSerializer.SerializeToElement(new[] { new { tag_name = ReleaseTag, version = Version, notes = Notes, draft = false, prerelease = false } });
 }
 public sealed record UpdateCheck(UpdateManifest Manifest, DateTimeOffset CheckedAt, bool OfflineCache) {
     [JsonIgnore]

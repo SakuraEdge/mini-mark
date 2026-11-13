@@ -105,6 +105,7 @@ try {
     await CloudTests.Run(folder, Check);
     await CloudDeleteTests.Run(folder, Check);
     DocumentNameTests.Run(folder, Check);
+    FolderWorkspaceTests.Run(folder, Check);
     if (args.Contains("--live-update")) {
         var live = await new GitHubUpdates(Path.Combine(folder, "live")).Check();
         Check(!live.OfflineCache, "Live update check used an offline cache");

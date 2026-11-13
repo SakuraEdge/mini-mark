@@ -2,12 +2,14 @@ import { sample } from '../documents/sample';
 import { BrowserWorkspace, type DocumentData, type TabData } from '../documents/workspace';
 import { documentLanguage, formatLabel } from '../documents/formats';
 import type { CloudBinding } from '../features/cloud/model';
+import { browserFolderRequest, readBrowserWorkspaceFile } from '../features/workspace/browser';
 export type { DocumentData, TabData } from '../documents/workspace';
 
 export type HostMessage =
   | { type: 'workspace'; tabs: TabData[]; document: DocumentData; recovered?: boolean }
   | { type: 'saved'; documentId: string; name: string; path?: string; text: string; cloud?: CloudBinding | null; autoName?: boolean }
   | { type: 'cloudResponse'; requestId: string; data?: unknown; error?: string }
+  | { type: 'folderResponse'; requestId: string; data?: unknown; error?: string }
   | { type: 'requestClosingText'; requestId: string }
   | { type: 'requestExportPdf'; requestId: string; documentId: string; text: string; name: string }
   | { type: 'operationComplete' }
@@ -66,6 +68,11 @@ export function connect(callback: typeof onMessage) {
 
 export function send(type: string, payload: Record<string, unknown> = {}) {
   if (native) { native.postMessage({ type, ...payload }); return; }
+  if (type === 'folderRequest') {
+    void browserFolderRequest(String(payload.action), payload).then(data => onMessage({ type: 'folderResponse', requestId: String(payload.requestId), data }),
+      error => onMessage({ type: 'folderResponse', requestId: String(payload.requestId), error: error instanceof Error ? error.message : '工作区读取失败。' }));
+    return;
+  }
   if (type === 'copyEquation') {
     void navigator.clipboard.write([new ClipboardItem({
       'text/html': new Blob([String(payload.html)], { type: 'text/html' }),
@@ -83,6 +90,17 @@ export function send(type: string, payload: Record<string, unknown> = {}) {
   if (typeof payload.text === 'string' && typeof payload.revision === 'number') workspace.update(id, payload.text, payload.revision, typeof payload.autoTitle === 'string' ? payload.autoTitle : undefined);
   const doc = workspace.documents.find(item => item.id === id);
   if (type === 'edit') { persist(); return; }
+  if (type === 'openWorkspaceFile') {
+    void readBrowserWorkspaceFile(String(payload.rootId), String(payload.path)).then(file => {
+      const path = `workspace:${String(payload.rootId)}/${String(payload.path)}`;
+      const existing = workspace.documents.find(item => item.path === path);
+      if (existing) workspace.activate(existing.id);
+      else { const opened = workspace.add(file.text, file.name, file.text); opened.path = path; }
+      publish();
+    }).catch(error => onMessage({ type: 'error', message: error instanceof Error ? error.message : '工作区文件打开失败。' }))
+      .finally(() => onMessage({ type: 'operationComplete' }));
+    return;
+  }
   if (type === 'new') { workspace.add(String(payload.initialText ?? ''), typeof payload.name === 'string' ? payload.name : undefined); publish(); }
   if (type === 'activate') { workspace.activate(String(payload.targetId)); publish(); }
   if (type === 'renameDocument') {

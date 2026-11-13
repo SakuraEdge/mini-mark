@@ -6,7 +6,7 @@
 
 Markdown、YAML、HTML 编辑器，支持 Windows 和 macOS。
 
-[![Release](https://img.shields.io/badge/release-Rev%20v1.0.2-286bd6)](https://github.com/SakuraEdge/mini-mark/releases/latest)
+[![Release](https://img.shields.io/badge/release-Rev%20v1.0.3-286bd6)](https://github.com/SakuraEdge/mini-mark/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-526a85)](LICENSE)
 
 [下载正式版](https://github.com/SakuraEdge/mini-mark/releases/latest) · [版本记录](https://github.com/SakuraEdge/mini-mark/releases) · [反馈问题](https://github.com/SakuraEdge/mini-mark/issues)
@@ -21,6 +21,7 @@ Markdown、YAML、HTML 编辑器，支持 Windows 和 macOS。
 | --- | --- |
 | Markdown | 即时排版、源码、阅读、分屏；公式、表格、任务清单与大纲 |
 | 多文档 | 独立标签、右键重命名、撤销记录和草稿恢复 |
+| 工作区 | 打开文件夹、浏览目录、按需展开子文件夹 |
 | 中文命令 | 输入 `/公式`、`/代码`、`/表格` 插入对应内容 |
 | YAML | 语法高亮，保留注释和缩进 |
 | HTML | 编辑源码，在内置浏览器或本地 Chrome 中运行 |
@@ -28,9 +29,15 @@ Markdown、YAML、HTML 编辑器，支持 Windows 和 macOS。
 | 导出 | PDF 阅读副本、HTML 页面 |
 | 插件 | 用 JavaScript 添加文字处理命令 |
 
-支持亮色和深色主题。切换文档与主题带有过渡动画，遵循系统的“减少动画”设置。
+支持亮色和深色主题，也可在“更多 → 主题背景”中导入本地 PNG、JPEG、WebP 图片并调整透明度。背景只保存在本机，不影响正文和导出。切换文档与主题带有过渡动画，遵循系统的“减少动画”设置。
 
 新建 Markdown 草稿的第一行是 H1 标题时，文档名自动取该标题；第一行不是 H1 时保持原名。手动重命名或保存后，不再自动改名。
+
+## 工作区
+
+左侧可切换“单文档”或“工作区文档”。点击“打开文件夹”后，工作区显示目录中的文件和子文件夹。Markdown、YAML、HTML、TXT 文件可直接打开，不覆盖已有标签中的修改。
+
+目录按需展开，文件较多时分批显示。可刷新目录或关闭工作区；关闭工作区不会关闭已打开的文档。不支持编辑的文件和链接仅显示，不自动运行。桌面版会记住选择的文件夹；浏览器预览重新打开后需再次选择。
 
 ## 云文档
 
@@ -98,7 +105,7 @@ macOS 将 `Mini Mark.app` 拖入 Applications。当前包使用 **ad-hoc 签名�
 
 本地文档支持 UTF-8 文本，打开上限为 20 MB。草稿恢复不替代正式保存；PDF 是阅读副本，导出后仍需保存源文件。
 
-“更多 → 检测更新”可检查正式版本。Windows 支持下载并覆盖安装，沿用安装目录并保留文档和草稿。Rev v1.0.1 起，发布页和下载包统一使用 Rev 版本号；同一大版本内可检测并安装更新，不自动弹窗，升到 Rev v2.0.0 时才提醒。大版本提醒可关闭。
+点击左上角 Mini Mark，或“更多 → 检测更新”，可查看版本更新内容并检查正式版本。Windows 支持下载并覆盖安装，沿用安装目录并保留文档和草稿。同一大版本内可检测并安装更新，不自动弹窗，升到 Rev v2.0.0 时才提醒。大版本提醒可关闭。
 
 本地编辑可离线使用，没有遥测。GitHub 登录、云同步、更新检测和外链图片需要网络。暂不支持 Mermaid。
 

@@ -66,7 +66,11 @@ public sealed class DocumentWorkspace {
         var absolute = System.IO.Path.GetFullPath(path);
         var existing = Documents.Find(document => document.Path is not null && SamePath(document.Path, absolute));
         if (existing is not null) { ActiveId = existing.Id; return existing; }
-        var loaded = DocumentStore.Read(absolute);
+        return Open(DocumentStore.Read(absolute));
+    }
+    public OpenDocument Open(LoadedDocument loaded) {
+        var existing = Documents.Find(document => document.Path is not null && SamePath(document.Path, loaded.Path));
+        if (existing is not null) { ActiveId = existing.Id; return existing; }
         var document = new OpenDocument(); document.Load(loaded);
         Documents.Add(document); ActiveId = document.Id; return document;
     }

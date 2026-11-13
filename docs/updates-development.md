@@ -7,6 +7,7 @@
 - 两平台读取 `updates/rev-stable.json`，失败后读取最新正式 Release 的 `update.json`。schema 2 包含内部 `version`、公开 `releaseVersion`、实际 `tag` 和 Windows 安装器的地址、大小、SHA-256。
 - 原生端严格检查 tag、Rev 文件名和 GitHub 下载路径一致。Windows 下载前后验证大小和哈希，安装前再次校验，不接受任意地址。
 - 前端用内部版本判断有无更新，用 Rev 主版本决定是否自动弹窗。同主版本不弹窗，手动检测和安装仍可使用。旧提醒偏好迁移到 `moye.updates.rev.v1`，保留自动检测与关闭提醒选项，但不迁移旧的主版本提醒计数。
+- Rev v1.0.3 起，清单增加可选 `notes` 纯文本字段，最多 16000 个 UTF-16 代码单元。发布脚本从对应的 `docs/release-rev-vX.Y.Z.md` 生成，老清单缺少此字段仍可读取；不另外请求 GitHub API。新版更新窗口通过 `textContent` 展示内容，不执行 HTML 或加载远程图片。当前版本说明位于 `src/features/updates/current-release.json`，发行时同步版本及摘要。
 
 ## 一次性过渡
 

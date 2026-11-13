@@ -5,6 +5,7 @@ import PDFKit
 func runStoreTests() throws {
     try runUpdateManifestTests()
     try runDocumentNameTests()
+    try runFolderWorkspaceTests()
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent("moye-test-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: folder) }
@@ -155,6 +156,10 @@ extension AppDelegate {
                 if let error = error { self.smokeFinish(error); return }
                 self.checkConfirmationSmoke { error in
                 if let error = error { self.smokeFinish(error); return }
+                self.checkFolderWorkspaceSmoke { error in
+                if let error = error { self.smokeFinish(error); return }
+                self.checkBackgroundSmoke { error in
+                if let error = error { self.smokeFinish(error); return }
                 self.web.takeSnapshot(with: nil) { image, error in
                     if let image = image, let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff), let png = bitmap.representation(using: .png, properties: [:]) { try? png.write(to: output.appendingPathComponent("macos-editor.png")) }
                     do {
@@ -165,6 +170,8 @@ extension AppDelegate {
                         guard try Store.read(path).text == self.session.documents[index].text else { throw Store.failure("Native save mismatch") }
                         try self.beginPdf(self.session.documents[index], output.appendingPathComponent("macos-export.pdf"))
                     } catch { self.smokeFinish(error) }
+                }
+                }
                 }
                 }
                 }

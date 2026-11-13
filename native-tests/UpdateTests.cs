@@ -14,6 +14,7 @@ static class UpdateTests {
         branded.Validate();
         check(branded.DownloadAsset.Url.Contains("/mini-mark/"), "New updater did not select branded installer");
         check(UpdateManifest.Parse(JsonSerializer.SerializeToUtf8Bytes(manifest, UpdateManifest.JsonOptions)).DownloadAsset == manifest.Windows, "Legacy update feed was rejected");
+        CheckNotes(manifest, check);
         try { (branded with { WindowsV2 = branded.WindowsV2! with { Size = 1 } }).Validate(); throw new Exception("Mismatched compatible assets accepted"); }
         catch (IOException) { check(true, "Mismatched compatible assets rejected"); }
         HttpResponseMessage Manifest() => new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(manifest, UpdateManifest.JsonOptions)) };
@@ -81,6 +82,7 @@ static class UpdateTests {
             new UpdateAsset("https://github.com/SakuraEdge/mini-mark/releases/download/rev-v1.0.0/MiniMark-Rev-1.0.0-Setup-windows-x64.exe",
                 Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length), ReleaseVersion: "1.0.0", Tag: "rev-v1.0.0");
         var parsed = UpdateManifest.Parse(JsonSerializer.SerializeToUtf8Bytes(manifest, UpdateManifest.JsonOptions));
+        CheckNotes(manifest, check);
         check(parsed.ReleaseTag == "rev-v1.0.0" && parsed.DownloadAsset == manifest.Windows && parsed.Version == "4.0.1", "Rev feed lost public tag or internal version");
         var release = parsed.Releases[0];
         check(release.GetProperty("tag_name").GetString() == "rev-v1.0.0" && release.GetProperty("version").GetString() == "4.0.1" &&
@@ -140,6 +142,23 @@ static class UpdateTests {
         await downgradeUpdater.Check();
         try { await downgradeUpdater.DownloadInstaller(manifest.ReleaseTag, new Progress<int>(), default); throw new Exception("Rev public name bypassed internal downgrade protection"); }
         catch (IOException) { check(downgradeHandler.Uris.Count == 1, "Internal downgrade reached the download endpoint"); }
+    }
+
+    private static void CheckNotes(UpdateManifest manifest, Action<bool, string> check) {
+        check(manifest.Notes is null && manifest.Releases[0].GetProperty("notes").ValueKind == JsonValueKind.Null, "Old update manifest requires notes");
+        const string notes = "更新内容\n<script>alert('unsafe')</script>\n中文说明";
+        var withNotes = UpdateManifest.Parse(JsonSerializer.SerializeToUtf8Bytes(manifest with { Notes = notes }, UpdateManifest.JsonOptions));
+        check(withNotes.Notes == notes && withNotes.Releases[0].GetProperty("notes").GetString() == notes, "Release notes were lost or interpreted as markup");
+        (manifest with { Notes = new string('界', 16000) }).Validate();
+        check(true, "Maximum length update notes accepted");
+        try { (manifest with { Notes = new string('界', 16001) }).Validate(); throw new Exception("Unbounded release notes accepted"); }
+        catch (IOException) { check(true, "Unbounded release notes rejected"); }
+        var json = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(manifest, UpdateManifest.JsonOptions))!;
+        foreach (var invalid in new[] { "5", "{}", "[]", "true" }) {
+            json["notes"] = System.Text.Json.Nodes.JsonNode.Parse(invalid);
+            try { UpdateManifest.Parse(Encoding.UTF8.GetBytes(json.ToJsonString())); throw new Exception("Non-string release notes accepted"); }
+            catch (JsonException) { check(true, "Non-string release notes rejected"); }
+        }
     }
 }
 

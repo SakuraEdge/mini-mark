@@ -15,6 +15,7 @@ src/
   features/updates/    检测更新界面、版本比较、提醒偏好
   features/cloud/      GitHub 登录、目录浏览、云文档选择与请求协议
   features/documents/  文档右键菜单与重命名交互
+  features/workspace/  工作区目录树、分页、请求协议与浏览器文件夹预览
   features/theme/      主题偏好与渐变切换
   features/images/     图片插入、粘贴与拖入
   features/formulas/   按需加载的公式编辑器、Office 公式转换与复制
@@ -25,6 +26,7 @@ native/                Windows / .NET
   Program.cs           程序入口、单实例入口与退出后启动更新
   Host/                WebView2 初始化、消息分发和原生窗口
   Documents/           文件读写、会话、外部修改检测
+  Folders/             工作区授权根目录、路径校验和异步目录读取
   Infrastructure/      数据路径和进程间通信
   Export/              原生 PDF 引擎
   Updates/             更新清单、下载、校验与缓存
@@ -56,10 +58,12 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 | 新建、标签切换、脏状态 | `src/app/main.ts`、`src/documents/workspace.ts` |
 | 文档打开与保存 | `src/platform/bridge.ts`、`native/Host/MainWindow.cs`、`native/Documents/` |
 | 重命名与首行 H1 命名 | `src/documents/naming.ts`、`src/features/documents/rename.ts`、两平台 `Documents/DocumentNames` |
+| 工作区文件夹 | `src/features/workspace/`、`native/Folders/`、`native/Host/FolderRequests.cs`、`macos/Documents/FolderWorkspace.swift`、`macos/Host/FolderWorkspaceBridge.swift` |
 | 中文命令与输入法 | `src/editor/commands.ts`、`src/editor/editor.ts` |
 | Markdown、YAML、公式、代码高亮 | `src/markdown/render.ts`、`src/editor/editor.ts`、`src/documents/formats.ts` |
 | PDF、HTML 导出 | `src/markdown/export.ts`、两平台的 `Export/` |
 | 主题、字号、标签动画 | `src/styles/app.css`、`src/app/main.ts` |
+| 自定义背景 | `src/features/theme/background*.ts`、`src/styles/background.css`；图片与设置在独立 IndexedDB 中保存 |
 | Mini Mark 图标与预览 | `public/mini-mark.svg`、`docs/branding/README.md`、`scripts/create-icon.mjs`、`scripts/icon-mac.mjs` |
 | 图片导入与资源访问 | `src/features/images/`、`src/markdown/render.ts`、两平台 `Documents/ImageAssets`、`docs/images.md` |
 | 自定义插件 | `src/features/plugins/`、`public/plugin-host.html`、`public/plugin-host.js`、`docs/plugins.md` |
@@ -90,6 +94,10 @@ docs/                  发布记录、验证记录、性能记录和生成索引
 `autoName` 随会话持久化，仅新建的未命名 Markdown 草稿启用。第一行非空 H1 自动生成 `.md` 名称；非 H1 保持最后名称。手动重命名、保存、云绑定或解绑后禁用。旧会话缺少此字段时只识别标准“未命名”名称。自动名称不增加正文 `revision`，不能改变撤销记录。编辑快照的 `autoTitle` 仅在自动命名仍启用且当前没有 H1 时作为合法名称提示，避免去抖间隔内输入后删除 H1 导致名称回退。
 
 `renameDocument` 携带当前活动文档快照，以及独立的 `targetId`、`name`。不能把活动正文写进右键选中的非活动标签。改名完成后发布工作区和操作完成回执；失败保留正文、基线和原位置，不覆盖同名目标。输入框与右键菜单独立于平台原生弹窗。
+
+文件夹模式独立于多标签会话。`folderRequest` / `folderResponse` 处理选择、恢复、分页和关闭，`openWorkspaceFile` 使用当前活动编辑快照与授权 `rootId`、相对路径。目录只读一层，每页 500 项；不递归预加载，也不跟随符号链接或重解析点。后台结果回到界面前再次检查授权根目录。关闭工作区撤销目录授权，但不删除或关闭文档。具体约定见 `docs/workspace-development.md`。
+
+背景图片通过格式、大小和像素数检查后缩放保存，运行时仅使用本地 Blob URL。独立 IndexedDB `minimark-appearance` 保存图片与设置；透明度变化只更新小型设置记录，不重复存储图片。背景不进入文档、PDF 或 HTML 导出。macOS 主界面的图片 CSP 允许 `blob:`，不扩大脚本和预览窗口权限。
 
 实际数据目录由 `MOYE_DATA_DIR`（开发覆盖）、当前用户注册表 `Software\Moye\DataDirectory` 或默认 AppData 决定。测试必须使用隔离目录，不改写实际用户会话。
 

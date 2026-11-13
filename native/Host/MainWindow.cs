@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Form {
     private PdfRequest? pdfRequest;
     private readonly GitHubUpdates updates;
     private readonly GitHubCloud cloud;
+    private readonly FolderWorkspace folders;
     private CancellationTokenSource? updateDownload;
     private DownloadedInstaller? preparedInstaller;
     public DownloadedInstaller? InstallerToRun { get; private set; }
@@ -39,6 +40,7 @@ public sealed partial class MainWindow : Form {
         sessionFile = Path.Combine(dataRoot, "session-v2.json");
         updates = new GitHubUpdates(dataRoot);
         cloud = new GitHubCloud(new WindowsTokenStore(dataRoot), () => GitHubCloud.ReadClientId(root));
+        folders = new FolderWorkspace(dataRoot);
         Text = "Mini Mark";
         Width = 1180; Height = 840; MinimumSize = new Size(720, 520);
         StartPosition = FormStartPosition.CenterScreen; BackColor = Color.White;
@@ -119,6 +121,7 @@ public sealed partial class MainWindow : Form {
                 return;
             }
             if (!initialized) return;
+            if (type == "folderRequest") { _ = FolderRequest(message.Clone()); return; }
             if (type == "cloudRequest") {
                 var request = message.Clone();
                 if (request.TryGetProperty("action", out var cloudAction) && cloudAction.GetString() is "delete" or "write" or "folder" or "rename") {
@@ -213,6 +216,10 @@ public sealed partial class MainWindow : Form {
                     var closeId = message.GetProperty("targetId").GetString()!;
                     RunAsync(() => CloseTab(closeId)); break;
                 case "open": RunAction(Open); break;
+                case "openWorkspaceFile":
+                    var folderId = message.GetProperty("rootId").GetString()!;
+                    var folderPath = message.GetProperty("path").GetString()!;
+                    RunAsync(() => OpenWorkspaceFile(folderId, folderPath)); break;
                 case "save":
                     var saveBinding = document.Cloud;
                     RunAsync(async () => {

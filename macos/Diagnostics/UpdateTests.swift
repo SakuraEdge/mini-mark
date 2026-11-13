@@ -39,6 +39,26 @@ func runUpdateManifestTests() throws {
                                 "sha256": hash.uppercased(), "size": 256 * 1024 * 1024]
     _ = try decode(modernLegacy)
     let current = try decode(rev)
+    guard current.notes == nil, current.release["notes"] == nil else { throw Store.failure("Missing update notes changed compatibility") }
+    var noted = rev
+    let notes = "## 更新\n\n- 工作区\n- 界面背景"
+    noted["notes"] = notes
+    let withNotes = try decode(noted)
+    let notesCache = CachedUpdate(manifest: withNotes, checkedAt: Date())
+    let restoredNotes = try JSONDecoder().decode(CachedUpdate.self, from: JSONEncoder().encode(notesCache))
+    guard restoredNotes.manifest.notes == notes, restoredNotes.manifest.release["notes"] as? String == notes else {
+        throw Store.failure("Update notes did not survive cache or release mapping")
+    }
+    noted["notes"] = String(repeating: "a", count: 16000)
+    _ = try decode(noted)
+    noted["notes"] = String(repeating: "\u{1f600}", count: 8000)
+    _ = try decode(noted)
+    let invalidNotes: [Any] = [String(repeating: "a", count: 16001), String(repeating: "\u{1f600}", count: 8001), 42, ["invalid"]]
+    for value in invalidNotes {
+        try field("notes", value)
+    }
+    noted["notes"] = NSNull()
+    guard try decode(noted).notes == nil else { throw Store.failure("Null update notes were not optional") }
     var alternateAsset = rev
     alternateAsset["windowsV2"] = rev["windows"]
     try reject(alternateAsset)
@@ -72,5 +92,5 @@ func runUpdateManifestTests() throws {
     for invalidHash in ["", String(repeating: "a", count: 63), String(repeating: "g", count: 64), hash + "\n"] { try asset("sha256", invalidHash) }
     for size in [-1, 0, 256 * 1024 * 1024 + 1] { try asset("size", size) }
     try asset("size", 1.5); try asset("size", "1024")
-    print("PASS macOS updates: legacy and Rev schemas, cache round trip, metadata, URL, tag, hash and numeric validation")
+    print("PASS macOS updates: legacy and Rev schemas, notes and cache round trip, metadata, URL, tag, hash and numeric validation")
 }

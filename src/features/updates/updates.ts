@@ -1,4 +1,7 @@
 import { send, isDesktop, type HostMessage } from '../../platform/bridge';
+import { Download, ExternalLink, RefreshCw, X, createIcons } from 'lucide';
+import currentRelease from './current-release.json';
+import '../../styles/updates.css';
 
 export const APP_VERSION = __APP_VERSION__;
 export const APP_DISPLAY_VERSION = __APP_DISPLAY_VERSION__;
@@ -6,7 +9,7 @@ export const APP_RELEASE_VERSION = __APP_RELEASE_VERSION__;
 const SETTINGS_KEY = 'moye.updates.rev.v1';
 const LEGACY_SETTINGS_KEY = 'moye.updates.v1';
 const DAY = 86_400_000;
-export interface Release { tag_name: string; version?: string; releaseVersion?: string; name?: string; draft?: boolean; prerelease?: boolean }
+export interface Release { tag_name: string; version?: string; releaseVersion?: string; name?: string; draft?: boolean; prerelease?: boolean; notes?: string }
 interface Version { core: number[]; pre: string[] }
 export function parseVersion(value: string): Version | null {
   const match = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(value);
@@ -83,6 +86,7 @@ let pending: { id: string; manual: boolean; timer: ReturnType<typeof setTimeout>
 let candidate: Release | null = null;
 let installSupported = false;
 let installing = false;
+let offlineResult = false;
 let deferredPrompt: (() => void) | undefined;
 function clearDeferredPrompt() {
   if (deferredPrompt) window.removeEventListener('focus', deferredPrompt);
@@ -103,21 +107,33 @@ function setResult(text: string) {
   element<HTMLButtonElement>('update-install').hidden = !candidate || !installSupported;
   element<HTMLButtonElement>('update-install').disabled = installing;
   element<HTMLButtonElement>('update-cancel').hidden = !installing;
+  dialog.setAttribute('aria-busy', String(Boolean(pending) || installing));
+  dialog.dataset.state = installing ? 'installing' : pending ? 'checking' : offlineResult ? 'offline' : candidate ? 'available' : 'current';
+  element('update-next-version').hidden = !candidate;
+  element('update-next-version').textContent = candidate ? `可用版本 ${releaseLabel(candidate)}` : '';
+  const shownRelease = !offlineResult ? candidate : null;
+  element('update-notes-title').textContent = shownRelease ? `${releaseLabel(shownRelease)} 更新内容` : `Rev v${currentRelease.version} 更新内容`;
+  const notes = shownRelease ? shownRelease.notes : currentRelease.notes;
+  element('update-notes').textContent = typeof notes === 'string' && notes.length <= 16000 && notes.trim() ? notes.trim() : '此版本未提供更新内容。';
 }
 export function initializeUpdates() {
   const container = document.createElement('div');
-  container.innerHTML = `<dialog id="update-dialog" class="update-dialog" aria-labelledby="update-title">
-    <header><h2 id="update-title">软件更新</h2><button id="update-close" class="icon-button" aria-label="关闭更新窗口" title="关闭">×</button></header>
-    <p class="update-version">当前版本 ${APP_DISPLAY_VERSION}</p>
-    <p id="update-status" role="status">从 GitHub 检查正式版本。</p>
-    <div class="update-options">
-      <label><input id="update-auto" type="checkbox">自动检测更新</label>
-      <label><input id="update-suppress" type="checkbox">不再弹出大版本更新提醒</label>
+  container.innerHTML = `<dialog id="update-dialog" class="update-dialog rev-update-dialog" aria-labelledby="update-title">
+    <header><img src="./mini-mark.svg" alt="" width="44" height="44"><div><strong>Mini Mark</strong><h2 id="update-title">软件更新</h2></div><button id="update-close" class="icon-button" aria-label="关闭更新窗口" title="关闭"><i data-lucide="x"></i></button></header>
+    <div class="update-version-row"><p class="update-version">当前版本 ${APP_DISPLAY_VERSION}</p><p id="update-next-version" hidden></p></div>
+    <p id="update-status" role="status" aria-live="polite">从 GitHub 检查正式版本。</p>
+    <section class="update-release-notes" aria-labelledby="update-notes-title"><h3 id="update-notes-title"></h3><div id="update-notes" tabindex="0"></div></section>
+    <div class="update-bottom">
+      <div class="update-options">
+        <label><input id="update-auto" type="checkbox">自动检测更新</label>
+        <label><input id="update-suppress" type="checkbox">不再弹出大版本更新提醒</label>
+      </div>
+      <footer><button id="update-cancel" hidden>取消下载</button><button id="update-check"><i data-lucide="refresh-cw"></i>检测更新</button><button id="update-release" hidden><i data-lucide="external-link"></i>查看新版 / 下载</button><button id="update-install" class="primary" hidden><i data-lucide="download"></i>下载并覆盖更新</button></footer>
     </div>
-    <footer><button id="update-cancel" hidden>取消下载</button><button id="update-check">检测更新</button><button id="update-release" hidden>查看新版 / 下载</button><button id="update-install" class="primary" hidden>下载并覆盖更新</button></footer>
   </dialog>`;
   document.body.append(container);
   dialog = element('update-dialog');
+  createIcons({ icons: { Download, ExternalLink, RefreshCw, X }, root: dialog, attrs: { 'stroke-width': 1.65 } });
   element<HTMLInputElement>('update-auto').checked = settings.auto;
   element<HTMLInputElement>('update-suppress').checked = !settings.notifyMajor;
   element('update-close').onclick = () => dialog.close();
@@ -131,6 +147,7 @@ export function initializeUpdates() {
     send('installUpdate', { version: candidate.tag_name });
   };
   element('update-release').onclick = () => { if (candidate) send('openExternal', { url: `https://github.com/SakuraEdge/mini-mark/releases/tag/${encodeURIComponent(candidate.tag_name)}` }); };
+  setResult('从 GitHub 检查正式版本。');
 }
 export function openUpdates() {
   element('update-title').textContent = '软件更新';
@@ -151,6 +168,7 @@ function checkUpdates(manual: boolean) {
   clearDeferredPrompt();
   if (!manual) { settings.lastAttempt = Date.now(); saveSettings(); }
   candidate = null;
+  offlineResult = false;
   const id = crypto.randomUUID();
   pending = { id, manual, timer: setTimeout(() => handleUpdateMessage({ type: 'updateResult', requestId: id, error: '检测超时，请稍后重试。' }), 20000) };
   setResult('正在连接 GitHub…');
@@ -170,6 +188,7 @@ export function handleUpdateMessage(message: HostMessage): boolean {
   if (message.error) { setResult(message.error); return true; }
   try {
     candidate = latestRelease(message.releases, APP_VERSION);
+    offlineResult = Boolean(message.cacheNotice);
     installSupported = message.installSupported === true;
     const summary = candidate ? `发现${majorCandidate(candidate) ? '大版本' : '新版本'} ${releaseLabel(candidate)}。` : message.cacheNotice ? '缓存中没有高于当前版本的更新。' : `当前已是最新正式版本（${APP_DISPLAY_VERSION}）。`;
     setResult(message.cacheNotice ? `${message.cacheNotice}\n${summary}` : summary);

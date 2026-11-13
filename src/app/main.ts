@@ -13,6 +13,7 @@ import { normalizeText } from '../documents/workspace';
 import { canAutoName, headingDocumentName } from '../documents/naming';
 import { APP_DISPLAY_VERSION, initializeUpdates, openUpdates, scheduleUpdateCheck, handleUpdateMessage } from '../features/updates/updates';
 import { initializeTheme, toggleTheme } from '../features/theme/theme';
+import { initializeBackground } from '../features/theme/background';
 import { initializeImages, handleImageMessage } from '../features/images/images';
 import { initializePlugins } from '../features/plugins/manager';
 import { initializeFormulas } from '../features/formulas/formulas';
@@ -20,6 +21,7 @@ import { handleFormulaMessage } from '../features/formulas/clipboard';
 import { initializeCloud } from '../features/cloud/manager';
 import type { CloudBinding } from '../features/cloud/model';
 import { initializeRename } from '../features/documents/rename';
+import { initializeWorkspace } from '../features/workspace/manager';
 import '../styles/app.css';
 
 const app = mountApp(isDesktop, APP_DISPLAY_VERSION);
@@ -130,9 +132,14 @@ const cloudActions = initializeCloud({
     cloudBinding?.owner.toLowerCase() === owner.toLowerCase() && cloudBinding.path === cloudPath ? 'save' : 'cloudBind', { owner, cloudPath }),
   detachDocument: () => cloudDocumentAction('cloudDetach'),
 });
+const workspaceActions = initializeWorkspace({
+  openFile: (rootId, path) => cloudDocumentAction('openWorkspaceFile', { rootId, path }),
+  notice: showToast,
+});
+const backgroundActions = initializeBackground({ notice: showToast });
 const renameActions = initializeRename({
   document: id => tabs.find(tab => tab.id === id),
-  rename: (targetId, nextName) => cloudDocumentAction('renameDocument', { targetId, name: nextName }),
+  rename: async (targetId, nextName) => { await cloudDocumentAction('renameDocument', { targetId, name: nextName }); workspaceActions.refreshAfterSave(); },
   disabled: () => transitionPending || view.composing,
   restoreFocus: () => { if (mode !== 'read') view.focus(); },
 });
@@ -342,6 +349,7 @@ function renderDocument(text: string) {
 }
 
 function toggleSidebar() {
+  if (matchMedia('(max-width: 800px)').matches) { app.classList.toggle('sidebar-mobile-open'); return; }
   app.classList.toggle('sidebar-hidden');
   requestAnimationFrame(() => {
     view.requestMeasure();
@@ -409,6 +417,8 @@ function applyFont() {
 applyFont();
 on('more', () => { const menu = document.querySelector<HTMLElement>('#more-menu')!; menu.hidden = !menu.hidden; });
 on('check-updates', () => { document.querySelector<HTMLElement>('#more-menu')!.hidden = true; openUpdates(); });
+on('brand-updates', openUpdates);
+on('custom-background', () => { document.querySelector<HTMLElement>('#more-menu')!.hidden = true; backgroundActions.open(); });
 on('manage-plugins', () => { document.querySelector<HTMLElement>('#more-menu')!.hidden = true; pluginActions.open(); });
 document.addEventListener('click', (event) => {
   if (!(event.target as Element).closest('#more,#more-menu')) document.querySelector<HTMLElement>('#more-menu')!.hidden = true;
@@ -472,6 +482,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && act
 
 let updateScheduled = false;
 connect((message) => {
+  if (workspaceActions.handleMessage(message)) return;
   if (cloudActions.handleMessage(message)) return;
   if (handleFormulaMessage(message)) return;
   if (handleImageMessage(message)) return;
@@ -526,6 +537,7 @@ connect((message) => {
     document.querySelector('#current-file')!.setAttribute('title', doc.path || name);
     updateOutline(); updateSaved();
     cloudActions.documentChanged();
+    workspaceActions.start();
     document.querySelector('#word-count')!.textContent = `${wordCount(current.text).toLocaleString()} 字`;
     document.querySelector('#line-count')!.textContent = `${view.state.doc.lines.toLocaleString()} 行`;
     setMode(mode);
@@ -549,6 +561,7 @@ connect((message) => {
       if (!updateScheduled) { updateScheduled = true; scheduleUpdateCheck(); }
     })));
   } else if (message.type === 'saved') {
+    workspaceActions.refreshAfterSave();
     const cached = documents.get(message.documentId);
     if (cached) Object.assign(cached.document, { name: message.name, path: message.path, cloud: message.cloud, baseline: message.text, autoName: false });
     const tab = tabs.find(tab => tab.id === message.documentId);
