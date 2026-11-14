@@ -1,8 +1,8 @@
 # Mini Mark 项目协作规范
 
-本目录是 Mini Mark 的独立源码项目。主工作区为 `D:\GPTProject\WXHelper\MiniMark`，其他工作区以 `git rev-parse --show-toplevel` 为准。
+本目录是 Mini Mark 的独立源码项目。主工作区为 `D:\MiniMark`，其他工作区以 `git rev-parse --show-toplevel` 为准。
 
-这里只存放源码、测试、构建脚本、开发文档和必要资源。已安装的软件、用户文档、草稿、GitHub 凭据、快捷方式和运行时数据不因源码任务被移动或删除。父目录 WXHelper 的产品、人设、仓库及发布约定不适用于本独立项目，不修改父项目文件。
+这里只存放源码、测试、构建脚本、开发文档和必要资源。已安装的软件、用户文档、草稿、GitHub 凭据、快捷方式和运行时数据不因源码任务被移动或删除。本项目独立于 WXHelper，不沿用其产品、人设、仓库及发布约定，不修改其他项目文件。
 
 ## 开始工作
 
@@ -54,7 +54,7 @@ npm run docs:map
 
 ## 版本与交付
 
-- 独立仓库是 `SakuraEdge/mini-mark`，不要向父项目仓库提交本项目代码。
+- 独立仓库是 `SakuraEdge/mini-mark`，不要向其他项目仓库提交本项目代码。
 - `version` 是内部构建防降级版本，`releaseVersion` 是用户可见版本；正式标签为 `rev-vX.Y.Z`。
 - 仅在用户明确要求且两平台测试通过后，使用 `.github/workflows/release.yml` 发布已验证的构建。检查附件、哈希和更新清单后才称已发布。
 - 安装升级保持原程序目录、用户数据、草稿和快捷方式；不因源码维护重新安装或迁移软件。
