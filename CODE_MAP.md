@@ -48,6 +48,7 @@ scripts/               打包、图标、性能、PDF 验证、文件索引生�
 .github/workflows/     两平台构建、测试与经验证的发布流程
 public/                图标和初始文档
 docs/                  发布记录、验证记录、性能记录和生成索引
+android-app/           Android Compose 应用与移动端界面
 ```
 
 ## 按需求找代码

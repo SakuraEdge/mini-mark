@@ -388,9 +388,30 @@
       ]
     },
     {
+      "path": "android-app",
+      "purpose": "Android Compose 应用与移动端界面",
+      "files": [
+        "android-app/.gitignore",
+        "android-app/app/build.gradle.kts",
+        "android-app/app/proguard-rules.pro",
+        "android-app/app/src/main/AndroidManifest.xml",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/MainActivity.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/documents/DocumentStore.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/updates/UpdateDialog.kt",
+        "android-app/app/src/main/res/drawable/mini_mark_logo.xml",
+        "android-app/app/src/main/res/values/strings.xml",
+        "android-app/app/src/main/res/values/themes.xml",
+        "android-app/app/src/test/java/com/sakuraedge/minimark/documents/DocumentHelpersTest.kt",
+        "android-app/build.gradle.kts",
+        "android-app/gradle.properties",
+        "android-app/settings.gradle.kts"
+      ]
+    },
+    {
       "path": ".github/workflows",
       "purpose": "构建与发布",
       "files": [
+        ".github/workflows/android.yml",
         ".github/workflows/build.yml",
         ".github/workflows/local-patch.yml",
         ".github/workflows/release.yml",
@@ -437,8 +458,14 @@
         "docs/branding/mini-mark-final.png",
         "docs/cloud-development.md",
         "docs/code-map.json",
+        "docs/collaboration.md",
+        "docs/design/README.md",
+        "docs/design/android-ui.html",
         "docs/editor-v1.png",
         "docs/editor.png",
+        "docs/handoff/CONVERSATION.md",
+        "docs/handoff/NEW_DEVICE_PROMPT.md",
+        "docs/handoff/README.md",
         "docs/images.md",
         "docs/mac-signing.md",
         "docs/mini-mark-editor.png",

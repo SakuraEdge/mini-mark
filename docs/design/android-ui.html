@@ -1,0 +1,887 @@
+<div id="mini-mark-android-preview">
+  <style>
+    #mini-mark-android-preview {
+      --mm-ink: #263246;
+      --mm-muted: #6f7b8d;
+      --mm-line: #e1e7f0;
+      --mm-surface: #ffffff;
+      --mm-canvas: #f4f7fb;
+      --mm-soft: #eaf2ff;
+      --mm-blue: #286bd6;
+      --mm-blue-dark: #1f58b4;
+      --mm-green: #2f8f6b;
+      --mm-shadow: 0 24px 60px rgba(38, 50, 70, .18);
+      color: var(--mm-ink);
+      font: 400 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      padding: 20px 12px 28px;
+    }
+    #mini-mark-android-preview * { box-sizing: border-box; }
+    #mini-mark-android-preview .mm-heading {
+      max-width: 860px;
+      margin: 0 auto 14px;
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    #mini-mark-android-preview .mm-heading h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+    #mini-mark-android-preview .mm-heading p {
+      margin: 0;
+      color: var(--mm-muted);
+      font-size: 12px;
+    }
+    #mini-mark-android-preview .mm-tabs {
+      max-width: 860px;
+      margin: 0 auto 18px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    #mini-mark-android-preview .mm-tab {
+      min-height: 40px;
+      padding: 0 14px;
+      border: 1px solid var(--mm-line);
+      border-radius: 8px;
+      background: var(--mm-surface);
+      color: var(--mm-muted);
+      font: inherit;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    #mini-mark-android-preview .mm-tab[aria-selected="true"] {
+      border-color: var(--mm-blue);
+      background: var(--mm-soft);
+      color: var(--mm-blue-dark);
+      font-weight: 500;
+    }
+    #mini-mark-android-preview .mm-stage {
+      max-width: 860px;
+      margin: 0 auto;
+      min-height: 690px;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      border-radius: 16px;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(40, 107, 214, .08), transparent 30%),
+        radial-gradient(circle at 84% 78%, rgba(47, 143, 107, .07), transparent 28%),
+        #eef3f9;
+    }
+    #mini-mark-android-preview .mm-phone {
+      width: min(100%, 378px);
+      height: 650px;
+      position: relative;
+      overflow: hidden;
+      border: 8px solid #182232;
+      border-radius: 36px;
+      background: var(--mm-canvas);
+      box-shadow: var(--mm-shadow);
+    }
+    #mini-mark-android-preview .mm-phone::before {
+      content: "";
+      position: absolute;
+      z-index: 4;
+      top: 7px;
+      left: 50%;
+      width: 92px;
+      height: 22px;
+      transform: translateX(-50%);
+      border-radius: 0 0 14px 14px;
+      background: #182232;
+    }
+    #mini-mark-android-preview .mm-screen {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      background: var(--mm-canvas);
+    }
+    #mini-mark-android-preview .mm-screen.is-active { display: flex; }
+    #mini-mark-android-preview .mm-appbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 68px;
+      padding: 20px 16px 8px;
+      background: var(--mm-surface);
+      border-bottom: 1px solid var(--mm-line);
+    }
+    #mini-mark-android-preview .mm-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--mm-ink);
+      font-weight: 500;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      font: inherit;
+      cursor: pointer;
+    }
+    #mini-mark-android-preview .mm-brand:focus-visible { outline: 2px solid var(--mm-blue); outline-offset: 4px; border-radius: 6px; }
+    #mini-mark-android-preview .mm-mark {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      color: #fff;
+      background: linear-gradient(135deg, #2aa6d4, #4d75da 48%, #c66ac6);
+      font-weight: 500;
+      font-size: 12px;
+    }
+    #mini-mark-android-preview .mm-app-title {
+      min-width: 0;
+      flex: 1;
+      font-size: 15px;
+      font-weight: 500;
+    }
+    #mini-mark-android-preview .mm-app-title small {
+      display: block;
+      color: var(--mm-muted);
+      font-size: 11px;
+      font-weight: 400;
+    }
+    #mini-mark-android-preview .mm-icon {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 8px;
+      color: var(--mm-muted);
+      background: transparent;
+      cursor: pointer;
+    }
+    #mini-mark-android-preview .mm-icon:hover,
+    #mini-mark-android-preview .mm-icon:focus-visible { background: var(--mm-soft); color: var(--mm-blue-dark); }
+    #mini-mark-android-preview .mm-content {
+      min-height: 0;
+      flex: 1;
+      overflow: auto;
+      padding: 18px 16px 20px;
+    }
+    #mini-mark-android-preview .mm-search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 0 12px;
+      border: 1px solid var(--mm-line);
+      border-radius: 8px;
+      background: var(--mm-surface);
+      color: var(--mm-muted);
+    }
+    #mini-mark-android-preview .mm-search input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--mm-ink);
+      font: inherit;
+    }
+    #mini-mark-android-preview .mm-section-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 20px 0 8px;
+      color: var(--mm-muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+    #mini-mark-android-preview .mm-doc {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      width: 100%;
+      min-height: 62px;
+      margin-bottom: 8px;
+      padding: 9px 10px;
+      border: 1px solid var(--mm-line);
+      border-radius: 8px;
+      background: var(--mm-surface);
+      text-align: left;
+      color: var(--mm-ink);
+      font: inherit;
+      cursor: pointer;
+    }
+    #mini-mark-android-preview .mm-doc:hover,
+    #mini-mark-android-preview .mm-doc:focus-visible { border-color: #aac5f2; background: #fbfdff; }
+    #mini-mark-android-preview .mm-doc-icon {
+      width: 34px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+      color: var(--mm-blue);
+      background: var(--mm-soft);
+    }
+    #mini-mark-android-preview .mm-doc-main { min-width: 0; flex: 1; }
+    #mini-mark-android-preview .mm-doc-name {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+    #mini-mark-android-preview .mm-doc-meta { color: var(--mm-muted); font-size: 11px; }
+    #mini-mark-android-preview .mm-fab {
+      position: absolute;
+      right: 18px;
+      bottom: 20px;
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 16px;
+      color: #fff;
+      background: var(--mm-blue);
+      box-shadow: 0 10px 20px rgba(40, 107, 214, .28);
+      cursor: pointer;
+    }
+    #mini-mark-android-preview .mm-modebar {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--mm-line);
+      border-radius: 8px;
+      background: var(--mm-surface);
+    }
+    #mini-mark-android-preview .mm-mode {
+      flex: 1;
+      min-height: 34px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--mm-muted);
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    #mini-mark-android-preview .mm-mode[aria-pressed="true"] {
+      background: var(--mm-soft);
+      color: var(--mm-blue-dark);
+      font-weight: 500;
+    }
+    #mini-mark-android-preview .mm-editor-title {
+      margin: 20px 0 12px;
+      font-size: 26px;
+      line-height: 1.18;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+    #mini-mark-android-preview .mm-editor-copy {
+      color: #3c485a;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    #mini-mark-android-preview .mm-code {
+      margin: 14px 0;
+      padding: 12px;
+      overflow: auto;
+      border-radius: 6px;
+      background: #edf2f8;
+      color: #384761;
+      font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+    #mini-mark-android-preview .mm-equation {
+      margin: 12px 0;
+      padding: 12px;
+      border-left: 3px solid #9ab9ea;
+      color: #234e98;
+      background: #f3f7ff;
+      font: 17px/1.3 Georgia, serif;
+      text-align: center;
+    }
+    #mini-mark-android-preview .mm-bottom-tools {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      min-height: 58px;
+      padding: 5px 4px 7px;
+      border-top: 1px solid var(--mm-line);
+      background: var(--mm-surface);
+    }
+    #mini-mark-android-preview .mm-tool-more {
+      color: var(--mm-blue-dark);
+      background: var(--mm-soft);
+    }
+    #mini-mark-android-preview .mm-slash-glyph {
+      display: grid;
+      place-items: center;
+      color: currentColor;
+      font: 400 16px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+      letter-spacing: 0;
+      transform: translateY(-1px);
+    }
+    #mini-mark-android-preview .mm-tool {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 8px;
+      color: var(--mm-muted);
+      background: transparent;
+      cursor: pointer;
+    }
+    #mini-mark-android-preview .mm-tool:hover,
+    #mini-mark-android-preview .mm-tool:focus-visible { color: var(--mm-blue-dark); background: var(--mm-soft); }
+    #mini-mark-android-preview .mm-split {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr 1fr;
+    }
+    #mini-mark-android-preview .mm-pane {
+      min-width: 0;
+      min-height: 320px;
+      padding: 11px;
+      overflow: auto;
+      border: 1px solid var(--mm-line);
+      border-radius: 8px;
+      background: var(--mm-surface);
+    }
+    #mini-mark-android-preview .mm-pane-label {
+      margin-bottom: 8px;
+      color: var(--mm-muted);
+      font-size: 11px;
+      font-weight: 500;
+    }
+    #mini-mark-android-preview .mm-source {
+      white-space: pre-wrap;
+      color: #3b506b;
+      font: 11px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+    #mini-mark-android-preview .mm-reader h1,
+    #mini-mark-android-preview .mm-reader h2,
+    #mini-mark-android-preview .mm-reader p { margin: 0 0 10px; }
+    #mini-mark-android-preview .mm-reader h1 { font-size: 21px; font-weight: 500; }
+    #mini-mark-android-preview .mm-reader h2 { font-size: 16px; font-weight: 500; color: var(--mm-blue-dark); }
+    #mini-mark-android-preview .mm-reader p { color: #4c586a; font-size: 12px; line-height: 1.55; }
+    #mini-mark-android-preview .mm-drawer {
+      position: absolute;
+      z-index: 3;
+      inset: 0 54px 0 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--mm-surface);
+      box-shadow: 12px 0 30px rgba(38, 50, 70, .16);
+    }
+    #mini-mark-android-preview .mm-drawer-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 72px;
+      padding: 20px 16px 8px;
+      border-bottom: 1px solid var(--mm-line);
+    }
+    #mini-mark-android-preview .mm-drawer-scroll { min-height: 0; flex: 1; overflow: auto; padding: 14px 16px; }
+    #mini-mark-android-preview .mm-segment {
+      display: flex;
+      gap: 3px;
+      margin: 4px 0 18px;
+      padding: 3px;
+      border-radius: 8px;
+      background: var(--mm-canvas);
+    }
+    #mini-mark-android-preview .mm-segment button {
+      flex: 1;
+      min-height: 34px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--mm-muted);
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    #mini-mark-android-preview .mm-segment button[aria-pressed="true"] { background: var(--mm-surface); color: var(--mm-blue-dark); box-shadow: 0 1px 3px rgba(38, 50, 70, .08); }
+    #mini-mark-android-preview .mm-tree-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-height: 42px;
+      border-bottom: 1px solid #edf1f6;
+      color: var(--mm-ink);
+      font-size: 13px;
+    }
+    #mini-mark-android-preview .mm-tree-row.indent { padding-left: 24px; }
+    #mini-mark-android-preview .mm-sync {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 18px;
+      padding: 12px;
+      border-radius: 8px;
+      background: var(--mm-soft);
+      color: #325a9a;
+    }
+    #mini-mark-android-preview .mm-sheet {
+      position: absolute;
+      z-index: 3;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      padding: 16px 16px 20px;
+      border-top: 1px solid var(--mm-line);
+      border-radius: 18px 18px 0 0;
+      background: var(--mm-surface);
+      box-shadow: 0 -12px 30px rgba(38, 50, 70, .14);
+    }
+    #mini-mark-android-preview .mm-sheet h3 { margin: 0; font-size: 18px; font-weight: 500; }
+    #mini-mark-android-preview .mm-sheet p { margin: 5px 0 14px; color: var(--mm-muted); font-size: 12px; }
+    #mini-mark-android-preview .mm-account {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      padding: 10px;
+      border: 1px solid var(--mm-line);
+      border-radius: 8px;
+    }
+    #mini-mark-android-preview .mm-avatar {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #dbe8fb;
+      color: var(--mm-blue-dark);
+      font-weight: 500;
+    }
+    #mini-mark-android-preview .mm-account-main { min-width: 0; flex: 1; }
+    #mini-mark-android-preview .mm-account-main strong,
+    #mini-mark-android-preview .mm-account-main span { display: block; }
+    #mini-mark-android-preview .mm-account-main span { color: var(--mm-muted); font-size: 11px; }
+    #mini-mark-android-preview .mm-action {
+      width: 100%;
+      min-height: 44px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--mm-blue);
+      color: #fff;
+      font: inherit;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    #mini-mark-android-preview .mm-action:hover,
+    #mini-mark-android-preview .mm-action:focus-visible { background: var(--mm-blue-dark); }
+    #mini-mark-android-preview .mm-more-sheet {
+      position: absolute;
+      z-index: 3;
+      right: 0;
+      bottom: 58px;
+      left: 0;
+      padding: 14px 14px 16px;
+      border-top: 1px solid var(--mm-line);
+      border-radius: 16px 16px 0 0;
+      background: var(--mm-surface);
+      box-shadow: 0 -12px 30px rgba(38, 50, 70, .14);
+    }
+    #mini-mark-android-preview .mm-more-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    #mini-mark-android-preview .mm-more-head strong {
+      font-size: 16px;
+      font-weight: 500;
+    }
+    #mini-mark-android-preview .mm-more-head span {
+      color: var(--mm-muted);
+      font-size: 11px;
+    }
+    #mini-mark-android-preview .mm-more-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    #mini-mark-android-preview .mm-more-item {
+      min-width: 0;
+      min-height: 66px;
+      padding: 8px 4px;
+      border: 1px solid var(--mm-line);
+      border-radius: 8px;
+      background: var(--mm-canvas);
+      color: var(--mm-ink);
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    #mini-mark-android-preview .mm-more-item i {
+      display: block;
+      margin: 0 auto 5px;
+      color: var(--mm-blue);
+    }
+    #mini-mark-android-preview .mm-more-item:hover,
+    #mini-mark-android-preview .mm-more-item:focus-visible {
+      border-color: #aac5f2;
+      background: var(--mm-soft);
+    }
+    #mini-mark-android-preview .mm-command-sheet {
+      position: absolute;
+      z-index: 3;
+      right: 12px;
+      bottom: 66px;
+      left: 12px;
+      padding: 12px;
+      border: 1px solid var(--mm-line);
+      border-radius: 12px;
+      background: var(--mm-surface);
+      box-shadow: 0 -8px 24px rgba(38, 50, 70, .14);
+    }
+    #mini-mark-android-preview .mm-command-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    #mini-mark-android-preview .mm-command-head strong {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    #mini-mark-android-preview .mm-command-head span {
+      color: var(--mm-muted);
+      font-size: 11px;
+    }
+    #mini-mark-android-preview .mm-command-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+    #mini-mark-android-preview .mm-command-item {
+      min-height: 38px;
+      padding: 0 9px;
+      border: 1px solid var(--mm-line);
+      border-radius: 7px;
+      background: var(--mm-canvas);
+      color: var(--mm-ink);
+      font: inherit;
+      font-size: 11px;
+      text-align: left;
+      cursor: pointer;
+    }
+    #mini-mark-android-preview .mm-command-item strong {
+      color: var(--mm-blue-dark);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-weight: 500;
+    }
+    #mini-mark-android-preview .mm-command-item:hover,
+    #mini-mark-android-preview .mm-command-item:focus-visible {
+      border-color: #aac5f2;
+      background: var(--mm-soft);
+    }
+    #mini-mark-android-preview .mm-update-dialog {
+      position: absolute;
+      z-index: 5;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(24, 34, 50, .28);
+    }
+    #mini-mark-android-preview .mm-update-dialog[hidden] { display: none; }
+    #mini-mark-android-preview .mm-update-panel {
+      width: 100%;
+      max-height: 92%;
+      overflow: auto;
+      padding: 18px;
+      border: 1px solid var(--mm-line);
+      border-radius: 14px;
+      background: var(--mm-surface);
+      box-shadow: 0 18px 44px rgba(38, 50, 70, .24);
+    }
+    #mini-mark-android-preview .mm-update-panel h3 { margin: 0; font-size: 19px; font-weight: 500; }
+    #mini-mark-android-preview .mm-update-panel p { margin: 8px 0 0; color: var(--mm-muted); font-size: 12px; line-height: 1.55; }
+    #mini-mark-android-preview .mm-update-rule { height: 1px; margin: 15px 0; background: var(--mm-line); }
+    #mini-mark-android-preview .mm-update-heading { display: flex; align-items: center; gap: 10px; }
+    #mini-mark-android-preview .mm-update-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      color: #fff;
+      background: linear-gradient(135deg, #2aa6d4, #4d75da 48%, #c66ac6);
+      font-size: 12px;
+      font-weight: 500;
+    }
+    #mini-mark-android-preview .mm-update-label { margin-top: 16px; color: var(--mm-ink); font-size: 13px; font-weight: 500; }
+    #mini-mark-android-preview .mm-update-notes {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--mm-canvas);
+      color: var(--mm-ink);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+    #mini-mark-android-preview .mm-update-actions { display: flex; gap: 8px; margin-top: 16px; }
+    #mini-mark-android-preview .mm-update-actions button { flex: 1; min-height: 42px; }
+    #mini-mark-android-preview .mm-update-secondary {
+      border: 1px solid var(--mm-line);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--mm-ink);
+      font: inherit;
+      cursor: pointer;
+    }
+    @media (max-width: 360px) {
+      #mini-mark-android-preview .mm-more-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 520px) {
+      #mini-mark-android-preview { padding-inline: 0; }
+      #mini-mark-android-preview .mm-heading,
+      #mini-mark-android-preview .mm-tabs { padding-inline: 12px; }
+      #mini-mark-android-preview .mm-heading { display: block; }
+      #mini-mark-android-preview .mm-heading p { margin-top: 4px; }
+      #mini-mark-android-preview .mm-stage { padding: 8px; border-radius: 0; }
+      #mini-mark-android-preview .mm-split { grid-template-columns: 1fr; }
+      #mini-mark-android-preview .mm-pane { min-height: 220px; }
+    }
+  </style>
+
+  <div class="mm-heading">
+    <div>
+      <h2>Mini Mark Android UI Preview</h2>
+      <p>移动端优先：单栏编辑、抽屉工作区、底部云文档入口</p>
+    </div>
+    <button class="mm-tab" type="button" id="mm-theme-toggle" aria-pressed="false">浅色主题</button>
+  </div>
+
+  <div class="mm-tabs" role="tablist" aria-label="Android screens">
+    <button class="mm-tab" role="tab" type="button" aria-selected="true" data-screen-tab="library">文档库</button>
+    <button class="mm-tab" role="tab" type="button" aria-selected="false" data-screen-tab="editor">编辑器</button>
+    <button class="mm-tab" role="tab" type="button" aria-selected="false" data-screen-tab="workspace">工作区</button>
+    <button class="mm-tab" role="tab" type="button" aria-selected="false" data-screen-tab="cloud">云文档</button>
+  </div>
+
+  <div class="mm-stage">
+    <div class="mm-phone" aria-label="Mini Mark Android app preview">
+      <section class="mm-screen is-active" data-screen="library">
+        <div class="mm-appbar">
+          <button class="mm-brand" type="button" data-open-updates aria-label="版本与更新"><span class="mm-mark">MM</span><span>Mini Mark</span></button>
+          <button class="mm-icon" type="button" data-open-screen="workspace" aria-label="打开工作区" data-tooltip="打开工作区"><i data-lucide="folder-open" aria-hidden="true"></i></button>
+          <button class="mm-icon" type="button" data-open-screen="cloud" aria-label="云文档" data-tooltip="云文档"><i data-lucide="cloud" aria-hidden="true"></i></button>
+        </div>
+        <div class="mm-content">
+          <label class="mm-search"><i data-lucide="search" aria-hidden="true"></i><input aria-label="搜索文档" placeholder="搜索文档"></label>
+          <div class="mm-section-label"><span>最近编辑</span><span>3 篇</span></div>
+          <button class="mm-doc" type="button" data-open-screen="editor">
+            <span class="mm-doc-icon"><i data-lucide="file-text" aria-hidden="true"></i></span>
+            <span class="mm-doc-main"><span class="mm-doc-name">随手记.md</span><span class="mm-doc-meta">刚刚 · 本地文档</span></span>
+            <i data-lucide="chevron-right" aria-hidden="true"></i>
+          </button>
+          <button class="mm-doc" type="button" data-open-screen="editor">
+            <span class="mm-doc-icon"><i data-lucide="file-text" aria-hidden="true"></i></span>
+            <span class="mm-doc-main"><span class="mm-doc-name">项目想法.md</span><span class="mm-doc-meta">昨天 · 本地文档</span></span>
+            <i data-lucide="chevron-right" aria-hidden="true"></i>
+          </button>
+          <button class="mm-doc" type="button" data-open-screen="editor">
+            <span class="mm-doc-icon"><i data-lucide="file-code-2" aria-hidden="true"></i></span>
+            <span class="mm-doc-main"><span class="mm-doc-name">app-config.yaml</span><span class="mm-doc-meta">周一 · 云文档</span></span>
+            <i data-lucide="chevron-right" aria-hidden="true"></i>
+          </button>
+          <div class="mm-section-label"><span>快捷操作</span></div>
+          <button class="mm-doc" type="button" data-open-screen="workspace">
+            <span class="mm-doc-icon"><i data-lucide="folder-tree" aria-hidden="true"></i></span>
+            <span class="mm-doc-main"><span class="mm-doc-name">打开工作区</span><span class="mm-doc-meta">浏览文件夹中的全部文档</span></span>
+            <i data-lucide="chevron-right" aria-hidden="true"></i>
+          </button>
+        </div>
+        <button class="mm-fab" type="button" data-open-screen="editor" aria-label="新建文档" data-tooltip="新建文档"><i data-lucide="plus" aria-hidden="true"></i></button>
+        <div class="mm-update-dialog" data-update-dialog hidden>
+          <div class="mm-update-panel" role="dialog" aria-modal="true" aria-labelledby="mm-update-title">
+            <div class="mm-update-heading">
+              <span class="mm-update-mark">MM</span>
+              <div><h3 id="mm-update-title">版本与更新</h3><p>Mini Mark Android · 当前版本 0.1.0</p></div>
+            </div>
+            <div class="mm-update-rule"></div>
+            <div class="mm-update-label">本次版本</div>
+            <div class="mm-update-notes">Android 界面预览，包含文档库、编辑器、工作区和云文档界面。文档存储与云同步尚未接入。</div>
+            <p>Android 更新源尚未配置，可前往 GitHub 发布页查看正式版本。</p>
+            <div class="mm-update-actions">
+              <button class="mm-update-secondary" type="button" data-close-updates>返回主页</button>
+              <button class="mm-action" type="button" data-close-updates>查看发布版本</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mm-screen" data-screen="editor">
+        <div class="mm-appbar">
+          <button class="mm-icon" type="button" data-open-screen="library" aria-label="返回文档库"><i data-lucide="arrow-left" aria-hidden="true"></i></button>
+          <div class="mm-app-title">随手记.md<small>已保存到本地</small></div>
+          <button class="mm-icon" type="button" aria-label="保存" data-tooltip="保存"><i data-lucide="save" aria-hidden="true"></i></button>
+          <button class="mm-icon" type="button" aria-label="文档操作" data-tooltip="文档操作"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+        </div>
+        <div class="mm-content">
+          <div class="mm-modebar" role="group" aria-label="编辑模式">
+            <button class="mm-mode" type="button" aria-pressed="true">即时</button>
+            <button class="mm-mode" type="button" aria-pressed="false">源码</button>
+            <button class="mm-mode" type="button" aria-pressed="false">阅读</button>
+          </div>
+          <h1 class="mm-editor-title">今天的好想法</h1>
+          <p class="mm-editor-copy">把灵感先写下来，再用 Markdown 让它变得清晰。输入 <strong>/公式</strong> 可以快速插入公式块。</p>
+          <div class="mm-equation">a² + b² = c²</div>
+          <p class="mm-editor-copy">Android 版优先保证输入、预览、保存和跨设备同步的流畅性。</p>
+          <pre class="mm-code">## 下一步
+- 完成移动端编辑器
+- 接入 GitHub 云文档
+- 支持离线继续编辑</pre>
+        </div>
+        <div class="mm-bottom-tools">
+          <button class="mm-tool" type="button" aria-label="撤销"><i data-lucide="undo-2" aria-hidden="true"></i></button>
+          <button class="mm-tool" type="button" aria-label="重做"><i data-lucide="redo-2" aria-hidden="true"></i></button>
+          <button class="mm-tool" type="button" aria-label="标题"><i data-lucide="heading-2" aria-hidden="true"></i></button>
+          <button class="mm-tool" type="button" aria-label="插入图片"><i data-lucide="image-plus" aria-hidden="true"></i></button>
+          <button class="mm-tool" type="button" data-command-toggle aria-expanded="false" aria-label="快捷指令" data-tooltip="快捷指令"><span class="mm-slash-glyph" aria-hidden="true">/?</span></button>
+          <button class="mm-tool" type="button" data-open-screen="cloud" aria-label="云端同步"><i data-lucide="cloud-upload" aria-hidden="true"></i></button>
+          <button class="mm-tool mm-tool-more" type="button" data-more-toggle aria-expanded="false" aria-label="更多功能" data-tooltip="更多功能"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+        </div>
+        <div class="mm-command-sheet" data-command-sheet hidden>
+          <div class="mm-command-head"><strong>快捷指令</strong><span>输入 / 快速调用</span></div>
+          <div class="mm-command-list">
+            <button class="mm-command-item" type="button"><strong>/公式</strong> 插入公式</button>
+            <button class="mm-command-item" type="button"><strong>/图片</strong> 插入图片</button>
+            <button class="mm-command-item" type="button"><strong>/表格</strong> 插入表格</button>
+            <button class="mm-command-item" type="button"><strong>/代码</strong> 插入代码块</button>
+          </div>
+        </div>
+        <div class="mm-more-sheet" data-more-sheet hidden>
+          <div class="mm-more-head"><strong>更多功能</strong><span>编辑器工具</span></div>
+          <div class="mm-more-grid">
+            <button class="mm-more-item" type="button"><i data-lucide="file-down" aria-hidden="true"></i>保存为 PDF</button>
+            <button class="mm-more-item" type="button"><i data-lucide="columns-2" aria-hidden="true"></i>分屏阅读</button>
+            <button class="mm-more-item" type="button"><i data-lucide="globe-2" aria-hidden="true"></i>HTML 预览</button>
+            <button class="mm-more-item" type="button"><i data-lucide="table-2" aria-hidden="true"></i>插入表格</button>
+            <button class="mm-more-item" type="button"><i data-lucide="palette" aria-hidden="true"></i>主题背景</button>
+            <button class="mm-more-item" type="button"><i data-lucide="puzzle" aria-hidden="true"></i>插件</button>
+            <button class="mm-more-item" type="button" data-open-screen="cloud"><i data-lucide="cloud" aria-hidden="true"></i>云文档</button>
+            <button class="mm-more-item" type="button"><i data-lucide="settings-2" aria-hidden="true"></i>编辑设置</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="mm-screen" data-screen="workspace">
+        <div class="mm-screen" style="display:flex;background:rgba(25,35,50,.22);">
+          <div class="mm-drawer">
+            <div class="mm-drawer-head">
+              <button class="mm-icon" type="button" data-open-screen="library" aria-label="关闭工作区"><i data-lucide="x" aria-hidden="true"></i></button>
+              <div class="mm-app-title">工作区<small>D:\Notes</small></div>
+              <button class="mm-icon" type="button" aria-label="刷新目录"><i data-lucide="refresh-cw" aria-hidden="true"></i></button>
+            </div>
+            <div class="mm-drawer-scroll">
+              <div class="mm-segment" role="group" aria-label="文档范围">
+                <button type="button" aria-pressed="false" data-open-screen="library">单文档</button>
+                <button type="button" aria-pressed="true">工作区</button>
+              </div>
+              <button class="mm-doc" type="button" data-open-screen="editor">
+                <span class="mm-doc-icon"><i data-lucide="file-text" aria-hidden="true"></i></span>
+                <span class="mm-doc-main"><span class="mm-doc-name">随手记.md</span><span class="mm-doc-meta">当前文档</span></span>
+                <i data-lucide="check" aria-hidden="true"></i>
+              </button>
+              <div class="mm-section-label"><span>项目目录</span><span>12 项</span></div>
+              <div class="mm-tree-row"><i data-lucide="chevron-down" aria-hidden="true"></i><i data-lucide="folder" aria-hidden="true"></i><span>docs</span></div>
+              <div class="mm-tree-row indent"><i data-lucide="file-text" aria-hidden="true"></i><span>readme.md</span></div>
+              <div class="mm-tree-row indent"><i data-lucide="file-code-2" aria-hidden="true"></i><span>config.yaml</span></div>
+              <div class="mm-tree-row"><i data-lucide="chevron-right" aria-hidden="true"></i><i data-lucide="folder" aria-hidden="true"></i><span>assets</span></div>
+              <div class="mm-tree-row"><i data-lucide="file-code-2" aria-hidden="true"></i><span>index.html</span></div>
+              <div class="mm-sync"><i data-lucide="info" aria-hidden="true"></i><span>工作区只读取已授权目录。打开文件夹后可以按需打开文档，不会自动扫描全部内容。</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mm-screen" data-screen="cloud">
+        <div class="mm-appbar">
+          <button class="mm-icon" type="button" data-open-screen="editor" aria-label="返回编辑器"><i data-lucide="arrow-left" aria-hidden="true"></i></button>
+          <div class="mm-app-title">云文档<small>MiniMarkDisk</small></div>
+          <button class="mm-icon" type="button" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button>
+        </div>
+        <div class="mm-content">
+          <div class="mm-section-label"><span>GitHub 账号</span><span style="color:var(--mm-green)">已连接</span></div>
+          <div class="mm-account">
+            <span class="mm-avatar">S</span>
+            <span class="mm-account-main"><strong>SakuraEdge</strong><span>同步仓库 · MiniMarkDisk</span></span>
+            <i data-lucide="check-circle-2" aria-hidden="true" style="color:var(--mm-green)"></i>
+          </div>
+          <div class="mm-section-label"><span>当前文档</span></div>
+          <div class="mm-doc">
+            <span class="mm-doc-icon"><i data-lucide="cloud" aria-hidden="true"></i></span>
+            <span class="mm-doc-main"><span class="mm-doc-name">随手记.md</span><span class="mm-doc-meta">云文档 · 已同步</span></span>
+            <i data-lucide="more-horizontal" aria-hidden="true"></i>
+          </div>
+        </div>
+        <div class="mm-sheet">
+          <h3>同步设置</h3>
+          <p>保存时同步当前文档；离线时保留本地修改，恢复网络后继续。</p>
+          <div class="mm-modebar" role="group" aria-label="文档位置">
+            <button class="mm-mode" type="button" aria-pressed="true">云文档</button>
+            <button class="mm-mode" type="button" aria-pressed="false">本地文档</button>
+          </div>
+          <button class="mm-action" type="button" style="margin-top:12px">同步并返回编辑器</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById("mini-mark-android-preview");
+      const tabs = [...root.querySelectorAll("[data-screen-tab]")];
+      const screens = [...root.querySelectorAll("[data-screen]")];
+      const state = { screen: "editor", dark: false, moreOpen: false, commandOpen: false, updateOpen: false };
+      const saved = window.openai?.widgetState?.modelContent;
+      if (saved && typeof saved === "object") Object.assign(state, saved);
+      function render() {
+        tabs.forEach(tab => tab.setAttribute("aria-selected", String(tab.dataset.screenTab === state.screen)));
+        screens.forEach(screen => screen.classList.toggle("is-active", screen.dataset.screen === state.screen));
+        root.style.setProperty("--mm-canvas", state.dark ? "#20262f" : "#f4f7fb");
+        root.style.setProperty("--mm-surface", state.dark ? "#2a313c" : "#ffffff");
+        root.style.setProperty("--mm-ink", state.dark ? "#eef4ff" : "#263246");
+        root.style.setProperty("--mm-muted", state.dark ? "#aab7ca" : "#6f7b8d");
+        root.style.setProperty("--mm-line", state.dark ? "#414c5d" : "#e1e7f0");
+        root.style.setProperty("--mm-soft", state.dark ? "#304b78" : "#eaf2ff");
+        root.querySelector("#mm-theme-toggle").textContent = state.dark ? "深色主题" : "浅色主题";
+        root.querySelector("#mm-theme-toggle").setAttribute("aria-pressed", String(state.dark));
+        const moreSheet = root.querySelector("[data-more-sheet]");
+        const moreToggle = root.querySelector("[data-more-toggle]");
+        moreSheet.hidden = !(state.screen === "editor" && state.moreOpen);
+        moreToggle.setAttribute("aria-expanded", String(!moreSheet.hidden));
+        const commandSheet = root.querySelector("[data-command-sheet]");
+        const commandToggle = root.querySelector("[data-command-toggle]");
+        commandSheet.hidden = !(state.screen === "editor" && state.commandOpen);
+        commandToggle.setAttribute("aria-expanded", String(!commandSheet.hidden));
+        const updateDialog = root.querySelector("[data-update-dialog]");
+        updateDialog.hidden = !(state.screen === "library" && state.updateOpen);
+        window.openai?.setWidgetState?.({ modelContent: { screen: state.screen, dark: state.dark } }).catch(() => {});
+      }
+      function select(screen) { state.screen = screen; state.moreOpen = false; state.commandOpen = false; state.updateOpen = false; render(); }
+      tabs.forEach(tab => tab.addEventListener("click", () => select(tab.dataset.screenTab)));
+      root.querySelectorAll("[data-open-screen]").forEach(button => button.addEventListener("click", () => select(button.dataset.openScreen)));
+      root.querySelector("#mm-theme-toggle").addEventListener("click", () => { state.dark = !state.dark; render(); });
+      root.querySelector("[data-more-toggle]").addEventListener("click", () => { state.moreOpen = !state.moreOpen; state.commandOpen = false; render(); });
+      root.querySelector("[data-command-toggle]").addEventListener("click", () => { state.commandOpen = !state.commandOpen; state.moreOpen = false; render(); });
+      root.querySelector("[data-open-updates]").addEventListener("click", () => { state.screen = "library"; state.updateOpen = true; render(); });
+      root.querySelectorAll("[data-close-updates]").forEach(button => button.addEventListener("click", () => { state.updateOpen = false; render(); }));
+      root.querySelectorAll(".mm-command-item").forEach(button => button.addEventListener("click", () => {
+        state.commandOpen = false;
+        render();
+      }));
+      root.querySelectorAll(".mm-mode").forEach(button => button.addEventListener("click", () => {
+        button.parentElement.querySelectorAll(".mm-mode").forEach(peer => peer.setAttribute("aria-pressed", String(peer === button)));
+      }));
+      render();
+    })();
+  </script>
+</div>

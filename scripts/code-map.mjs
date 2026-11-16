@@ -23,13 +23,15 @@ const areas = [
   ['macos/Preview', 'macOS HTML 运行'],
   ['tests', '界面回归'], ['native-tests', '原生单元检查'], ['native-ui-tests', '真实 WebView2 交互'],
   ['native-pdf-tests', '真实 PDF 引擎'], ['installer', 'Windows 安装'], ['scripts', '开发脚本'],
+  ['android-app', 'Android Compose 应用与移动端界面'],
   ['.github/workflows', '构建与发布'], ['public', '应用资源'], ['docs', '开发与发布记录'],
 ];
 const groups = [];
 for (const [path, purpose] of areas) {
   const entries = await readdir(join(root, path), { withFileTypes: true, recursive: true });
   const files = entries.filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name).slice(root.length + 1).replaceAll('\\', '/'))
-    .filter(file => !/(^|\/)(bin|obj|vendor)(\/|$)/.test(file)).sort();
+    .filter(file => !/(^|\/)(bin|obj|vendor|build|\.gradle)(\/|$)/.test(file))
+    .filter(file => !file.endsWith('/local.properties')).sort();
   groups.push({ path, purpose, files });
 }
 const map = { guide: 'CODE_MAP.md', regenerate: 'npm run docs:map', entryPoints: ['index.html', 'src/app/main.ts', 'native/Program.cs', 'macos/App/Main.swift'], groups };
