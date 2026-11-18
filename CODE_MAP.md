@@ -102,6 +102,8 @@ android-app/           Android 原生宿主与共享 Web 编辑器
 
 标题快捷键由 `src/editor/editor.ts` 以单次 CodeMirror 事务处理，当前行或选中行一起变更，并跳过代码围栏；选中可编辑行已经全部处于目标标题等级时，再按同一快捷键恢复正文。YAML 文档和阅读模式不会响应。标题跨度采用内联排版，换行高度由浏览器计算，不固定跨度高度；对应回归在 `tests/editor.spec.ts`。
 
+鼠标拖选期间保留当前即时排版与公式入口装饰，鼠标释放后再按最终选区更新，避免表格或公式改变高度后反复重算选区。窗口失焦、鼠标在窗口外释放和缓存文档恢复会清除拖选状态。正文修改仍立即更新装饰。实际拖选回归见 `tests/html-selection.spec.ts`，Windows WebView2 覆盖相同显示与正文保持约定。
+
 未命名文档从 1 开始寻找当前标签中尚未占用的编号，不沿用持久化会话的历史计数。浏览器、Windows 和 macOS 的命名入口分别在 `src/documents/workspace.ts`、`native/Documents/DocumentWorkspace.cs`、`macos/App/Main.swift`。
 
 `autoName` 随会话持久化，仅新建的未命名 Markdown 草稿启用。第一行非空 H1 自动生成 `.md` 名称；非 H1 保持最后名称。手动重命名、保存、云绑定或解绑后禁用。旧会话缺少此字段时只识别标准“未命名”名称。自动名称不增加正文 `revision`，不能改变撤销记录。编辑快照的 `autoTitle` 仅在自动命名仍启用且当前没有 H1 时作为合法名称提示，避免去抖间隔内输入后删除 H1 导致名称回退。

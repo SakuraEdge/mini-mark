@@ -1,4 +1,4 @@
-import { Compartment, EditorSelection, EditorState, Prec, RangeSetBuilder, StateField, type Extension } from '@codemirror/state';
+import { Compartment, EditorSelection, EditorState, Prec, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin, WidgetType, highlightActiveLine, keymap, lineNumbers, placeholder, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { HighlightStyle, bracketMatching, foldGutter, indentOnInput, syntaxHighlighting, syntaxTree } from '@codemirror/language';
@@ -19,6 +19,59 @@ export const modeCompartment = new Compartment();
 const languageCompartment = new Compartment();
 const fontCompartment = new Compartment();
 const editableCompartment = new Compartment();
+
+const setPointerSelection = StateEffect.define<boolean>();
+const pointerSelection = StateField.define<boolean>({
+  create: () => false,
+  update(value, transaction) {
+    if (transaction.docChanged) return false;
+    for (const effect of transaction.effects) {
+      if (effect.is(setPointerSelection)) return effect.value;
+    }
+    return value;
+  },
+});
+
+const stablePointerLayout = ViewPlugin.fromClass(class {
+  private active = false;
+  private releaseTimer: ReturnType<typeof setTimeout> | undefined;
+  constructor(readonly view: EditorView) {
+    view.contentDOM.addEventListener('mousedown', this.start, true);
+    if (view.state.field(pointerSelection)) {
+      this.releaseTimer = setTimeout(() => view.dispatch({ effects: setPointerSelection.of(false) }), 0);
+    }
+  }
+  private start = (event: MouseEvent) => {
+    if (event.button !== 0 || !(event.target instanceof Element) || event.target.closest('.rendered-block,button')) return;
+    clearTimeout(this.releaseTimer);
+    if (!this.active) {
+      this.active = true;
+      this.view.contentDOM.ownerDocument.addEventListener('mouseup', this.finish);
+      this.view.contentDOM.ownerDocument.addEventListener('mousemove', this.recoverRelease);
+      this.view.contentDOM.ownerDocument.defaultView?.addEventListener('blur', this.finish);
+    }
+    this.view.dispatch({ effects: setPointerSelection.of(true) });
+  };
+  private recoverRelease = (event: MouseEvent) => {
+    if (event.buttons === 0) this.finish();
+  };
+  private finish = () => {
+    if (!this.active) return;
+    this.active = false;
+    this.view.contentDOM.ownerDocument.removeEventListener('mouseup', this.finish);
+    this.view.contentDOM.ownerDocument.removeEventListener('mousemove', this.recoverRelease);
+    this.view.contentDOM.ownerDocument.defaultView?.removeEventListener('blur', this.finish);
+    // Let CodeMirror finish its mouse-selection handler before changing block geometry.
+    this.releaseTimer = setTimeout(() => this.view.dispatch({ effects: setPointerSelection.of(false) }), 0);
+  };
+  destroy() {
+    clearTimeout(this.releaseTimer);
+    this.view.contentDOM.removeEventListener('mousedown', this.start, true);
+    this.view.contentDOM.ownerDocument.removeEventListener('mouseup', this.finish);
+    this.view.contentDOM.ownerDocument.removeEventListener('mousemove', this.recoverRelease);
+    this.view.contentDOM.ownerDocument.defaultView?.removeEventListener('blur', this.finish);
+  }
+});
 
 const colors = HighlightStyle.define([
   { tag: tags.heading1, class: 'syntax-h1' },
@@ -100,7 +153,8 @@ class FormulaButton extends WidgetType {
 
 const formulaEntries = StateField.define<DecorationSet>({
   create: formulaEntryDecorations,
-  update: (_, transaction) => formulaEntryDecorations(transaction.state),
+  update: (previous, transaction) => transaction.state.field(pointerSelection) && !transaction.docChanged
+    ? previous : formulaEntryDecorations(transaction.state),
   provide: field => EditorView.decorations.from(field),
 });
 
@@ -176,7 +230,8 @@ function liveDecorations(state: EditorState): DecorationSet {
 
 const liveField = StateField.define<DecorationSet>({
   create: liveDecorations,
-  update: (_, transaction) => liveDecorations(transaction.state),
+  update: (previous, transaction) => transaction.state.field(pointerSelection) && !transaction.docChanged
+    ? previous : liveDecorations(transaction.state),
   provide: (field) => EditorView.decorations.from(field),
 });
 
@@ -322,6 +377,7 @@ function makeState(doc: string, onChange: (update: ViewUpdate) => void, mode: Ed
       doc,
       extensions: [
         history(), indentOnInput(), bracketMatching(), highlightSelectionMatches(),
+        pointerSelection, stablePointerLayout,
         languageCompartment.of(languageExtensions(language)),
         syntaxHighlighting(colors),
         search({ top: true }),

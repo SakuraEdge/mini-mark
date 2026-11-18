@@ -86,3 +86,51 @@ test('native selection covers Chinese, headings and code with contrasting colors
     await page.screenshot({ path: `test-results/selection-${theme}.png` });
   }
 });
+
+test('dragging JSON text beside a rendered table keeps the live layout stable', async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 1000 });
+  await page.goto('/');
+  await page.getByRole('button', { name: '源码', exact: true }).click();
+  const source = [
+    '# 拖选回归', '', '| 名称 | 编码 |', '| --- | --- |',
+    ...Array.from({ length: 7 }, (_, index) => `| 项目 ${index + 1} | \`item_${index + 1}\` |`), '', '',
+    '{ code: "item_1", name: "项目一" },',
+    '{ code: "item_2", name: "项目二" },',
+    '{ code: "item_3", name: "项目三" },',
+    '{ code: "item_4", name: "项目四" },', '', '## 后续内容', '', '继续编辑。',
+  ].join('\n');
+  const editor = page.getByRole('textbox', { name: 'Markdown 编辑器' });
+  await editor.fill(source);
+  await page.getByRole('button', { name: '即时', exact: true }).click();
+  const table = page.locator('.table-block');
+  const jsonLine = page.locator('.cm-line').filter({ hasText: '{ code: "item_2"' });
+  await expect(table).toBeVisible();
+  const tableBox = (await table.boundingBox())!;
+  const jsonBox = (await jsonLine.boundingBox())!;
+  await page.mouse.move(jsonBox.x + 200, jsonBox.y + jsonBox.height / 2);
+  await page.mouse.down();
+  try {
+    for (let step = 1; step <= 30; step++) {
+      const progress = step / 30;
+      await page.mouse.move(
+        jsonBox.x + 200 - 20 * progress,
+        jsonBox.y + jsonBox.height / 2 + (tableBox.y + tableBox.height / 3 - jsonBox.y - jsonBox.height / 2) * progress,
+      );
+      await expect(table).toBeVisible();
+      expect((await jsonLine.boundingBox())!.y).toBeCloseTo(jsonBox.y, 0);
+    }
+    await page.waitForTimeout(350);
+    expect((await jsonLine.boundingBox())!.y).toBeCloseTo(jsonBox.y, 0);
+  } finally {
+    await page.mouse.up();
+  }
+  const selection = await page.evaluate(() => getSelection()?.toString());
+  expect(selection).toContain('item_1');
+  await page.getByRole('button', { name: '源码', exact: true }).click();
+  expect(await editor.locator('.cm-line').allTextContents()).toEqual(source.split('\n'));
+  await editor.press('Control+End');
+  await page.getByRole('button', { name: '即时', exact: true }).click();
+  await table.click();
+  await expect(table).toHaveCount(0);
+  await expect(editor).toContainText('| 名称 | 编码 |');
+});

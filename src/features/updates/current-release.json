@@ -1,4 +1,4 @@
 {
   "version": "1.0.4",
-  "notes": "- Android 启动图标与应用内渐变双 M 品牌图标统一。\n- Android 提供文档、工作区、云文档和设置四个入口，支持编辑、公式、图片、插件及 PDF/HTML 导出。\n- GitHub 云文档支持 MiniMarkDisk 浏览、保存、重命名、删除及冲突处理。"
+  "notes": "- Android 启动图标与应用内渐变双 M 品牌图标统一。\n- 修复即时编辑中拖选 JSON 等文字时，相邻表格反复切换显示引发的跳动与闪屏。\n- Android 提供文档、工作区、云文档和设置四个入口，支持编辑、公式、图片、插件及 PDF/HTML 导出。\n- GitHub 云文档支持 MiniMarkDisk 浏览、保存、重命名、删除及冲突处理。"
 }

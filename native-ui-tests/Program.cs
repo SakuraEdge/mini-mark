@@ -363,6 +363,33 @@ internal static class Program {
                 await Wait("!document.getElementById('background-enabled').checked", "Background disable did not respond");
                 await browser.CoreWebView2.ExecuteScriptAsync("document.getElementById('background-dialog').close()");
                 Console.WriteLine("PASS actual WebView2 background image import/render, opacity and disable without document changes");
+                var selectionText = "# Drag selection\n\n| Name | Code |\n| --- | --- |\n| One | item_1 |\n| Two | item_2 |\n| Three | item_3 |\n\n{ code: \"item_1\", name: \"一\" },\n{ code: \"item_2\", name: \"二\" },\n";
+                var selectionFile = Path.Combine(folder, "selection-regression.md");
+                File.WriteAllText(selectionFile, selectionText);
+                window.OpenFromArguments([selectionFile]);
+                await Wait("document.getElementById('document-name').textContent === 'selection-regression.md'", "Selection fixture did not open");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-mode=live]').click()");
+                await Wait("Boolean(document.querySelector('.table-block'))", "Table preview missing before pointer selection");
+                await browser.CoreWebView2.ExecuteScriptAsync("""
+                (() => {
+                    const editor = document.querySelector('.cm-content');
+                    const line = [...editor.querySelectorAll('.cm-line')].find(node => node.textContent.includes('{ code:'));
+                    window.__selectionLine = line;
+                    window.__selectionTop = line.getBoundingClientRect().top;
+                    window.__selectionScroll = document.querySelector('.cm-scroller').scrollTop;
+                    line.dispatchEvent(new MouseEvent('mousedown', {bubbles:true, button:0, buttons:1}));
+                    editor.focus(); document.execCommand('selectAll');
+                })()
+                """);
+                await Task.Delay(300);
+                if (!await Evaluate("Boolean(document.querySelector('.table-block')) && Math.abs(window.__selectionLine.getBoundingClientRect().top-window.__selectionTop)<1 && document.querySelector('.cm-scroller').scrollTop===window.__selectionScroll"))
+                    throw new Exception("Live layout moved during pointer selection in actual WebView2");
+                await browser.CoreWebView2.ExecuteScriptAsync("document.dispatchEvent(new MouseEvent('mouseup', {bubbles:true,button:0,buttons:0}))");
+                await Wait("!document.querySelector('.table-block')", "Table source did not refresh after pointer release");
+                await Click("save-markdown");
+                await Wait("document.getElementById('save-state').textContent === '已保存'", "Selection fixture save did not complete");
+                if (File.ReadAllText(selectionFile) != selectionText) throw new Exception("Selection changed document content");
+                Console.WriteLine("PASS actual WebView2 stable table layout during pointer selection, release refresh and unchanged saved text");
                 if (!window.Text.Contains("Mini Mark")) throw new Exception("Window branding did not update");
                 Console.WriteLine($"PASS actual WebView2 CRLF restore, native New/Open/Save/tab buttons, view/theme/focus/menu controls, clean session, bounded messages ({received})");
                 Console.WriteLine("PASS actual WebView2 image import/render/save and plugin sandbox/network/bridge isolation");
