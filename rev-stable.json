@@ -1,12 +1,12 @@
 {
   "schemaVersion": 2,
-  "version": "4.0.4",
-  "releaseVersion": "1.0.4",
-  "tag": "rev-v1.0.4",
-  "notes": "# Mini Mark Rev v1.0.4\n\n- Android 启动图标与应用内渐变双 M 图标统一，包含相同的字形、位置和下划线。\n- Android 提供文档、工作区、云文档和设置四个入口，支持多标签、即时编辑、源码、阅读、分屏、公式、图片、主题背景和插件。\n- Android 支持系统文件保存、文件夹工作区、HTML 运行和 PDF/HTML 导出。\n- GitHub 云文档支持登录、MiniMarkDisk 浏览、保存、重命名、删除和冲突处理。\n\nAndroid 8.0 及以上，需要近期版本的 Android System WebView。APK 沿用此前本地预览版的签名，支持覆盖升级和保留草稿。GitHub 账号跨设备全流程与不同手机输入法仍待实机验收。\n\nWindows 10 / 11 x64。macOS 13 及以上，支持 Apple Silicon 和 Intel。macOS 使用 ad-hoc 签名，Windows 使用现有未商业签名的安装包。\n",
+  "version": "4.0.3",
+  "releaseVersion": "1.0.3",
+  "tag": "rev-v1.0.3",
+  "notes": "# Mini Mark Rev v1.0.3\n\n- 侧栏新增“单文档”和“工作区文档”切换。打开文件夹后可浏览目录，展开子文件夹并打开文档。\n- 工作区显示所有文件；支持编辑的文本在新标签中打开，不支持的文件与链接仅显示，不自动运行。\n- 点击左上角 Mini Mark 图标或名称可打开更新窗口。更新窗口重新排版，并显示当前版本或新版的更新内容。\n- 新增主题背景，可导入本地 PNG、JPEG、WebP 图片，调整透明度、暂停使用或移除。背景仅保存在本机，不写入正文或导出文件。\n\nWindows 10 / 11 x64；macOS 13+，支持 Apple Silicon 和 Intel。\n\nWindows 可通过“更多 → 检测更新”覆盖升级，保留原安装位置、文档和草稿。\n\nmacOS 使用 ad-hoc 签名，未使用 Apple Developer ID，也未公证。Windows 包未使用商业代码签名。\n",
   "windows": {
-    "url": "https://github.com/SakuraEdge/mini-mark/releases/download/rev-v1.0.4/MiniMark-Rev-1.0.4-Setup-windows-x64.exe",
-    "sha256": "3197f7cb39d5d8046c02e2c2eae708948c9ad47ed0550b9aaa1aeeacd5aa3895",
-    "size": 55360875
+    "url": "https://github.com/SakuraEdge/mini-mark/releases/download/rev-v1.0.3/MiniMark-Rev-1.0.3-Setup-windows-x64.exe",
+    "sha256": "01eb807366a8dcee705c7365dc8e191f66aa1b75eb58e6e0ff023cc687b85172",
+    "size": 55340441
   }
 }
