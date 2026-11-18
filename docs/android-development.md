@@ -1,6 +1,6 @@
 # Android 应用
 
-2026-11-18 用户审核通过移动端设计。应用使用 Kotlin 原生宿主与离线打包的共享 Web 编辑器，包名为 `com.sakuraedge.minimark`，版本为 `1.0.3` / `103`。最低安装版本为 Android 8.0 / API 26，运行需要支持 AndroidX `WEB_MESSAGE_LISTENER` 的近期 Android System WebView。
+2026-11-18 用户审核通过移动端设计。应用使用 Kotlin 原生宿主与离线打包的共享 Web 编辑器，包名为 `com.sakuraedge.minimark`，版本为 `1.0.4` / `104`。最低安装版本为 Android 8.0 / API 26，运行需要支持 AndroidX `WEB_MESSAGE_LISTENER` 的近期 Android System WebView。
 
 ## 界面与共享能力
 
@@ -9,6 +9,8 @@
 编辑器复用 `src/editor/` 的 CodeMirror、即时排版、源码、阅读、分屏、中文命令、独立撤销重做、大纲和查找替换。YAML 使用语法高亮。公式使用现有 MathLive、KaTeX 与 Office 转换模块。图片、主题背景、插件、HTML 导出复用 `src/features/` 现有实现。
 
 `docs/design/android-approved.html` 保留本次审核稿。原先 `android-ui.html` 继续作为早期设计记录。
+
+Android 启动图标 `res/mipmap-anydpi/mini_mark_launcher.xml` 使用与 `public/mini-mark.svg` 相同的渐变色标、双 M 和下划线位置。`drawable/mini_mark_background.xml` 与 `mini_mark_foreground.xml` 分别提供底色和字形，前景按 Android 自适应图标的 72 dp 可视区域缩放。API 33 的资源变体复用前景提供系统主题图标。VectorDrawable 提供各密度下的矢量渲染。
 
 ## 原生宿主与协议
 
@@ -58,6 +60,10 @@ PDF 使用共享 HTML 排版并调用 Android PrintManager。用户在系统窗�
 
 Linux/macOS 使用 `bash gradlew`。Wrapper 固定 Gradle 8.9 并校验分发包 SHA-256。Gradle 自动构建共享前端，并将输出复制到生成的 assets 目录，排除 source map。开发 APK 输出到 `app/build/outputs/apk/debug/app-debug.apk`。覆盖安装需要相同开发证书。
 
+发行构建使用 `:app:assembleRelease`，关闭调试，输出 `app/build/outputs/apk/release/app-release.apk`。环境变量 `MINIMARK_ANDROID_KEYSTORE`、`MINIMARK_ANDROID_STORE_PASSWORD`、`MINIMARK_ANDROID_KEY_ALIAS`、`MINIMARK_ANDROID_KEY_PASSWORD` 提供签名配置。CI 从同名 Actions 加密 secrets 及 `MINIMARK_ANDROID_KEYSTORE_BASE64` 恢复签名材料，临时文件在任务结束后移除。当前证书沿用本机预览版的开发证书，SHA-256 指纹为 `c7f526166a1f61ac84c31f4f1acf65d285ed6d49f8d6b787bf0919776f09dc26`，支持覆盖已有预览安装。
+
+`.github/workflows/android.yml` 验证、签名并上传 `MiniMark-android` 构建附件。`release.yml` 核对 Android 与 Windows/macOS 的成功构建对应同一 main 提交，然后统一发布 APK、桌面包和校验和。
+
 `WebEditorFlowTest` 在隔离英文 API 35 模拟器验证中文编辑、撤销重做、搜索重命名、关闭确认、公式表格、分屏旋转、Activity 恢复、系统保存另存为、取消、重复打开、选择期间重建、长文档软键盘、当前标签可见性、阅读模式按钮、插件及原生桥隔离。debug-only iframe 探针仅进入调试 APK。Keystore 检查使用测试目录。
 
 JVM 测试覆盖文档、旧会话、BOM/CRLF、外部修改、部分写入失败、云与本地基线、过期 revision、账号隔离、OAuth、刷新凭据持久化、SHA 冲突和 Git tree 变更。共享前端继续通过原桌面测试集。
@@ -66,4 +72,4 @@ JVM 测试覆盖文档、旧会话、BOM/CRLF、外部修改、部分写入失�
 
 ## 后续验收
 
-真实手机、真实中文输入法、API 26、不同文件提供者、大文件性能、Word/WPS 粘贴及真实 GitHub 账号全流程待验收。Android 正式签名和自动覆盖安装更新渠道待配置。当前更新检查只识别带 APK 附件的正式 Release。
+真实手机、真实中文输入法、API 26、不同文件提供者、大文件性能、Word/WPS 粘贴及真实 GitHub 账号全流程待验收。当前分发沿用已有证书，应用商店签名策略和自动覆盖安装更新仍待配置。更新检查识别带 APK 附件的正式 Release。

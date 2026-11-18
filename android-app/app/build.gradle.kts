@@ -12,13 +12,26 @@ android {
         applicationId = "com.sakuraedge.minimark"
         minSdk = 26
         targetSdk = 35
-        versionCode = 103
-        versionName = "1.0.3"
+        versionCode = 104
+        versionName = "1.0.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("distribution") {
+            val keystore = providers.environmentVariable("MINIMARK_ANDROID_KEYSTORE").orNull
+            if (keystore != null) {
+                storeFile = file(keystore)
+                storePassword = providers.environmentVariable("MINIMARK_ANDROID_STORE_PASSWORD").orNull
+                keyAlias = providers.environmentVariable("MINIMARK_ANDROID_KEY_ALIAS").orNull
+                keyPassword = providers.environmentVariable("MINIMARK_ANDROID_KEY_PASSWORD").orNull
+            }
+        }
     }
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("distribution")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -44,6 +57,7 @@ val buildSharedWeb by tasks.registering(Exec::class) {
     inputs.dir("../../src")
     inputs.dir("../../public")
     inputs.file("../../package-lock.json")
+    inputs.file("../../package.json")
     inputs.file("../../vite.config.ts")
     inputs.file("../../index.html")
     outputs.dir("../../dist")

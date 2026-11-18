@@ -10,6 +10,8 @@
 
 正式源文件为 `public/mini-mark.svg`，字母与下划线整体左移 30/1024。Windows 多尺寸图标为 `native/Assets/mini-mark.ico`，预览为 `docs/branding/mini-mark-final.png`；运行 `node scripts/create-icon.mjs` 生成。macOS 图标脚本读取同一 SVG。
 
+Rev v1.0.4 将 Android 启动图标同步为同一品牌图形。`android-app/app/src/main/res/drawable/mini_mark_background.xml` 与 `mini_mark_foreground.xml` 保留源 SVG 的两层渐变、双 M 与下划线。启动器通过 `mipmap-anydpi/mini_mark_launcher.xml` 使用分层自适应图标，API 33 变体提供系统主题图标。修改品牌源文件时需同步这些资源。
+
 界面采用白底、浅灰分区、蓝色强调色；炫彩只用于图标。亮暗主题切换颜色过渡约 260 ms，并尊重系统减少动画偏好。
 
 版本为 2.0.0，用户已要求双平台验证后发布。显示名、可执行文件和主要安装包统一使用 Mini Mark / MiniMark；安装 AppId、数据目录和注册表身份保持兼容。更新清单同时保留旧版验证器可接受的安装包别名，确保 v1.x 能升级。

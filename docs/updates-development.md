@@ -23,4 +23,6 @@ Rev v1.0.2 起，正常发布同时更新 `rev-stable.json` 和旧名称 `stable
 
 ## 验证
 
-`npm test` 覆盖 Rev 版本与清单生成；`test:native` 和 macOS 原生自测覆盖 schema、路径、哈希与防降级；`tests/updates.spec.ts` 覆盖同主版本静默、Rev 2 弹窗、偏好迁移和下载取消。发布后核对 6 个附件及 `rev-stable.json`。安装器不超过 256 MiB。
+`npm test` 覆盖 Rev 版本与清单生成；`test:native` 和 macOS 原生自测覆盖 schema、路径、哈希与防降级；`tests/updates.spec.ts` 覆盖同主版本静默、Rev 2 弹窗、偏好迁移和下载取消。安装器不超过 256 MiB。
+
+Rev v1.0.4 起，`release.yml` 接收 Windows/macOS 的 `build_run_id` 与 Android 的 `android_run_id`，两次成功构建须来自同一 main 提交。发布附件共 7 个，包括 4 个桌面包、1 个 APK、覆盖 5 个安装包的 SHA-256 清单和 schema 2 `update.json`。发布后核对附件与两个静态更新清单。Android 当前通过正式 Release 的 APK 附件检测版本，由用户下载后安装。

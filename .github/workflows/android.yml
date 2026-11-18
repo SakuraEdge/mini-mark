@@ -1,4 +1,4 @@
-name: Android Preview Build
+name: Android Build and Test
 
 on:
   push:
@@ -10,6 +10,8 @@ on:
       - 'src/**'
       - 'public/**'
       - 'package*.json'
+      - 'index.html'
+      - 'vite.config.ts'
       - '.github/workflows/android.yml'
   workflow_dispatch:
 
@@ -17,7 +19,7 @@ permissions:
   contents: read
 
 jobs:
-  android-preview:
+  android:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -39,7 +41,7 @@ jobs:
       - uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
-      - name: Validate and assemble installable preview
+      - name: Validate and assemble device test build
         run: bash gradlew --no-daemon --stacktrace :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
       - name: Enable emulator acceleration
         run: |
@@ -56,34 +58,65 @@ jobs:
           disable-animations: true
           working-directory: android-app
           script: bash gradlew --no-daemon --stacktrace :app:connectedDebugAndroidTest
-      - name: Verify Android preview metadata
+      - name: Verify Android test metadata
         shell: bash
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
-          jq -e '
+          version=$(node -p "require('../package.json').releaseVersion")
+          jq -e --arg version "$version" '
             .applicationId == "com.sakuraedge.minimark" and
             .variantName == "debug" and
             (.elements | length) == 1 and
-            .elements[0].versionName == "1.0.3" and
-            .elements[0].versionCode == 103 and
+            .elements[0].versionName == $version and
+            .elements[0].versionCode == 104 and
             .elements[0].outputFile == "app-debug.apk"
           ' app/build/outputs/apk/debug/output-metadata.json
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify app/build/outputs/apk/debug/app-debug.apk
-      - name: Prepare preview artifact
+      - name: Assemble signed Android package
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          MINIMARK_ANDROID_KEYSTORE_BASE64: ${{ secrets.MINIMARK_ANDROID_KEYSTORE_BASE64 }}
+          MINIMARK_ANDROID_STORE_PASSWORD: ${{ secrets.MINIMARK_ANDROID_STORE_PASSWORD }}
+          MINIMARK_ANDROID_KEY_ALIAS: ${{ secrets.MINIMARK_ANDROID_KEY_ALIAS }}
+          MINIMARK_ANDROID_KEY_PASSWORD: ${{ secrets.MINIMARK_ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$MINIMARK_ANDROID_KEYSTORE_BASE64"
+          export MINIMARK_ANDROID_KEYSTORE="$RUNNER_TEMP/minimark-distribution.keystore"
+          trap 'rm -f "$MINIMARK_ANDROID_KEYSTORE"' EXIT
+          printf '%s' "$MINIMARK_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$MINIMARK_ANDROID_KEYSTORE"
+          unset MINIMARK_ANDROID_KEYSTORE_BASE64
+          bash gradlew --no-daemon --stacktrace :app:assembleRelease
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk > "$RUNNER_TEMP/minimark-signature.txt"
+          grep -q 'c7f526166a1f61ac84c31f4f1acf65d285ed6d49f8d6b787bf0919776f09dc26' "$RUNNER_TEMP/minimark-signature.txt"
+          version=$(node -p "require('../package.json').releaseVersion")
+          jq -e --arg version "$version" '
+            .applicationId == "com.sakuraedge.minimark" and
+            .variantName == "release" and
+            (.elements | length) == 1 and
+            .elements[0].versionName == $version and
+            .elements[0].versionCode == 104 and
+            .elements[0].outputFile == "app-release.apk"
+          ' app/build/outputs/apk/release/output-metadata.json
+          if "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/release/app-release.apk | grep -q application-debuggable; then
+            echo 'Distribution APK must disable debugging.'
+            exit 1
+          fi
+      - name: Prepare Android artifact
+        if: github.event_name != 'pull_request'
         shell: bash
         run: |
+          version=$(node -p "require('../package.json').releaseVersion")
           mkdir -p ../release/android
-          cp app/build/outputs/apk/debug/app-debug.apk \
-            ../release/android/MiniMark-Rev-v1.0.3-android-preview.apk
+          cp app/build/outputs/apk/release/app-release.apk \
+            "../release/android/MiniMark-Rev-$version-android.apk"
           cd ../release/android
-          sha256sum MiniMark-Rev-v1.0.3-android-preview.apk \
-            > SHA256SUMS-Rev-v1.0.3-android-preview.txt
+          sha256sum "MiniMark-Rev-$version-android.apk" > SHA256SUMS-android.txt
       - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
         with:
-          name: MiniMark-android-preview
-          path: |
-            release/android/MiniMark-Rev-v1.0.3-android-preview.apk
-            release/android/SHA256SUMS-Rev-v1.0.3-android-preview.txt
+          name: MiniMark-android
+          path: release/android/*
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()

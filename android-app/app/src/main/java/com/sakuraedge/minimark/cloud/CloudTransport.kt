@@ -9,6 +9,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import com.sakuraedge.minimark.BuildConfig
 
 internal class CloudApiException(val status: Int, message: String) : IOException(message)
 
@@ -22,7 +23,7 @@ internal class GitHubTransport : CloudTransport {
     override fun request(method: String, url: String, body: String?, token: String?, form: Boolean): Any {
         val address = URL(url)
         require(address.protocol == "https" && address.host in setOf("github.com", "api.github.com") && address.userInfo == null)
-        val request = Request.Builder().url(url).header("User-Agent", "MiniMark-Android/1.0.3")
+        val request = Request.Builder().url(url).header("User-Agent", "MiniMark-Android/${BuildConfig.VERSION_NAME}")
             .header("Accept", if (form) "application/json" else "application/vnd.github+json")
         if (token != null) {
             request.header("Authorization", "Bearer $token")

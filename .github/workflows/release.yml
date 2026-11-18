@@ -6,6 +6,10 @@ on:
         description: Successful main-branch Build and Test run
         required: true
         type: string
+      android_run_id:
+        description: Successful Android Build and Test run for the same commit
+        required: true
+        type: string
 permissions:
   actions: read
   contents: write
@@ -15,6 +19,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       RUN_ID: ${{ inputs.build_run_id }}
+      ANDROID_RUN_ID: ${{ inputs.android_run_id }}
     steps:
       - name: Resolve verified build
         id: build
@@ -24,6 +29,12 @@ jobs:
           test "$(jq -r .conclusion run.json)" = success
           test "$(jq -r .head_branch run.json)" = main
           test "$(jq -r .path run.json)" = .github/workflows/build.yml
+          [[ "$ANDROID_RUN_ID" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ANDROID_RUN_ID" > android-run.json
+          test "$(jq -r .conclusion android-run.json)" = success
+          test "$(jq -r .head_branch android-run.json)" = main
+          test "$(jq -r .path android-run.json)" = .github/workflows/android.yml
+          test "$(jq -r .head_sha android-run.json)" = "$(jq -r .head_sha run.json)"
           echo "sha=$(jq -r .head_sha run.json)" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
@@ -42,6 +53,8 @@ jobs:
           mkdir -p release-assets
           gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name MiniMark-windows-x64 --dir release-assets
           gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name MiniMark-macos-universal --dir release-assets
+          gh run download "$ANDROID_RUN_ID" --repo "$GITHUB_REPOSITORY" --name MiniMark-android --dir release-assets
+          (cd release-assets && sha256sum --check SHA256SUMS-android.txt)
       - name: Publish all assets together
         env:
           BUILD_SHA: ${{ steps.build.outputs.sha }}
@@ -59,7 +72,7 @@ jobs:
           cp "MiniMark-$version-windows-x64.zip" "MiniMark-Rev-$release_version-windows-x64.zip"
           cp "MiniMark-$version-macos-universal.dmg" "MiniMark-Rev-$release_version-macos-universal.dmg"
           cp "MiniMark-$version-macos-universal.zip" "MiniMark-Rev-$release_version-macos-universal.zip"
-          files=("MiniMark-Rev-$release_version-Setup-windows-x64.exe" "MiniMark-Rev-$release_version-windows-x64.zip" "MiniMark-Rev-$release_version-macos-universal.dmg" "MiniMark-Rev-$release_version-macos-universal.zip")
+          files=("MiniMark-Rev-$release_version-Setup-windows-x64.exe" "MiniMark-Rev-$release_version-windows-x64.zip" "MiniMark-Rev-$release_version-macos-universal.dmg" "MiniMark-Rev-$release_version-macos-universal.zip" "MiniMark-Rev-$release_version-android.apk")
           for file in "${files[@]}"; do test -s "$file"; done
           node ../scripts/update-manifest.mjs "$version" . "$release_version"
           checksums="SHA256SUMS-Rev-v$release_version.txt"

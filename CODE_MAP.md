@@ -90,6 +90,7 @@ android-app/           Android 原生宿主与共享 Web 编辑器
 | Android 文件与草稿 | `android-app/app/src/main/java/com/sakuraedge/minimark/documents/`、`workspace/`；SAF 文档身份、UTF-8、目录授权与草稿队列 |
 | Android 云文档 | `android-app/app/src/main/java/com/sakuraedge/minimark/cloud/`；Device Flow、Keystore、版本校验与 Git tree 修改 |
 | Android 构建与验证 | `android-app/gradlew`、`android-app/app/src/test/`、`android-app/app/src/androidTest/`、`.github/workflows/android.yml` |
+| Android 图标与发行签名 | `android-app/app/src/main/res/mipmap-anydpi/mini_mark_launcher.xml`、`res/drawable/mini_mark_*.xml`、`public/mini-mark.svg`、`android-app/app/build.gradle.kts`、`.github/workflows/release.yml` |
 
 ## 消息和文档约定
 

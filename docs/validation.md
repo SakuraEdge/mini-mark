@@ -1,5 +1,18 @@
 # 验证记录
 
+## Rev v1.0.4 发布前验证
+
+2026-11-18。用户确认 Android 功能后要求统一 APK 图标并发布 v1.0.4。公开版本为 `1.0.4`，内部版本为 `4.0.4`，Android versionCode 为 `104`。
+
+- 已确认的 Android 实现保存为提交 `e0baa78ff25b10132b7a1e44524a0dec66c3d1ba`。本次图标与发布工作在独立分支 `feature/release-v1.0.4`、独立 worktree 完成，依赖重新执行 `npm ci`。
+- Android 启动图标采用品牌 SVG 的渐变、双 M 和下划线，分成自适应底色与前景，API 33 支持系统主题图标。实际 API 35 启动器截图已检查，颜色和字形与应用内品牌一致。
+- `gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease :app:connectedDebugAndroidTest` 成功，47 项 JVM 测试和 7 组设备测试通过。图标资源调整后另行执行 `assembleRelease` 和 `lintRelease`。
+- 发行 APK 关闭调试，沿用上一版 APK 证书，签名材料配置在仓库 Actions 加密 secrets。APK v2 签名、版本、API 26 最低版本和四种 ABI 已核对。实际将 1.0.3 预览覆盖升级为 1.0.4 发行构建，中文草稿名称与完整正文恢复成功。
+- `npm test` 的 36 项前端与 4 项清单测试、97 项浏览器回归、520 项 Windows 原生检查通过。Windows 实际 WebView2 验证第一次遇到剪贴板占用，单独重跑后全部通过。更新测试从 package.json 读取发布版本，继续逐字核对界面版本。
+- `release.yml` 接入同一 main 提交的 Android 验证产物，发布时与 Windows、macOS 包共同生成 5 项包哈希。远程三平台构建和发布附件校验将在发布完成后补充。
+
+现有 npm 开发依赖仍报告 5 项 high。Android 真实 GitHub 账号全流程、实机输入法、API 26 设备和不同文件提供者的验收范围沿用前节记录。构建日志保存在源码外工具链，设备图标和升级截图保存在本地 `test-results/rev104-device/`。
+
 ## Android 审核界面与云文档预览
 
 2026-11-18。根据本聊天已确认的设计继续实现，基准提交为 `e82d829cd1b8d130563d0ca01b6c9d9a4040bfe4`，分支为 `feature/android-local-editor-20261118`，当前交付保存在未提交工作树。Android 版本为 `1.0.3` / `103`。

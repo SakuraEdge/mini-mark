@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <!-- Fit the brand artwork inside the adaptive icon's 72dp viewport. -->
+    <group android:scaleX="0.6666667" android:scaleY="0.6666667" android:translateX="170.6667" android:translateY="170.6667">
+        <group android:translateX="-30">
+            <path android:fillColor="#FFFFFF" android:pathData="M218,675 V345 H285 L405,515 L525,345 H592 V675 H505 V514 L405,652 L305,514 V675 Z" />
+            <path android:fillColor="#FFFFFF" android:fillAlpha="0.94" android:pathData="M635,675 V457 H691 L755,549 L819,457 H875 V675 H804 V587 L755,654 L706,587 V675 Z" />
+            <path android:fillColor="#FFFFFF" android:fillAlpha="0.63" android:pathData="M229,730 H864 A11,11 0,0 1,875 741 A11,11 0,0 1,864 752 H229 A11,11 0,0 1,218 741 A11,11 0,0 1,229 730 Z" />
+        </group>
+    </group>
+</vector>

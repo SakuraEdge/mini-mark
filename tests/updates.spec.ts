@@ -1,6 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
+import packageInfo from '../package.json' with { type: 'json' };
 
 const REV_SETTINGS = 'moye.updates.rev.v1';
+const releaseVersion = packageInfo.releaseVersion;
 const rev = (releaseVersion: string, version = '9.0.0') => ({
   tag_name: `rev-v${releaseVersion}`, version, releaseVersion,
   name: `Mini Mark Rev v${releaseVersion}`, draft: false, prerelease: false,
@@ -63,7 +65,7 @@ async function finishAutomaticCheck(page: Page) {
 test('Rev update links and installer use the real tag without displaying the internal version', async ({ page }) => {
   await mockUpdates(page, { releases: [rev('1.1.0', '9.1.0')], legacySettings: { auto: false } });
   await openUpdates(page);
-  await expect(page.locator('.update-version')).toHaveText('当前版本 Rev v1.0.3');
+  await expect(page.locator('.update-version')).toHaveText(`当前版本 Rev v${releaseVersion}`);
   await expect(page.locator('#update-status')).toHaveText('发现新版本 Rev v1.1.0。');
   await expect(page.locator('#update-dialog')).not.toContainText('9.1.0');
   await page.getByRole('button', { name: '查看新版 / 下载' }).click();
@@ -182,7 +184,7 @@ test('brand opens the shared update dialog and shows bundled notes while checkin
   await expect(page.locator('#update-dialog')).toBeVisible();
   await expect(page.locator('#update-dialog')).toHaveAttribute('data-state', 'checking');
   await expect(page.locator('#update-dialog')).toHaveAttribute('aria-busy', 'true');
-  await expect(page.locator('#update-notes-title')).toContainText('Rev v1.0.3');
+  await expect(page.locator('#update-notes-title')).toContainText(`Rev v${releaseVersion}`);
   await expect(page.locator('#update-notes')).not.toBeEmpty();
   await page.evaluate(() => (window as any).__finishUpdateCheck());
   await expect(page.locator('#update-dialog')).toHaveAttribute('data-state', 'current');
@@ -203,7 +205,7 @@ test('fresh candidate notes render as inert text and offline results return to b
   expect(await page.evaluate(() => (window as any).__unsafeNotes)).toBeUndefined();
   await page.locator('#update-check').click();
   await expect(page.locator('#update-dialog')).toHaveAttribute('data-state', 'offline');
-  await expect(page.locator('#update-notes-title')).toContainText('Rev v1.0.3');
+  await expect(page.locator('#update-notes-title')).toContainText(`Rev v${releaseVersion}`);
   await expect(page.locator('#update-notes')).not.toContainText('Cached candidate notes');
 });
 
