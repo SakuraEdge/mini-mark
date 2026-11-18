@@ -1,5 +1,41 @@
 # 验证记录
 
+## Android 审核界面与云文档预览
+
+2026-11-18。根据本聊天已确认的设计继续实现，基准提交为 `e82d829cd1b8d130563d0ca01b6c9d9a4040bfe4`，分支为 `feature/android-local-editor-20261118`，当前交付保存在未提交工作树。Android 版本为 `1.0.3` / `103`。
+
+- 审核稿保存为 `docs/design/android-approved.html`，与聊天设计文件的 SHA-256 均为 `c276936e3805e55e1ce204545022d88eaeccf203081b8b966556c279ab25751b`。实现文档、工作区、云文档、设置四入口，以及多标签、底部工具、更多菜单和 `/?`。应用采用离线共享 Web 编辑器与 Kotlin 宿主，复用 PC 的编辑、公式、图片、主题、插件和导出模块。
+- `npm ci`、`npm run build`、36 项前端单元测试、4 项清单测试通过。最终 `npm run test:e2e -- --output=test-results/desktop-android-final` 的 97 项浏览器回归通过。Windows `npm run test:native` 的 520 项检查及 `npm run test:native-ui` 的实际 WebView2 回归通过，使用测试程序生成的独立数据目录。
+- `gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:connectedDebugAndroidTest --no-daemon --console=plain` 成功。47 项 JVM 测试通过，包含 15 项格式与命名、7 项会话、15 项存储与 10 项云文档测试。覆盖旧草稿恢复、LF/BOM/CRLF、保存期间编辑、外部修改、部分写入失败、独立云与本地基线、过期 revision、账号隔离、设备授权、令牌轮换持久化、SHA 冲突和 Git tree 重命名。
+- API 35、x86_64、WebView 124 模拟器的 7 组设备测试全部通过，覆盖编辑与命名、撤销重做、搜索、关闭确认、公式表格、横竖分屏、Activity 重建、系统保存与另存为、取消、重复打开同一文件、选择期间重建、插件、原生桥隔离与 Keystore 密文。新增完整草稿断言以覆盖 CodeMirror 虚拟滚动，并通过系统目录滚动寻找文件。160 段中文长文档的工具栏、软键盘与分屏独立滚动另以 320 dp 宽度通过。
+- 实际打开系统文件夹、编辑并逐字读回文件，插入 PNG 后确认 `assets` 文件存在并在 WebView 渲染。HTML 工作区预览实际运行且原生桥不可见。背景导入与透明度操作保持正文。检查浅色、深色、跟随系统、系统栏、窄屏、更多菜单和当前标签可见性，已查看截图。
+- 在系统保存选择器前台时执行 `am kill` 回收后台应用，确认进程 ID 改变后继续接收选择结果。3,066 字符草稿、目标文档 ID、保存基线与磁盘 UTF-8 字节一致。文件操作通过跨 Activity 宿主状态完成，重建后的 PDF 排版请求可重新发送。
+- HTML 实际导出到系统目标。Android PDF 通过系统打印保存为一页 A4，文件名为单一 `.pdf` 后缀，48,906 字节，中文、公式、表格和边距已渲染检查。Windows `native-pdf-tests` 生成三页 A4，149,979 字节，已逐页检查公式、代码、表格、本地图片与末尾文字。
+- GitHub 原生逻辑使用模拟 HTTP 验证。移动云界面通过模拟宿主检查已登录目录、重命名和云保存。真实 Android 账号授权、MiniMarkDisk 创建、跨设备读写与冲突仍待账号级验收。
+- `lintDebug` 为 0 错误、7 条依赖更新提示。修复 API 26–28 无法调用 `DocumentsContract.isChildDocument` 的兼容问题，以及系统深色主题未传入 WebView 的问题。Kotlin 编译守护进程在一次启动失败后自动恢复，最终构建与设备测试完成。
+- 交付 APK 位于 `release/android-approved-ui-20261118/MiniMark-Rev-v1.0.3-android-preview.apk`，大小 7,640,118 字节，SHA-256 为 `29eea7cc58111503ea86dbae5a540c2b414b0b16c398bbb062f8c9c8426478b1`。APK v2 签名验证通过，开发证书、包名、版本、API 26 最低版本和 arm64-v8a、armeabi-v7a、x86、x86_64 均已核对，最终 APK 已在隔离模拟器安装启动。较早的 `android-local-editor-20261118` 产物保留为历史构建。
+- 工具链位于源码外 `D:\AndroidToolchain\MiniMark`，补充安装的隔离 .NET SDK 8.0.428 下载包经过官方 SHA-512 校验。继续使用现有 checkout 的独立分支。DeepSeek delegate 不可用，内置子代理在执行前返回 `unsupported_encrypted_agent_content`，本轮由主代理实现与复核。`npm audit` 的 5 项 high 开发依赖结果仍保留在待办。
+
+真实手机、实际中文输入法、API 26 设备、不同文件提供者、接近大小上限的性能、Word/WPS 粘贴、macOS 本轮验证和远程 Actions 仍待完成。正式签名与自动覆盖安装更新渠道待配置。SAF 中断写入可能留下部分目标文件，草稿会保留。日志在本机工具链，截图、PDF 和检查脚本在 `test-results/android-approved/`。此前重跑 Playwright 曾清理默认输出目录，最后一次浏览器回归使用独立输出路径，最终设备截图和 PDF 已重新生成。[Android 开发说明](android-development.md)
+
+## Android 本地编辑器预览
+
+以下记录对应审核界面实施前的早期预览。
+
+2026-11-18。源码基于交接提交 `e82d829cd1b8d130563d0ca01b6c9d9a4040bfe4`，工作分支 `feature/android-local-editor-20261118`。Android 版本为 `1.0.3` / `103`，本次产物使用开发签名。
+
+- 使用 JDK 17.0.21、仓库 Gradle 8.9 Wrapper、Android Platform 35 与 Build Tools 35.0.0 完成本地构建。Wrapper 下载包 SHA-256 校验通过。命令 `gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:connectedDebugAndroidTest` 成功。
+- 32 项 JVM 测试通过，包含 15 项格式与命名、6 项会话迁移、11 项存储与生命周期测试。覆盖 UTF-8/BOM/CRLF、粘贴选区、旧会话空基线、重复 ID、外部修改、保存期间继续输入、提供者写入失败、重试保护与清理后立即恢复。
+- API 35 默认 x86_64 模拟器的 5 组设备测试通过，覆盖中文 H1 命名、撤销重做、搜索、手动重命名、关闭确认、快捷指令、阅读与分屏、横竖屏、页面重建、系统文件保存、另存为、重复打开、取消与文件选择器中的页面重建。实际保存后读回正文与 URI，重名另存为保留 `.md` 后缀。
+- 160 段中文文档的滚动与软键盘检查通过，另外以 320 dp 宽度重跑。修复原生阅读视图越过分屏边界的问题，增加滚动前后工具栏截图像素比较。已查看普通竖屏、横屏、窄屏、键盘、更多、快捷指令与版本窗口截图。
+- 单独检查进程重启，3577 字符草稿、名称和会话逐字保持。另在系统保存窗口前台时回收后台应用进程，确认新进程继续处理保存结果，正文、保存基线、文件 URI 与设备文件 SHA-256 一致。
+- `lintDebug` 为 0 错误，9 条依赖有较新版本的提示。新 CI 配置包含相同测试及开发签名 APK 上传，远程 Actions 的执行仍待后续推送。
+- 交付文件位于本地忽略目录 `release/android-local-editor-20261118/MiniMark-Rev-v1.0.3-android-preview.apk`，大小 16,619,087 字节，SHA-256 为 `228b0fb02f94a875fca507abb003808d2c2b1e7b57c2089a4e0876da9ad1bcea`。APK Signature Scheme v2 校验通过，包名、版本、API 26 最低要求和四种 ABI 已核对。APK 已在隔离模拟器安装启动。
+- 桌面依赖通过 `npm ci` 重建，`npm run build`、36 项前端单元测试与 4 项更新清单测试通过。`npm audit` 报告现有 Vite/Vitest 开发依赖链中的 5 项 high 结果，涉及 picomatch ReDoS 及其上层依赖。桌面原生与 macOS 回归留待对应平台任务。
+- 本次采用现有 checkout 的独立分支，原因是桌面 worktree 工具未识别该仓库。DeepSeek delegate 未提供可用入口，内置子代理返回 `unsupported_encrypted_agent_content`，实现与复核由主代理完成。工具链安装在源码外的 `D:\AndroidToolchain\MiniMark`。本机 Maven Central 访问失败后使用工具链缓存中的本地镜像配置。
+
+该阶段尚待实现云同步、文件夹工作区、PDF、完整图片管理、公式渲染与编辑、HTML 运行、主题和插件，后续实现与验收见本页上节。真实手机、真实中文输入法、API 26 最低版本和接近大小上限的文档性能仍待验收。正式签名和自动更新待配置。SAF 提供者直接写入的限制与草稿异常终止窗口见 Android 开发说明。[Android 开发说明](android-development.md)
+
 ## Rev v1.0.3 开发验证
 
 2026-11-13。公开版本 `1.0.3`，内部防降级版本 `4.0.3`。

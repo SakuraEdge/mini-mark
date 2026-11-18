@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.MiniMark" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#7BA8F4</item>
+        <item name="android:navigationBarColor">#23262B</item>
+        <item name="android:statusBarColor">#23262B</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>

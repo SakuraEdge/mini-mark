@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Mini Mark</string>
+    <string name="webview_update_required">请在系统应用商店更新 Android System WebView 后重新打开 Mini Mark。</string>
 </resources>

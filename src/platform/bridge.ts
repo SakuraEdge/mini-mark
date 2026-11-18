@@ -1,3 +1,4 @@
+import './android';
 import { sample } from '../documents/sample';
 import { BrowserWorkspace, type DocumentData, type TabData } from '../documents/workspace';
 import { documentLanguage, formatLabel } from '../documents/formats';
@@ -10,6 +11,7 @@ export type HostMessage =
   | { type: 'saved'; documentId: string; name: string; path?: string; text: string; cloud?: CloudBinding | null; autoName?: boolean }
   | { type: 'cloudResponse'; requestId: string; data?: unknown; error?: string }
   | { type: 'folderResponse'; requestId: string; data?: unknown; error?: string }
+  | { type: 'cloudConflict'; documentId: string; owner: string; path: string }
   | { type: 'requestClosingText'; requestId: string }
   | { type: 'requestExportPdf'; requestId: string; documentId: string; text: string; name: string }
   | { type: 'operationComplete' }

@@ -82,15 +82,15 @@ GitHub OAuth 授权会申请可读写私有仓库的 `repo` 权限。该权限�
 | --- | --- |
 | Windows 10 / 11，x64 | EXE 安装器，或完整解压 ZIP 后运行 `MiniMark.exe` |
 | macOS 13 或更新版本 | DMG 或 ZIP，通用包支持 Apple Silicon 与 Intel |
-| Android 8.0 或更新版本 | Android 界面预览构建（Rev v1.0.3，未签名，不作为正式安装包） |
+| Android 8.0 或更新版本 | Android 开发预览 APK，使用开发签名，需要近期版本的 Android System WebView |
 
-从[正式版下载页](https://github.com/SakuraEdge/mini-mark/releases/latest)选择对应系统的文件。
+Windows 与 macOS 安装包可在正式版下载页选择。[正式版下载页](https://github.com/SakuraEdge/mini-mark/releases/latest)
 
 Windows 安装时可以选择桌面和开始菜单快捷方式，以及 Markdown、YAML、HTML 文件关联。系统默认应用需要由 Windows 设置确认。三类文件使用独立文档图标，HTML 不会被强制设为默认应用。Windows 版需要 Microsoft Edge WebView2 Runtime。
 
 macOS 将 `Mini Mark.app` 拖入 Applications。当前包使用 **ad-hoc 签名，未使用 Apple Developer ID，也未公证**。免费个人开发证书不等同于公开发行签名。Windows 包同样未使用商业代码签名。请从本仓库下载并核对校验和，无需关闭系统安全保护。
 
-Android 版本目前是 UI 预览，包含编辑器、工作区、云文档和更新界面的移动端布局。Rev v1.0.3 的 CI 构建为未签名 APK，仅用于内部测试，暂不提供直接安装或正式更新渠道；本地文件编辑、持久化和 GitHub 云同步接入后再发布可安装版本。
+Android 预览采用文档、工作区、云文档、设置四个入口，共享桌面端的即时编辑、源码、阅读、分屏、公式、图片、主题与插件能力。系统文件选择器负责打开、保存和文件夹授权，PDF 通过系统打印中的“另存为 PDF”导出。GitHub 云文档包含登录、MiniMarkDisk 目录、保存、重命名、删除与冲突处理。单个本地文件上限为 20 MB，云文档上限为 5 MB。将 APK 传到手机点击安装，并按系统提示允许当前文件管理器安装应用。覆盖安装需要开发签名一致。真实账号全流程、手机输入法和正式更新渠道的验收范围见开发说明。[Android 开发说明](docs/android-development.md)
 
 ## 快捷键
 

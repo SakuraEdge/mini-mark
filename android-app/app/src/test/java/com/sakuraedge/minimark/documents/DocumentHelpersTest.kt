@@ -3,6 +3,8 @@ package com.sakuraedge.minimark.documents
 import org.junit.Assert.*
 import org.junit.Test
 import java.nio.charset.CharacterCodingException
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 
 class DocumentHelpersTest {
     @Test fun firstLineHeadingNamesDraft() {
@@ -79,5 +81,37 @@ class DocumentHelpersTest {
     @Test(expected = CharacterCodingException::class)
     fun invalidUtf8IsRejectedInsteadOfReplacingText() {
         decodeDocument(byteArrayOf(0xc3.toByte(), 0x28))
+    }
+
+    @Test fun pastedCrLfKeepsSelectionAndCompositionAligned() {
+        val normalized = normalizeTextValue(TextFieldValue("a\r\nb\rc", TextRange(6, 3), TextRange(3, 4)))
+        assertEquals("a\nb\nc", normalized.text)
+        assertEquals(TextRange(5, 2), normalized.selection)
+        assertEquals(TextRange(2, 3), normalized.composition)
+    }
+
+    @Test fun encodeNormalizesLegacyLineEndingsBeforeRestoringCrLf() {
+        assertEquals("\uFEFFa\r\nb\r\nc", encodeDocument("a\r\nb\rc", true, true).toString(Charsets.UTF_8))
+    }
+
+    @Test(expected = CharacterCodingException::class)
+    fun malformedSurrogateIsRejectedInsteadOfReplacingText() {
+        encodeDocument("\uD800", false, false)
+    }
+
+    @Test fun manualNamesRejectReservedOrOverlongFileNames() {
+        assertTrue(validDocumentName("中文笔记.md"))
+        assertFalse(validDocumentName("CON.md"))
+        assertFalse(validDocumentName("a/b.md"))
+        assertFalse(validDocumentName("a\n.md"))
+        assertFalse(validDocumentName("文".repeat(80) + ".md"))
+        assertFalse(validDocumentName("name."))
+    }
+
+    @Test fun htmlAndYamlUsePlainTextPreview() {
+        assertTrue(isMarkdown("note.MARKDOWN"))
+        assertTrue(isMarkdown("note.md"))
+        assertFalse(isMarkdown("index.html"))
+        assertFalse(isMarkdown("config.yml"))
     }
 }

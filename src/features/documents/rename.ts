@@ -51,6 +51,11 @@ export function initializeRename(options: Options) {
     rename.focus();
   }
   return {
+    open(id: string) {
+      if (options.disabled() || !options.document(id)) return;
+      targetId = id;
+      rename.click();
+    },
     bind(element: HTMLElement, id: () => string) {
       element.addEventListener('contextmenu', event => {
         event.preventDefault(); open(id(), element, event.clientX, event.clientY);

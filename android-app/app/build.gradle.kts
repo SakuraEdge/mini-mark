@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -15,6 +14,7 @@ android {
         targetSdk = 35
         versionCode = 103
         versionName = "1.0.3"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -33,16 +33,40 @@ android {
     }
 
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures { buildConfig = true }
+    testOptions { unitTests.isIncludeAndroidResources = true }
+    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/web-assets"))
 }
+
+val buildSharedWeb by tasks.registering(Exec::class) {
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine(if (System.getProperty("os.name").startsWith("Windows")) "npm.cmd" else "npm", "run", "build")
+    inputs.dir("../../src")
+    inputs.dir("../../public")
+    inputs.file("../../package-lock.json")
+    inputs.file("../../vite.config.ts")
+    inputs.file("../../index.html")
+    outputs.dir("../../dist")
+}
+val copySharedWeb by tasks.registering(Sync::class) {
+    dependsOn(buildSharedWeb)
+    from("../../dist") { exclude("**/*.map") }
+    into(layout.buildDirectory.dir("generated/web-assets/web"))
+}
+tasks.named("preBuild").configure { dependsOn(copySharedWeb) }
 
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
-    implementation("androidx.activity:activity-compose:1.10.0")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    debugImplementation("androidx.compose.ui:ui-tooling")
+    implementation("androidx.activity:activity-ktx:1.10.0")
+    implementation("androidx.webkit:webkit:1.12.1")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("androidx.compose.runtime:runtime")
+    implementation("androidx.compose.ui:ui-text")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }

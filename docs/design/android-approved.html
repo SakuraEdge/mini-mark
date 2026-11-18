@@ -1,0 +1,872 @@
+<div id="minimark-ui-review" aria-label="Mini Mark Android 界面设计">
+  <style>
+    #minimark-ui-review {
+      --mm-ink: light-dark(#26364d, #e6edf8);
+      --mm-muted: light-dark(#64748a, #a7b5ca);
+      --mm-line: light-dark(#e2e9f3, #354258);
+      --mm-paper: light-dark(#ffffff, #1b2534);
+      --mm-canvas: light-dark(#f4f7fc, #131c2a);
+      --mm-soft: light-dark(#eaf2ff, #263c5c);
+      --mm-blue: light-dark(#286bd6, #8ab7ff);
+      --mm-fill: #286bd6;
+      --mm-on-fill: #ffffff;
+      --mm-green: light-dark(#23785a, #8ddbb9);
+      --mm-green-soft: light-dark(#edf8f2, #1d3a32);
+      --mm-warning: light-dark(#96621e, #f0c784);
+      --mm-warning-soft: light-dark(#fff6e6, #3d3123);
+      --mm-red: light-dark(#bb4248, #ffaaa9);
+      --mm-code: light-dark(#8d469f, #ddb6f0);
+      --mm-doc-size: 16px;
+      --mm-preview-background: none;
+      color-scheme: light;
+      color: var(--mm-ink);
+      font-family: Inter, "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    #minimark-ui-review * { box-sizing: border-box; }
+    #minimark-ui-review [hidden] { display: none !important; }
+    #minimark-ui-review button, #minimark-ui-review input, #minimark-ui-review textarea, #minimark-ui-review select { font: inherit; }
+    #minimark-ui-review button { color: inherit; }
+    #minimark-ui-review button:disabled { opacity: .42; cursor: default; }
+    #minimark-ui-review h1, #minimark-ui-review h2, #minimark-ui-review h3, #minimark-ui-review p { margin: 0; }
+    #minimark-ui-review h1, #minimark-ui-review h2, #minimark-ui-review h3, #minimark-ui-review strong { font-weight: 500; }
+    #minimark-ui-review svg { flex-shrink: 0; width: 19px; height: 19px; stroke-width: 1.65; }
+    #minimark-ui-review .mm-stage { display: flex; justify-content: center; padding: 24px 12px; min-height: 830px; }
+    #minimark-ui-review .mm-phone { position: relative; width: min(100%, 410px); height: 782px; display: flex; flex-direction: column; border: 1px solid var(--mm-line); border-radius: 28px; background: var(--mm-paper); overflow: hidden; box-shadow: 0 12px 48px light-dark(#243b5520, #00000045); container-type: inline-size; }
+    #minimark-ui-review[data-device="tablet"] .mm-phone { width: min(100%, 680px); }
+    #minimark-ui-review .mm-status { display: flex; align-items: center; justify-content: space-between; height: 32px; flex: 0 0 32px; padding: 0 22px; background: var(--mm-paper); font-size: 12px; font-weight: 500; }
+    #minimark-ui-review .mm-status-icons { display: flex; align-items: center; gap: 5px; }
+    #minimark-ui-review .mm-status-icons svg { width: 14px; height: 14px; }
+    #minimark-ui-review .mm-app { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--mm-canvas); }
+    #minimark-ui-review .mm-system { flex: 0 0 18px; display: grid; place-items: center; background: var(--mm-paper); }
+    #minimark-ui-review .mm-system::after { content: ""; width: 105px; height: 4px; border-radius: 4px; background: var(--mm-ink); opacity: .72; }
+    #minimark-ui-review .mm-appbar { min-height: 64px; flex-shrink: 0; display: flex; align-items: center; gap: 5px; padding: 5px 12px; background: var(--mm-paper); border-bottom: 1px solid var(--mm-line); }
+    #minimark-ui-review .mm-brand { display: flex; align-items: center; gap: 10px; padding: 6px 0; border: 0; background: transparent; text-align: left; font-size: 19px; font-weight: 500; }
+    #minimark-ui-review .mm-logo { width: 32px; height: 32px; border-radius: 9px; }
+    #minimark-ui-review .mm-grow { flex: 1; min-width: 0; }
+    #minimark-ui-review .mm-app-title { min-width: 0; flex: 1; padding: 4px 0; }
+    #minimark-ui-review .mm-app-title h2 { font-size: 18px; }
+    #minimark-ui-review .mm-app-title small { color: var(--mm-muted); display: block; font-size: 11px; }
+    #minimark-ui-review .mm-icon { flex-shrink: 0; width: 44px; height: 44px; display: inline-grid; place-items: center; border: 0; border-radius: 9px; background: transparent; color: var(--mm-muted); }
+    #minimark-ui-review .mm-icon:hover { background: var(--mm-soft); color: var(--mm-blue); }
+    #minimark-ui-review .mm-primary-icon { color: var(--mm-blue); }
+    #minimark-ui-review .mm-content { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 22px 18px; scrollbar-width: thin; }
+    #minimark-ui-review .mm-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 18px; }
+    #minimark-ui-review .mm-section-head h1 { font-size: 25px; letter-spacing: -.4px; }
+    #minimark-ui-review .mm-button { min-height: 44px; border: 1px solid var(--mm-line); border-radius: 9px; padding: 9px 14px; background: var(--mm-paper); color: var(--mm-ink); display: inline-flex; justify-content: center; align-items: center; gap: 7px; font-weight: 500; }
+    #minimark-ui-review .mm-button.primary { background: var(--mm-fill); border-color: var(--mm-fill); color: var(--mm-on-fill); }
+    #minimark-ui-review .mm-button.danger { color: var(--mm-red); }
+    #minimark-ui-review .mm-button.wide { width: 100%; }
+    #minimark-ui-review .mm-text-button { border: 0; min-height: 44px; padding: 6px 8px; color: var(--mm-blue); background: transparent; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    #minimark-ui-review .mm-search { display: flex; align-items: center; gap: 8px; min-height: 46px; border: 1px solid var(--mm-line); border-radius: 10px; background: var(--mm-paper); padding: 0 12px; color: var(--mm-muted); }
+    #minimark-ui-review .mm-search input { min-width: 0; width: 100%; min-height: 44px; border: 0; background: transparent; color: var(--mm-ink); }
+    #minimark-ui-review .mm-search input::placeholder { color: var(--mm-muted); }
+    #minimark-ui-review .mm-filters { display: flex; gap: 18px; padding: 12px 0 4px; }
+    #minimark-ui-review .mm-filter { padding: 5px 2px 8px; min-height: 40px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--mm-muted); font-size: 13px; }
+    #minimark-ui-review .mm-filter[aria-pressed="true"] { color: var(--mm-blue); border-bottom-color: var(--mm-blue); }
+    #minimark-ui-review .mm-label { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 22px 0 8px; color: var(--mm-muted); font-size: 12px; }
+    #minimark-ui-review .mm-files { background: var(--mm-paper); border: 1px solid var(--mm-line); border-radius: 12px; overflow: hidden; }
+    #minimark-ui-review .mm-file-row { display: flex; align-items: center; border-bottom: 1px solid var(--mm-line); }
+    #minimark-ui-review .mm-file-row:last-child { border-bottom: 0; }
+    #minimark-ui-review .mm-file { display: flex; width: 100%; align-items: center; gap: 11px; min-height: 77px; padding: 13px 12px; border: 0; background: transparent; text-align: left; min-width: 0; }
+    #minimark-ui-review .mm-file:hover { background: var(--mm-soft); }
+    #minimark-ui-review .mm-file-icon { width: 35px; height: 42px; flex-shrink: 0; display: grid; place-items: center; background: var(--mm-soft); color: var(--mm-blue); border-radius: 7px; font-size: 11px; font-weight: 500; }
+    #minimark-ui-review .mm-file-icon.yaml { background: var(--mm-green-soft); color: var(--mm-green); }
+    #minimark-ui-review .mm-file-icon.html { background: var(--mm-warning-soft); color: var(--mm-warning); }
+    #minimark-ui-review .mm-file-main { flex: 1; min-width: 0; }
+    #minimark-ui-review .mm-file-name { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 500; }
+    #minimark-ui-review .mm-file-meta { display: flex; align-items: center; gap: 5px; margin-top: 4px; color: var(--mm-muted); font-size: 11px; }
+    #minimark-ui-review .mm-file-meta svg { width: 12px; height: 12px; }
+    #minimark-ui-review .mm-file-row > .mm-icon { margin-right: 3px; }
+    #minimark-ui-review .mm-quiet { color: var(--mm-muted); font-size: 12px; }
+    #minimark-ui-review .mm-footnote { display: flex; align-items: center; gap: 6px; color: var(--mm-muted); font-size: 11px; margin-top: 18px; }
+    #minimark-ui-review .mm-footnote svg { width: 14px; height: 14px; }
+    #minimark-ui-review .mm-bottom-nav { flex-shrink: 0; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--mm-paper); border-top: 1px solid var(--mm-line); padding: 6px 6px 2px; }
+    #minimark-ui-review .mm-nav-item { min-height: 59px; border: 0; border-radius: 10px; color: var(--mm-muted); background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px; }
+    #minimark-ui-review .mm-nav-item[aria-current="page"] { color: var(--mm-blue); background: var(--mm-soft); font-weight: 500; }
+    #minimark-ui-review .mm-nav-item svg { width: 21px; height: 21px; }
+    #minimark-ui-review .mm-empty { padding: 46px 10px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    #minimark-ui-review .mm-empty > svg { width: 36px; height: 36px; color: var(--mm-blue); }
+    #minimark-ui-review .mm-empty h2 { font-size: 21px; }
+    #minimark-ui-review .mm-empty p { color: var(--mm-muted); font-size: 13px; max-width: 280px; }
+    #minimark-ui-review .mm-path { display: flex; align-items: center; gap: 5px; color: var(--mm-muted); font-size: 12px; padding: 12px 0; flex-wrap: wrap; overflow-wrap: anywhere; }
+    #minimark-ui-review .mm-path button { border: 0; background: transparent; color: var(--mm-blue); padding: 6px 0; min-height: 32px; }
+    #minimark-ui-review .mm-path svg { width: 13px; height: 13px; }
+    #minimark-ui-review .mm-root-folder { padding: 14px; border: 1px solid var(--mm-line); border-radius: 11px; background: var(--mm-paper); display: flex; align-items: center; gap: 10px; }
+    #minimark-ui-review .mm-root-folder > svg { color: var(--mm-blue); width: 25px; height: 25px; }
+    #minimark-ui-review .mm-root-folder strong { display: block; font-size: 15px; }
+    #minimark-ui-review .mm-root-folder small { display: block; color: var(--mm-muted); font-size: 11px; margin-top: 3px; overflow-wrap: anywhere; }
+    #minimark-ui-review .mm-tree { border-top: 1px solid var(--mm-line); margin-top: 6px; }
+    #minimark-ui-review .mm-tree-row { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 48px; border: 0; border-bottom: 1px solid var(--mm-line); background: transparent; padding: 7px 3px; text-align: left; }
+    #minimark-ui-review .mm-tree-row svg { color: var(--mm-muted); width: 18px; }
+    #minimark-ui-review .mm-tree-row.indent { padding-left: 27px; }
+    #minimark-ui-review .mm-tree-row small { margin-left: auto; font-size: 11px; color: var(--mm-muted); }
+    #minimark-ui-review .mm-account { display: flex; gap: 12px; align-items: center; background: var(--mm-paper); border: 1px solid var(--mm-line); border-radius: 12px; padding: 14px 12px; }
+    #minimark-ui-review .mm-avatar { display: grid; place-items: center; flex-shrink: 0; width: 39px; height: 39px; border-radius: 11px; background: var(--mm-soft); color: var(--mm-blue); }
+    #minimark-ui-review .mm-connected { color: var(--mm-green); display: inline-flex; align-items: center; gap: 4px; font-size: 11px; }
+    #minimark-ui-review .mm-connected svg { width: 13px; height: 13px; }
+    #minimark-ui-review .mm-banner { display: flex; align-items: flex-start; gap: 8px; background: var(--mm-warning-soft); color: var(--mm-warning); padding: 12px; border-radius: 9px; margin: 14px 0; font-size: 12px; }
+    #minimark-ui-review .mm-banner strong { display: block; margin-bottom: 3px; }
+    #minimark-ui-review .mm-banner .mm-text-button { font-size: 12px; min-height: 30px; padding: 4px 0; }
+    #minimark-ui-review .mm-editor-heading { flex: 1; min-width: 0; border: 0; background: transparent; text-align: left; padding: 4px 0; }
+    #minimark-ui-review .mm-editor-name { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 500; }
+    #minimark-ui-review .mm-editor-name span { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+    #minimark-ui-review .mm-editor-name svg { width: 13px; height: 13px; }
+    #minimark-ui-review .mm-save-status { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--mm-muted); margin-top: 3px; }
+    #minimark-ui-review .mm-save-status svg { width: 12px; height: 12px; }
+    #minimark-ui-review .mm-document-tabs { display: flex; min-height: 40px; flex-shrink: 0; background: var(--mm-canvas); padding-left: 8px; border-bottom: 1px solid var(--mm-line); }
+    #minimark-ui-review .mm-tabs-scroll { display: flex; overflow-x: auto; flex: 1; min-width: 0; scrollbar-width: none; }
+    #minimark-ui-review .mm-document-tab { display: flex; flex-shrink: 0; align-items: center; max-width: 160px; border-bottom: 2px solid transparent; }
+    #minimark-ui-review .mm-document-tab.active { background: var(--mm-paper); border-bottom-color: var(--mm-blue); }
+    #minimark-ui-review .mm-document-tab > button { min-height: 39px; padding: 5px 9px; border: 0; background: transparent; font-size: 11px; color: var(--mm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #minimark-ui-review .mm-document-tab.active > button { color: var(--mm-blue); }
+    #minimark-ui-review .mm-document-tab > button:last-child { min-width: 30px; padding: 4px; }
+    #minimark-ui-review .mm-document-tab svg { width: 12px; height: 12px; }
+    #minimark-ui-review .mm-document-tabs > .mm-icon { height: 40px; }
+    #minimark-ui-review .mm-mode-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--mm-paper); flex-shrink: 0; border-bottom: 1px solid var(--mm-line); }
+    #minimark-ui-review .mm-modes { display: grid; grid-template-columns: repeat(4, 1fr); flex: 1; border: 1px solid var(--mm-line); background: var(--mm-canvas); border-radius: 8px; padding: 3px; gap: 2px; }
+    #minimark-ui-review .mm-mode { min-height: 32px; background: transparent; border: 0; border-radius: 5px; color: var(--mm-muted); font-size: 12px; }
+    #minimark-ui-review .mm-mode[aria-pressed="true"] { color: var(--mm-blue); background: var(--mm-paper); box-shadow: 0 1px 4px #2233440a; font-weight: 500; }
+    #minimark-ui-review .mm-mode-row > .mm-icon { width: 38px; }
+    #minimark-ui-review .mm-editor-surface { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--mm-paper); background-image: var(--mm-preview-background); overflow: hidden; }
+    #minimark-ui-review .mm-writing { flex: 1; min-height: 0; overflow: auto; padding: 26px 23px 34px; font-size: var(--mm-doc-size); line-height: 1.85; scrollbar-width: thin; }
+    #minimark-ui-review .mm-writing > * + * { margin-top: 16px; }
+    #minimark-ui-review .mm-writing h1 { font-size: 25px; line-height: 1.5; letter-spacing: -.4px; margin-bottom: 20px; }
+    #minimark-ui-review .mm-writing h2 { font-size: 19px; line-height: 1.6; margin-top: 26px; }
+    #minimark-ui-review .mm-writing h3 { font-size: 17px; }
+    #minimark-ui-review .mm-writing [contenteditable="true"] { border-radius: 3px; }
+    #minimark-ui-review .mm-writing [contenteditable="true"]:focus { outline: 1px solid var(--mm-line); outline-offset: 4px; }
+    #minimark-ui-review .mm-writing .mm-heading-marker { color: var(--mm-code); margin-right: 7px; }
+    #minimark-ui-review .mm-writing ul { padding-left: 20px; }
+    #minimark-ui-review .mm-writing blockquote { margin-left: 0; margin-right: 0; padding: 8px 12px; border-left: 3px solid color-mix(in srgb, var(--mm-blue) 40%, transparent); background: var(--mm-canvas); color: var(--mm-muted); font-size: 14px; }
+    #minimark-ui-review .mm-equation { width: 100%; border: 0; background: transparent; padding: 14px 5px; text-align: center; font: 20px/1.5 "STIX Two Text", Georgia, serif; color: var(--mm-ink); }
+    #minimark-ui-review .mm-fraction { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; font-size: .88em; }
+    #minimark-ui-review .mm-fraction span:first-child { border-bottom: 1px solid currentColor; padding: 0 4px 2px; }
+    #minimark-ui-review .mm-fraction span:last-child { padding-top: 2px; }
+    #minimark-ui-review .mm-task { display: flex; align-items: baseline; gap: 8px; font-size: 14px; }
+    #minimark-ui-review .mm-task input { accent-color: var(--mm-fill); width: 15px; height: 15px; }
+    #minimark-ui-review .mm-code-block { white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 7px; padding: 14px; background: var(--mm-canvas); color: var(--mm-blue); font: 12px/1.85 "IBM Plex Mono", Consolas, monospace; }
+    #minimark-ui-review .mm-writing a { color: var(--mm-blue); text-decoration: underline; }
+    #minimark-ui-review .mm-writing table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    #minimark-ui-review .mm-writing td, #minimark-ui-review .mm-writing th { border: 1px solid var(--mm-line); padding: 7px; text-align: left; }
+    #minimark-ui-review .mm-source-wrap { display: flex; flex: 1; min-height: 0; padding: 20px 12px; overflow: hidden; }
+    #minimark-ui-review .mm-source { flex: 1; min-width: 0; resize: none; border: 0; background: transparent; color: var(--mm-ink); font: 13px/25px "IBM Plex Mono", Consolas, "Microsoft YaHei", monospace; }
+    #minimark-ui-review .mm-code-editor { position: relative; flex: 1; min-width: 0; min-height: 0; }
+    #minimark-ui-review .mm-code-editor .mm-source { width: 100%; height: 100%; margin: 0; padding: 0; color: transparent; caret-color: var(--mm-ink); position: relative; }
+    #minimark-ui-review .mm-syntax-underlay { position: absolute; inset: 0; margin: 0; padding: 0; border: 0; white-space: pre-wrap; overflow-wrap: break-word; overflow: hidden; pointer-events: none; font: 13px/25px "IBM Plex Mono", Consolas, "Microsoft YaHei", monospace; color: var(--mm-ink); }
+    #minimark-ui-review .mm-syntax-preview { flex: 1; min-height: 0; margin: 0; padding: 20px 18px; white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; font: 13px/25px "IBM Plex Mono", Consolas, "Microsoft YaHei", monospace; color: var(--mm-ink); }
+    #minimark-ui-review .mm-syntax-key { color: var(--mm-blue); }
+    #minimark-ui-review .mm-syntax-comment { color: var(--mm-muted); }
+    #minimark-ui-review .mm-syntax-value { color: var(--mm-code); }
+    #minimark-ui-review .mm-split { flex: 1; min-height: 0; display: grid; grid-template-rows: 1fr 1fr; overflow: hidden; }
+    #minimark-ui-review .mm-split-pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+    #minimark-ui-review .mm-split-pane + .mm-split-pane { border-top: 1px solid var(--mm-line); }
+    #minimark-ui-review .mm-pane-caption { padding: 7px 14px; font-size: 11px; color: var(--mm-muted); background: var(--mm-canvas); border-bottom: 1px solid var(--mm-line); }
+    #minimark-ui-review .mm-split .mm-writing { padding: 15px 20px; }
+    #minimark-ui-review .mm-editor-footer { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 7px; padding: 6px 14px; border-top: 1px solid var(--mm-line); background: var(--mm-paper); color: var(--mm-muted); font-size: 11px; }
+    #minimark-ui-review .mm-tools { flex-shrink: 0; display: flex; justify-content: space-around; align-items: center; padding: 4px 3px; border-top: 1px solid var(--mm-line); background: var(--mm-paper); }
+    #minimark-ui-review .mm-tools .mm-icon { width: 42px; }
+    #minimark-ui-review .mm-slash { font: 400 16px/1 Inter, sans-serif; }
+    #minimark-ui-review .mm-format-glyph { font-size: 16px; font-weight: 500; }
+    #minimark-ui-review .mm-html-actions { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--mm-line); background: var(--mm-paper); }
+    #minimark-ui-review .mm-html-actions .mm-button { flex: 1; font-size: 12px; padding: 7px; }
+    #minimark-ui-review .mm-overlay { position: absolute; z-index: 8; inset: 32px 0 18px; display: flex; align-items: flex-end; background: #17263c45; }
+    #minimark-ui-review .mm-sheet { width: 100%; max-height: 92%; display: flex; flex-direction: column; border-radius: 20px 20px 0 0; background: var(--mm-paper); box-shadow: 0 -8px 30px #14243a17; }
+    #minimark-ui-review .mm-sheet-head { display: flex; align-items: center; padding: 12px 12px 5px 20px; gap: 7px; flex-shrink: 0; }
+    #minimark-ui-review .mm-sheet-head h2 { flex: 1; font-size: 18px; }
+    #minimark-ui-review .mm-sheet-body { overflow: auto; padding: 7px 20px 18px; min-height: 0; }
+    #minimark-ui-review .mm-sheet-body > p { font-size: 13px; color: var(--mm-muted); margin-bottom: 16px; line-height: 1.7; }
+    #minimark-ui-review .mm-sheet-actions { padding: 12px 20px 20px; border-top: 1px solid var(--mm-line); display: flex; gap: 9px; flex-shrink: 0; }
+    #minimark-ui-review .mm-sheet-actions > .mm-button { flex: 1; min-width: 0; }
+    #minimark-ui-review .mm-menu-row { width: 100%; display: flex; align-items: center; text-align: left; gap: 12px; min-height: 49px; padding: 9px 4px; border: 0; background: transparent; border-bottom: 1px solid var(--mm-line); }
+    #minimark-ui-review .mm-menu-row:last-child { border-bottom: 0; }
+    #minimark-ui-review .mm-menu-row > svg:first-child { color: var(--mm-muted); }
+    #minimark-ui-review .mm-menu-row > svg:last-child { width: 14px; color: var(--mm-muted); }
+    #minimark-ui-review .mm-menu-row small { display: block; color: var(--mm-muted); font-size: 11px; margin-top: 2px; }
+    #minimark-ui-review .mm-menu-row.danger { color: var(--mm-red); }
+    #minimark-ui-review .mm-menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+    #minimark-ui-review .mm-menu-tile { min-height: 77px; border: 0; border-radius: 9px; background: var(--mm-canvas); color: var(--mm-ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; font-size: 12px; }
+    #minimark-ui-review .mm-menu-tile svg { color: var(--mm-blue); }
+    #minimark-ui-review .mm-divider { height: 1px; background: var(--mm-line); margin: 17px 0; }
+    #minimark-ui-review .mm-field { display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: var(--mm-muted); margin: 14px 0; }
+    #minimark-ui-review .mm-input { min-height: 44px; width: 100%; min-width: 0; padding: 10px 12px; background: var(--mm-canvas); border: 1px solid var(--mm-line); color: var(--mm-ink); border-radius: 8px; font-size: 14px; }
+    #minimark-ui-review textarea.mm-input { resize: vertical; min-height: 110px; font-family: "IBM Plex Mono", Consolas, monospace; }
+    #minimark-ui-review .mm-form-row { display: flex; gap: 10px; align-items: center; }
+    #minimark-ui-review .mm-form-row > * { flex: 1; min-width: 0; }
+    #minimark-ui-review .mm-form-row > .mm-button { padding: 9px 8px; font-size: 13px; white-space: nowrap; }
+    #minimark-ui-review .mm-check-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 49px; font-size: 13px; padding: 8px 0; }
+    #minimark-ui-review .mm-check-row input { accent-color: var(--mm-fill); width: 18px; height: 18px; }
+    #minimark-ui-review .mm-check-row small { display: block; color: var(--mm-muted); font-size: 11px; margin-top: 4px; }
+    #minimark-ui-review .mm-pill { display: inline-flex; align-items: center; gap: 5px; min-height: 27px; padding: 3px 8px; border-radius: 6px; background: var(--mm-soft); color: var(--mm-blue); font-size: 11px; }
+    #minimark-ui-review .mm-pill svg { width: 12px; height: 12px; }
+    #minimark-ui-review .mm-auth-code { letter-spacing: 4px; text-align: center; font: 500 24px/1.5 "IBM Plex Mono", Consolas, monospace; background: var(--mm-canvas); border: 1px solid var(--mm-line); padding: 15px 8px; border-radius: 10px; }
+    #minimark-ui-review .mm-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0; }
+    #minimark-ui-review .mm-compare > div { min-width: 0; padding: 12px; background: var(--mm-canvas); border-radius: 8px; font-size: 12px; overflow-wrap: anywhere; }
+    #minimark-ui-review .mm-compare strong { display: block; margin-bottom: 8px; color: var(--mm-blue); }
+    #minimark-ui-review .mm-settings-group { background: var(--mm-paper); border: 1px solid var(--mm-line); border-radius: 11px; padding: 0 12px; }
+    #minimark-ui-review .mm-settings-group .mm-field { padding: 5px 0; }
+    #minimark-ui-review .mm-theme-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; padding-bottom: 13px; }
+    #minimark-ui-review .mm-theme-options button { min-height: 42px; border: 1px solid var(--mm-line); background: var(--mm-canvas); border-radius: 7px; font-size: 12px; }
+    #minimark-ui-review .mm-theme-options button[aria-pressed="true"] { background: var(--mm-soft); border-color: var(--mm-blue); color: var(--mm-blue); }
+    #minimark-ui-review .mm-range { width: 100%; accent-color: var(--mm-fill); min-height: 30px; }
+    #minimark-ui-review .mm-background-preview { display: grid; place-items: center; height: 124px; border: 1px dashed var(--mm-line); border-radius: 11px; color: var(--mm-muted); background: var(--mm-canvas); gap: 6px; font-size: 13px; }
+    #minimark-ui-review .mm-background-preview.selected { background: linear-gradient(130deg, var(--mm-soft), var(--mm-paper), var(--mm-green-soft)); border-style: solid; }
+    #minimark-ui-review .mm-plugin { border-bottom: 1px solid var(--mm-line); padding: 12px 0; }
+    #minimark-ui-review .mm-plugin-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    #minimark-ui-review .mm-plugin-head strong { flex: 1; }
+    #minimark-ui-review .mm-plugin-head input { accent-color: var(--mm-fill); }
+    #minimark-ui-review .mm-preview-page { background: var(--mm-canvas); border: 1px solid var(--mm-line); padding: 20px 17px; border-radius: 10px; }
+    #minimark-ui-review .mm-preview-page h3 { font-size: 20px; margin-bottom: 12px; }
+    #minimark-ui-review .mm-preview-page p { font-size: 13px; line-height: 1.9; margin-bottom: 12px; }
+    #minimark-ui-review .mm-inline-result { color: var(--mm-green); font-size: 12px; min-height: 20px; }
+    #minimark-ui-review .mm-error { color: var(--mm-red); font-size: 12px; }
+    #minimark-ui-review .mm-spinner { animation: mm-rotate 1s linear infinite; }
+    #minimark-ui-review .mm-toast { position: absolute; z-index: 20; left: 18px; right: 18px; bottom: 96px; padding: 12px 14px; background: var(--mm-ink); color: var(--mm-paper); border-radius: 10px; font-size: 12px; box-shadow: 0 6px 20px #16283d22; pointer-events: none; }
+    #minimark-ui-review .mm-focus-exit { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--mm-paper); border-bottom: 1px solid var(--mm-line); font-size: 12px; color: var(--mm-muted); }
+    #minimark-ui-review .mm-key { display: inline-block; padding: 2px 6px; background: var(--mm-canvas); border: 1px solid var(--mm-line); border-radius: 5px; font: 11px/1.5 Consolas, monospace; color: var(--mm-muted); }
+    @container (min-width: 580px) {
+      #minimark-ui-review .mm-split { grid-template-rows: 1fr; grid-template-columns: 1fr 1fr; }
+      #minimark-ui-review .mm-split-pane + .mm-split-pane { border-top: 0; border-left: 1px solid var(--mm-line); }
+      #minimark-ui-review .mm-writing { padding-left: 42px; padding-right: 42px; }
+      #minimark-ui-review .mm-menu-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+    @media (max-width: 400px) {
+      #minimark-ui-review .mm-stage { padding: 14px 0; min-height: 800px; }
+      #minimark-ui-review .mm-phone { border-radius: 20px; height: 766px; }
+      #minimark-ui-review .mm-content { padding: 18px 13px; }
+      #minimark-ui-review .mm-appbar { padding-left: 7px; padding-right: 7px; gap: 1px; }
+      #minimark-ui-review .mm-writing { padding-left: 18px; padding-right: 18px; }
+      #minimark-ui-review .mm-sheet-body { padding-left: 16px; padding-right: 16px; }
+      #minimark-ui-review .mm-sheet-actions { padding-left: 16px; padding-right: 16px; }
+      #minimark-ui-review .mm-tools .mm-icon { width: 40px; }
+    }
+    @media (prefers-reduced-motion: reduce) { #minimark-ui-review .mm-spinner { animation: none; } }
+    @keyframes mm-rotate { to { transform: rotate(360deg); } }
+  </style>
+  <div class="mm-stage viz-dotted-background">
+    <div class="mm-phone" aria-label="Mini Mark 手机界面">
+      <div class="mm-status" aria-hidden="true"><span>9:41</span><span class="mm-status-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></span></div>
+      <div class="mm-app"></div>
+      <div class="mm-system" aria-hidden="true"></div>
+      <div class="mm-overlay" hidden></div>
+      <div class="mm-toast" role="status" aria-live="polite" hidden></div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const root = document.getElementById('minimark-ui-review');
+      const app = root.querySelector('.mm-app');
+      const overlay = root.querySelector('.mm-overlay');
+      const toastElement = root.querySelector('.mm-toast');
+      const logo = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDI0IDEwMjQiPg0KICA8ZGVmcz4NCiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJhc2UiIHgxPSIwIiB5MT0iMSIgeDI9IjEiIHkyPSIwIj4NCiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiMyOGE4ZDciLz4NCiAgICAgIDxzdG9wIG9mZnNldD0iLjM2IiBzdG9wLWNvbG9yPSIjNDQ3NmRkIi8+DQogICAgICA8c3RvcCBvZmZzZXQ9Ii42NyIgc3RvcC1jb2xvcj0iI2IyNWZjOCIvPg0KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmE5YjgzIi8+DQogICAgPC9saW5lYXJHcmFkaWVudD4NCiAgICA8bGluZWFyR3JhZGllbnQgaWQ9InRpbnQiIHgxPSIwIiB5MT0iMCIgeDI9Ii43NSIgeTI9IjEiPg0KICAgICAgPHN0b3Agc3RvcC1jb2xvcj0iIzg3ZWRkYSIgc3RvcC1vcGFjaXR5PSIuOTUiLz4NCiAgICAgIDxzdG9wIG9mZnNldD0iLjUiIHN0b3AtY29sb3I9IiM2NmI2ZTQiIHN0b3Atb3BhY2l0eT0iLjEyIi8+DQogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNmMDg4Y2EiIHN0b3Atb3BhY2l0eT0iMCIvPg0KICAgIDwvbGluZWFyR3JhZGllbnQ+DQogIDwvZGVmcz4NCiAgPHJlY3QgeD0iMjQiIHk9IjI0IiB3aWR0aD0iOTc2IiBoZWlnaHQ9Ijk3NiIgcng9IjIyNCIgZmlsbD0idXJsKCNiYXNlKSIvPg0KICA8cmVjdCB4PSIyNCIgeT0iMjQiIHdpZHRoPSI5NzYiIGhlaWdodD0iOTc2IiByeD0iMjI0IiBmaWxsPSJ1cmwoI3RpbnQpIi8+DQogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0zMCAwKSI+DQogICAgPHBhdGggZD0iTTIxOCA2NzVWMzQ1aDY3bDEyMCAxNzAgMTIwLTE3MGg2N3YzMzBoLTg3VjUxNEw0MDUgNjUyIDMwNSA1MTR2MTYxeiIgZmlsbD0id2hpdGUiLz4NCiAgICA8cGF0aCBkPSJNNjM1IDY3NVY0NTdoNTZsNjQgOTIgNjQtOTJoNTZ2MjE4aC03MVY1ODdsLTQ5IDY3LTQ5LTY3djg4eiIgZmlsbD0id2hpdGUiIG9wYWNpdHk9Ii45NCIvPg0KICAgIDxyZWN0IHg9IjIxOCIgeT0iNzMwIiB3aWR0aD0iNjU3IiBoZWlnaHQ9IjIyIiByeD0iMTEiIGZpbGw9IndoaXRlIiBvcGFjaXR5PSIuNjMiLz4NCiAgPC9nPg0KPC9zdmc+DQo=';
+      const sampleBody = '# 今天的好想法\n\n把灵感先写下来，再慢慢整理成形。手机和电脑上，都能继续这份笔记。\n\n## 留一点空白，给想法\n\n写作是帮助自己把事情想清楚。试着把一个复杂的问题，拆成几个小问题。\n\n> 保留重要的想法，也给新的想法留出位置。\n\n## 一个小问题\n\n从 1 加到 n，可以把首尾配成一对。\n\n$$\n1 + 2 + \\cdots + n = \\frac{n(n+1)}{2}\n$$\n\n## 接下来\n\n- [x] 整理今天的笔记\n- [ ] 把项目想法保存到云文档\n\n```javascript\nconst idea = "从这里开始";\nconsole.log(idea);\n```';
+      const documents = [
+        { id: 'note', name: '随手记.md', kind: 'md', place: 'local', path: 'Documents / Notes', body: sampleBody, savedBody: sampleBody, time: '刚刚', undo: [], redo: [] },
+        { id: 'project', name: '项目备忘.md', kind: 'md', place: 'cloud', path: '工作', body: '# 项目备忘\n\n## 本周计划\n\n在电脑上整理资料，在手机上补充想法。\n\n- [x] 整理文档目录\n- [ ] 补充项目说明\n\n## 会议记录\n\n将新的决定保存在同一份文档里。', time: '12 分钟前', undo: [], redo: [] },
+        { id: 'yaml', name: 'app-config.yaml', kind: 'yaml', place: 'workspace', path: 'Notes / docs', body: '# 应用配置\napp:\n  name: Mini Mark\n  language: zh-CN\n\neditor:\n  font_size: 16\n  theme: light\n\ncloud:\n  repository: MiniMarkDisk', time: '今天', undo: [], redo: [] },
+        { id: 'html', name: 'index.html', kind: 'html', place: 'workspace', path: 'Notes', body: '<!doctype html>\n<html lang="zh-CN">\n<head>\n  <meta charset="UTF-8">\n  <title>我的笔记</title>\n</head>\n<body>\n  <h1>留一点空白，给想法</h1>\n  <p>把灵感先写下来。</p>\n</body>\n</html>', time: '昨天', undo: [], redo: [] },
+      ];
+      documents.forEach(doc => { doc.savedBody ??= doc.body; });
+      const cloudEntries = [
+        { id: 'work', name: '工作', folder: true, parent: '' },
+        { id: 'notes', name: '笔记', folder: true, parent: '' },
+        { id: 'project', name: '项目备忘.md', docId: 'project', parent: '工作' },
+        { id: 'cloud-readme', name: '欢迎使用.md', parent: '', body: '# 欢迎使用\n\n这里存放你的云文档。保存后，可以在手机和电脑之间继续编辑。' },
+        { id: 'reading', name: '读书摘录.md', parent: '笔记', body: '# 读书摘录\n\n把值得反复阅读的句子留在这里。' },
+      ];
+      const state = {
+        page: 'library', activeId: 'note', mode: 'live', filter: 'all', query: '',
+        cloudStatus: 'connected', cloudPath: '', pickerPath: '', folderOpen: true, workspace: true,
+        theme: 'light', device: 'phone', fontSize: 16, showTabs: true, focus: false,
+        modal: null, modalData: {}, background: false, opacity: 12, pluginEnabled: true,
+        opened: ['note', 'project'], busy: false, saveMessage: '', updateChecked: false,
+      };
+      let toastTimer;
+      let operationNumber = 0;
+      let modalFocus;
+      const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+      const icon = name => `<i data-lucide="${name === 'github' ? 'git-branch' : name}" aria-hidden="true"></i>`;
+      const attributes = data => Object.entries(data || {}).map(([key, value]) => ` data-${key}="${escape(value)}"`).join('');
+      function button(label, action, glyph, data = {}, style = '') {
+        return `<button class="mm-button cursor-interaction ${style}" type="button" data-action="${action}"${attributes(data)}>${glyph ? icon(glyph) : ''}${escape(label)}</button>`;
+      }
+      function iconButton(label, action, glyph, data = {}, disabled = false) {
+        return `<button type="button" class="mm-icon cursor-interaction" aria-label="${escape(label)}" data-tooltip="${escape(label)}" data-action="${action}"${attributes(data)}${disabled ? ' disabled' : ''}>${icon(glyph)}</button>`;
+      }
+      function menu(label, action, glyph, detail = '', data = {}, danger = false) {
+        return `<button type="button" class="mm-menu-row cursor-interaction ${danger ? 'danger' : ''}" data-action="${action}"${attributes(data)}>${icon(glyph)}<span class="mm-grow">${escape(label)}${detail ? `<small>${escape(detail)}</small>` : ''}</span>${icon('chevron-right')}</button>`;
+      }
+      const active = () => documents.find(doc => doc.id === state.activeId) || documents[0];
+      const dirty = doc => doc.body !== doc.savedBody;
+      const isMarkdown = doc => doc?.kind === 'md';
+      function hydrateIcons() { if (globalThis.lucide) globalThis.lucide.createIcons({ attrs: { width: 19, height: 19, 'stroke-width': 1.65 } }); }
+      function restore(snapshot) {
+        const choice = snapshot?.modelContent;
+        const personal = snapshot?.privateContent;
+        if (choice && typeof choice === 'object') {
+          if (['library', 'editor', 'workspace', 'cloud', 'settings'].includes(choice.page)) state.page = choice.page;
+          if (['light', 'dark', 'system'].includes(choice.theme)) state.theme = choice.theme;
+          if (['phone', 'tablet'].includes(choice.device)) state.device = choice.device;
+          if (['connected', 'signedout', 'offline', 'expired', 'conflict', 'error'].includes(choice.cloudStatus)) state.cloudStatus = choice.cloudStatus;
+          if ([14, 15, 16, 17, 18, 19, 20].includes(choice.fontSize)) state.fontSize = choice.fontSize;
+        }
+        if (personal && typeof personal === 'object') {
+          if (documents.some(doc => doc.id === personal.activeId)) state.activeId = personal.activeId;
+          if (['live', 'source', 'read', 'split'].includes(personal.mode)) state.mode = personal.mode;
+          if (typeof personal.showTabs === 'boolean') state.showTabs = personal.showTabs;
+        }
+      }
+      function persist() {
+        window.openai?.setWidgetState?.({
+          modelContent: { design: 'Mini Mark Android 完整功能界面', page: state.page, theme: state.theme, device: state.device, cloudStatus: state.cloudStatus, fontSize: state.fontSize },
+          privateContent: { activeId: state.activeId, mode: state.mode, showTabs: state.showTabs },
+        }).catch(() => {});
+      }
+      function toast(message) {
+        clearTimeout(toastTimer);
+        toastElement.textContent = message;
+        toastElement.hidden = false;
+        toastTimer = setTimeout(() => { toastElement.hidden = true; }, 2600);
+      }
+      function hideToast() { clearTimeout(toastTimer); toastElement.hidden = true; }
+      function applyAppearance() {
+        root.style.colorScheme = state.theme === 'system' ? 'light dark' : state.theme;
+        root.dataset.device = state.device;
+        root.style.setProperty('--mm-doc-size', `${state.fontSize}px`);
+        root.style.setProperty('--mm-preview-background', state.background
+          ? `linear-gradient(140deg, color-mix(in srgb, var(--mm-blue) ${state.opacity}%, transparent), transparent 60%, color-mix(in srgb, var(--mm-green) ${state.opacity}%, transparent))`
+          : 'none');
+      }
+      function navigation() {
+        return `<nav class="mm-bottom-nav" aria-label="主要导航">${[
+          ['library', '文档', 'files'], ['workspace', '工作区', 'folder-tree'], ['cloud', '云文档', 'cloud'], ['settings', '设置', 'sliders-horizontal'],
+        ].map(([page, label, glyph]) => `<button class="mm-nav-item cursor-interaction" type="button" data-action="navigate" data-page="${page}"${page === state.page ? ' aria-current="page"' : ''}>${icon(glyph)}<span>${label}</span></button>`).join('')}</nav>`;
+      }
+      function titlebar(title, subtitle = '', actions = '') {
+        return `<header class="mm-appbar"><div class="mm-app-title"><h2>${escape(title)}</h2>${subtitle ? `<small>${escape(subtitle)}</small>` : ''}</div>${actions}</header>`;
+      }
+      function documentRow(doc) {
+        const location = doc.place === 'cloud' ? '云文档' : doc.place === 'workspace' ? '工作区' : doc.place === 'draft' ? '本地草稿' : '本地文档';
+        return `<div class="mm-file-row"><button type="button" class="mm-file cursor-interaction" data-action="open-document" data-id="${escape(doc.id)}"><span class="mm-file-icon ${doc.kind}">${doc.kind === 'md' ? icon('file-text') : escape(doc.kind.toUpperCase())}</span><span class="mm-file-main"><span class="mm-file-name">${escape(doc.name)}</span><span class="mm-file-meta">${icon(doc.place === 'cloud' ? 'cloud' : 'hard-drive')} ${location} · ${dirty(doc) ? '有未保存修改' : doc.time}</span></span></button>${iconButton(`${doc.name}的操作`, 'document-menu', 'ellipsis', { id: doc.id })}</div>`;
+      }
+      function libraryList() {
+        const shown = documents.filter(doc => doc.name.toLowerCase().includes(state.query.toLowerCase()) && (state.filter === 'all' || (state.filter === 'cloud' ? doc.place === 'cloud' : doc.place !== 'cloud')));
+        return shown.length ? `<div class="mm-files">${shown.map(documentRow).join('')}</div>` : '<div class="mm-empty"><p>没有匹配的文档</p></div>';
+      }
+      function library() {
+        return `<header class="mm-appbar"><button class="mm-brand cursor-interaction" type="button" data-action="sheet" data-name="updates" aria-label="Mini Mark 版本与更新"><img class="mm-logo" src="${logo}" alt=""><span>Mini Mark</span></button><div class="mm-grow"></div>${iconButton('打开本地文件', 'sheet', 'folder-open', { name: 'open-file' })}</header>
+          <main class="mm-content"><div class="mm-section-head"><h1>我的文档</h1>${button('新建', 'sheet', 'plus', { name: 'new-document' }, 'primary')}</div>
+          <label class="mm-search">${icon('search')}<input type="search" aria-label="搜索文档" data-input="document-search" placeholder="搜索文档" value="${escape(state.query)}"></label>
+          <div class="mm-filters" role="group" aria-label="文档范围">${[['all', '全部'], ['local', '本地'], ['cloud', '云文档']].map(([key, label]) => `<button class="mm-filter cursor-interaction" type="button" data-action="filter" data-value="${key}" aria-pressed="${state.filter === key}">${label}</button>`).join('')}</div>
+          <div class="mm-label"><span>最近编辑</span><span>${documents.length} 份文档</span></div><div data-library-list>${libraryList()}</div>
+          <div class="mm-footnote">${icon('check')}<span>草稿已暂存到此设备</span></div></main>${navigation()}`;
+      }
+      function workspace() {
+        let content = `<div class="mm-empty">${icon('folder-open')}<h2>打开一个工作区</h2><p>选择文件夹，浏览其中的 Markdown、YAML、HTML 和文本文件。</p>${button('选择文件夹', 'choose-workspace', 'folder-open', {}, 'primary')}</div>`;
+        if (state.workspace) content = `<div class="mm-root-folder">${icon('folder-open')}<div class="mm-grow"><strong>Notes</strong><small>内部存储 / Documents / Notes</small></div>${iconButton('工作区操作', 'sheet', 'ellipsis', { name: 'workspace-menu' })}</div>
+          <div class="mm-label"><span>文件夹内容</span><span>已授权访问</span></div><div class="mm-tree">
+          <button class="mm-tree-row cursor-interaction" type="button" data-action="toggle-folder" aria-expanded="${state.folderOpen}">${icon(state.folderOpen ? 'chevron-down' : 'chevron-right')}${icon('folder')}<span>docs</span></button>
+          ${state.folderOpen ? `<button class="mm-tree-row indent cursor-interaction" type="button" data-action="open-document" data-id="note">${icon('file-text')}<span>随手记.md</span></button><button class="mm-tree-row indent cursor-interaction" type="button" data-action="open-document" data-id="yaml">${icon('file-code-2')}<span>app-config.yaml</span></button>` : ''}
+          <button class="mm-tree-row cursor-interaction" type="button" data-action="sheet" data-name="assets">${icon('chevron-right')}${icon('folder')}<span>assets</span><small>图片资源</small></button>
+          <button class="mm-tree-row cursor-interaction" type="button" data-action="open-document" data-id="html">${icon('file-code-2')}<span>index.html</span><small>HTML</small></button>
+          <button class="mm-tree-row cursor-interaction" type="button" data-action="sheet" data-name="unsupported">${icon('file-archive')}<span>archive.zip</span><small>仅显示</small></button></div>
+          <div class="mm-label"><span>已打开的文档</span></div><div class="mm-files">${documents.filter(doc => state.opened.includes(doc.id)).map(documentRow).join('')}</div>`;
+        return titlebar('工作区', '浏览本机文件夹', iconButton('刷新工作区', 'refresh-workspace', 'refresh-cw')) + `<main class="mm-content">${content}</main>` + navigation();
+      }
+      function cloudRows(path, selecting = false) {
+        const entries = cloudEntries.filter(entry => entry.parent === path && (!selecting || entry.folder));
+        if (!entries.length) return '<div class="mm-empty"><p>此文件夹暂无文档</p></div>';
+        return `<div class="mm-files">${entries.map(entry => `<div class="mm-file-row"><button type="button" class="mm-file cursor-interaction" data-action="${entry.folder ? (selecting ? 'picker-folder' : 'cloud-folder') : 'cloud-open'}" data-id="${escape(entry.id)}"><span class="mm-file-icon">${icon(entry.folder ? 'folder' : 'file-text')}</span><span class="mm-file-main"><span class="mm-file-name">${escape(entry.name)}</span><span class="mm-file-meta">${entry.folder ? '文件夹' : '云文档 · 已同步'}</span></span>${entry.folder ? icon('chevron-right') : ''}</button>${selecting ? '' : iconButton(`${entry.name}的云端操作`, 'cloud-menu', 'ellipsis', { id: entry.id })}</div>`).join('')}</div>`;
+      }
+      function cloud() {
+        if (state.cloudStatus === 'signedout') return titlebar('云文档', 'GitHub · MiniMarkDisk') + `<main class="mm-content"><div class="mm-empty">${icon('cloud')}<h2>连接 GitHub 云文档</h2><p>使用自己的 MiniMarkDisk，在手机和电脑之间打开、编辑和保存文档。</p>${button('登录 GitHub', 'sheet', 'github', { name: 'auth' }, 'primary')}<span class="mm-quiet">使用现有仓库，或创建私有仓库</span></div></main>` + navigation();
+        const banners = {
+          offline: ['wifi-off', '当前处于离线状态', '已打开的文档可继续编辑，联网后可手动保存。', '重新连接'],
+          expired: ['key-round', '登录已过期', '重新登录后继续访问 MiniMarkDisk。', '重新登录'],
+          conflict: ['git-compare-arrows', '项目备忘.md 存在云端修改', '保存前核对另一台设备的版本。', '查看差异'],
+          error: ['circle-alert', '云目录读取失败', '当前目录为上次成功读取的内容。', '重试'],
+        };
+        const notice = banners[state.cloudStatus];
+        return titlebar('云文档', 'GitHub · MiniMarkDisk', iconButton('刷新云目录', 'refresh-cloud', state.busy ? 'loader-circle' : 'refresh-cw', {}, state.busy) + iconButton('账号与连接', 'sheet', 'circle-user-round', { name: 'account' })) +
+          `<main class="mm-content"><div class="mm-account"><span class="mm-avatar">${icon('github')}</span><div class="mm-grow"><strong>mini-mark-demo</strong><div class="mm-file-meta">MiniMarkDisk · 私有仓库</div></div><span class="mm-connected">${icon(state.cloudStatus === 'connected' ? 'check' : 'circle')} ${state.cloudStatus === 'connected' ? '已连接' : '待处理'}</span></div>
+          ${notice ? `<div class="mm-banner">${icon(notice[0])}<div><strong>${notice[1]}</strong><div>${notice[2]}</div><button class="mm-text-button cursor-interaction" type="button" data-action="cloud-recover">${notice[3]}</button></div></div>` : ''}
+          <div class="mm-label"><span>文件与文件夹</span>${iconButton('新建云文件夹', 'sheet', 'folder-plus', { name: 'new-folder' }, ['offline', 'expired', 'error'].includes(state.cloudStatus))}</div>
+          <div class="mm-path"><button class="cursor-interaction" type="button" data-action="cloud-root">MiniMarkDisk</button>${state.cloudPath ? `${icon('chevron-right')}<span>${escape(state.cloudPath)}</span>` : ''}</div>${cloudRows(state.cloudPath)}
+          <div class="mm-label"><span>保存当前文档</span></div>${button('保存至云文档', 'cloud-save-picker', 'cloud-upload', {}, 'wide')}
+          <div class="mm-footnote">${icon('cloud')}<span>选择目录和文件名后，保存时同步</span></div></main>${navigation()}`;
+      }
+      function inline(text) {
+        return escape(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\[([^\]]+)\]\((https:\/\/[^)]+)\)/g, '<span style="color:var(--mm-blue)">$1</span>');
+      }
+      function formulaMarkup(expression) {
+        const templates = {
+          '\\frac{a}{b}': '<mfrac><mi>a</mi><mi>b</mi></mfrac>',
+          '\\sqrt{x}': '<msqrt><mi>x</mi></msqrt>',
+          '\\int_0^1 x^2 dx': '<msubsup><mo>∫</mo><mn>0</mn><mn>1</mn></msubsup><msup><mi>x</mi><mn>2</mn></msup><mi>d</mi><mi>x</mi>',
+          '\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix}': '<mo>(</mo><mtable><mtr><mtd><mi>a</mi></mtd><mtd><mi>b</mi></mtd></mtr><mtr><mtd><mi>c</mi></mtd><mtd><mi>d</mi></mtd></mtr></mtable><mo>)</mo>',
+          '1 + 2 + \\cdots + n = \\frac{n(n+1)}{2}': '<mn>1</mn><mo>+</mo><mn>2</mn><mo>+</mo><mo>⋯</mo><mo>+</mo><mi>n</mi><mo>=</mo><mfrac><mrow><mi>n</mi><mo>(</mo><mi>n</mi><mo>+</mo><mn>1</mn><mo>)</mo></mrow><mn>2</mn></mfrac>',
+        };
+        return templates[expression] ? `<math display="block">${templates[expression]}</math>` : `<span>${escape(expression)}</span>`;
+      }
+      function markdown(body, editable = false) {
+        return body.split(/\n\n/).map((block, index) => {
+          const edit = editable ? ` contenteditable="true" role="textbox" aria-label="编辑正文段落" data-block="${index}" spellcheck="false"` : '';
+          if (block.startsWith('$$')) return `<button class="mm-equation cursor-interaction" type="button" data-action="sheet" data-name="formula" aria-label="编辑公式">${formulaMarkup(block.replace(/^\$\$\s*|\s*\$\$$/g, ''))}</button>`;
+          if (block.startsWith('```')) return `<pre class="mm-code-block">${escape(block.replace(/^```[^\n]*\n?/, '').replace(/\n?```$/, ''))}</pre>`;
+          if (/^#{1,3} /.test(block)) {
+            const level = block.match(/^#+/)[0].length;
+            return `<h${level} data-heading-index="${index}">${editable ? `<span class="mm-heading-marker" aria-hidden="true">${'#'.repeat(level)}</span>` : ''}<span${edit}>${inline(block.replace(/^#+ /, ''))}</span></h${level}>`;
+          }
+          if (block.startsWith('- [')) return block.split('\n').map((line, lineIndex) => `<label class="mm-task"><input type="checkbox" data-task-block="${index}" data-task-line="${lineIndex}"${line.startsWith('- [x]') ? ' checked' : ''}${editable ? '' : ' disabled'}><span>${inline(line.replace(/^- \[[ x]\] /, ''))}</span></label>`).join('');
+          if (block.startsWith('> ')) return `<blockquote>${inline(block.slice(2))}</blockquote>`;
+          if (block.startsWith('|')) {
+            const rows = block.split('\n').filter(line => !/^\|[\s|:-]+\|$/.test(line));
+            return `<table>${rows.map((row, rowIndex) => `<tr>${row.split('|').slice(1, -1).map(cell => `<${rowIndex ? 'td' : 'th'}>${inline(cell.trim())}</${rowIndex ? 'td' : 'th'}>`).join('')}</tr>`).join('')}</table>`;
+          }
+          if (block.startsWith('![')) return `<div class="mm-background-preview">${icon('image')}<span>图片预览</span></div>`;
+          if (block.startsWith('- ')) return `<ul>${block.split('\n').map(line => `<li>${inline(line.replace(/^- /, ''))}</li>`).join('')}</ul>`;
+          return `<p${edit}>${inline(block).replace(/\n/g, '<br>')}</p>`;
+        }).join('');
+      }
+      function syntaxMarkup(doc) {
+        return doc.body.split('\n').map(line => {
+          if (doc.kind === 'yaml') {
+            if (/^\s*#/.test(line)) return `<span class="mm-syntax-comment">${escape(line)}</span>`;
+            const pair = line.match(/^(\s*)([\w.-]+)(:)(.*)$/);
+            if (pair) return `${escape(pair[1])}<span class="mm-syntax-key">${escape(pair[2])}</span>${pair[3]}<span class="mm-syntax-value">${escape(pair[4])}</span>`;
+          }
+          if (doc.kind === 'html') return line.split(/(<[^>]*>)/).map(token => token.startsWith('<') ? `<span class="mm-syntax-key">${escape(token)}</span>` : escape(token)).join('');
+          if (doc.kind === 'md' && /^#{1,6} /.test(line)) return `<span class="mm-syntax-key">${escape(line)}</span>`;
+          return escape(line);
+        }).join('\n') + '\n';
+      }
+      function sourceEditor(doc) {
+        return `<div class="mm-source-wrap"><div class="mm-code-editor"><pre class="mm-syntax-underlay" aria-hidden="true">${syntaxMarkup(doc)}</pre><textarea class="mm-source" data-input="source" aria-label="文档源码" spellcheck="false">${escape(doc.body)}</textarea></div></div>`;
+      }
+      function plainPreview(doc) {
+        return `<pre class="mm-syntax-preview" aria-label="${doc.kind.toUpperCase()} 阅读内容" data-reading-code>${syntaxMarkup(doc)}</pre>`;
+      }
+      function editorContent(doc) {
+        if (!isMarkdown(doc)) {
+          if (doc.kind === 'html' || state.mode === 'source') return sourceEditor(doc);
+          if (state.mode === 'split') return `<div class="mm-split"><section class="mm-split-pane"><div class="mm-pane-caption">源码</div>${sourceEditor(doc)}</section><section class="mm-split-pane"><div class="mm-pane-caption">语法高亮</div>${plainPreview(doc)}</section></div>`;
+          return plainPreview(doc);
+        }
+        if (state.mode === 'source') return sourceEditor(doc);
+        if (state.mode === 'split') return `<div class="mm-split"><section class="mm-split-pane"><div class="mm-pane-caption">源码</div>${sourceEditor(doc)}</section><section class="mm-split-pane"><div class="mm-pane-caption">阅读</div><article class="mm-writing" data-reading>${markdown(doc.body)}</article></section></div>`;
+        return `<article class="mm-writing" aria-label="${state.mode === 'read' ? '阅读内容' : '即时编辑'}">${markdown(doc.body, state.mode === 'live')}</article>`;
+      }
+      function saveStatus(doc) {
+        if (state.busy) return '正在保存…';
+        if (doc.place === 'cloud') return dirty(doc) ? '云文档 · 待保存' : '云文档 · 已同步';
+        return dirty(doc) || doc.place === 'draft' ? '本地草稿 · 已暂存' : '已保存到本地';
+      }
+      function editor() {
+        const doc = active();
+        if (!doc) { state.page = 'library'; return library(); }
+        const canEdit = state.mode !== 'read' || !isMarkdown(doc);
+        const tabs = state.showTabs ? `<div class="mm-document-tabs"><div class="mm-tabs-scroll" role="tablist" aria-label="打开的文档">${state.opened.map(id => documents.find(item => item.id === id)).filter(Boolean).map(item => `<div class="mm-document-tab ${item.id === doc.id ? 'active' : ''}"><button type="button" class="cursor-interaction" role="tab" aria-selected="${item.id === doc.id}" aria-controls="mm-review-editor-content" data-action="open-document" data-id="${escape(item.id)}">${escape(item.name)}${dirty(item) ? ' ·' : ''}</button><button class="cursor-interaction" type="button" aria-label="关闭${escape(item.name)}" data-action="close-document" data-id="${escape(item.id)}">${icon('x')}</button></div>`).join('')}</div>${iconButton('新建文档', 'sheet', 'plus', { name: 'new-document' })}</div>` : '';
+        return `${state.focus ? `<div class="mm-focus-exit"><span>${escape(doc.name)}</span>${button('退出专注', 'focus', 'minimize')}</div>` : `<header class="mm-appbar">${iconButton('返回文档库', 'navigate', 'arrow-left', { page: 'library' })}<button class="mm-editor-heading cursor-interaction" type="button" data-action="sheet" data-name="open-documents" aria-label="切换文档"><span class="mm-editor-name"><span>${escape(doc.name)}</span>${icon('chevron-down')}</span><span class="mm-save-status" data-save-status>${icon(doc.place === 'cloud' ? 'cloud' : 'check')}${saveStatus(doc)}</span></button>${iconButton('保存与导出', 'sheet', 'save', { name: 'save' }, state.busy)}${iconButton('文档大纲', 'sheet', 'list-tree', { name: 'outline' }, !isMarkdown(doc))}</header>${tabs}`}
+          ${doc.kind === 'html' ? `<div class="mm-html-actions">${button('保存并运行', 'sheet', 'play', { name: 'html-preview' })}${button('在浏览器运行', 'sheet', 'globe', { name: 'html-browser' })}</div>` : `<div class="mm-mode-row"><div class="mm-modes" role="group" aria-label="编辑模式">${[['live', '即时'], ['source', '源码'], ['read', '阅读'], ['split', '分屏']].map(([value, label]) => `<button class="mm-mode cursor-interaction" type="button" data-action="mode" data-value="${value}" aria-pressed="${state.mode === value}"${doc.kind !== 'md' && value === 'live' ? ' disabled' : ''}>${label}</button>`).join('')}</div>${iconButton('查找与替换', 'sheet', 'search', { name: 'find' })}</div>`}
+          <main class="mm-editor-surface" id="mm-review-editor-content">${editorContent(doc)}</main>
+          <div class="mm-editor-footer"><span data-word-count>${doc.body.replace(/\s/g, '').length} 字 · ${doc.body.split('\n').length} 行</span><span>UTF-8 · ${doc.kind === 'md' ? 'Markdown' : doc.kind.toUpperCase()}</span></div>
+          <div class="mm-tools" aria-label="编辑工具栏">${iconButton('撤销', 'undo', 'undo-2', {}, !doc.undo.length || !canEdit)}${iconButton('重做', 'redo', 'redo-2', {}, !doc.redo.length || !canEdit)}<button class="mm-icon cursor-interaction" type="button" aria-label="格式工具" data-action="sheet" data-name="format"${!isMarkdown(doc) || !canEdit ? ' disabled' : ''}><span class="mm-format-glyph">Aa</span></button>${iconButton('公式编辑器', 'sheet', 'sigma', { name: 'formula' }, !isMarkdown(doc) || !canEdit)}${iconButton('插入图片', 'sheet', 'image-plus', { name: 'image' }, !isMarkdown(doc) || !canEdit)}<button class="mm-icon cursor-interaction" type="button" aria-label="快捷指令" data-action="sheet" data-name="commands"${!isMarkdown(doc) || !canEdit ? ' disabled' : ''}><span class="mm-slash">/?</span></button>${iconButton('更多功能', 'sheet', 'ellipsis', { name: 'more' })}</div>`;
+      }
+      function settings() {
+        return titlebar('设置', '外观与编辑偏好') + `<main class="mm-content"><div class="mm-settings-group"><div class="mm-check-row"><span>外观</span>${icon('sun-moon')}</div><div class="mm-theme-options" role="group" aria-label="外观主题">${[['light', '浅色'], ['dark', '深色'], ['system', '跟随系统']].map(([value, label]) => `<button class="cursor-interaction" type="button" data-action="theme" data-value="${value}" aria-pressed="${state.theme === value}">${label}</button>`).join('')}</div><label class="mm-field"><span>正文字号 <output data-font-output>${state.fontSize} px</output></span><input class="mm-range" aria-label="正文字号" type="range" min="14" max="20" value="${state.fontSize}" data-input="font-size"></label>${menu('主题背景', 'sheet', 'image', state.background ? '已启用背景预览' : '图片与透明度', { name: 'background' })}</div>
+          <div class="mm-label"><span>编辑</span></div><div class="mm-settings-group">${menu('插件', 'sheet', 'puzzle', '导入、编写和运行文字处理命令', { name: 'plugins' })}${menu('外接键盘快捷键', 'sheet', 'keyboard', '新建、保存、标题与查找', { name: 'shortcuts' })}<label class="mm-check-row"><span>显示多文档标签<small>每份文档保留独立的编辑状态</small></span><input type="checkbox" data-input="show-tabs"${state.showTabs ? ' checked' : ''}></label></div>
+          <div class="mm-label"><span>账号与应用</span></div><div class="mm-settings-group">${menu('GitHub 云文档', 'navigate', 'cloud', state.cloudStatus === 'signedout' ? '登录并连接 MiniMarkDisk' : 'mini-mark-demo · MiniMarkDisk', { page: 'cloud' })}${menu('版本与更新', 'sheet', 'circle-arrow-up', 'Mini Mark · Rev v1.0.3', { name: 'updates' })}</div></main>` + navigation();
+      }
+      function render() {
+        applyAppearance();
+        const pages = { library, workspace, cloud, editor, settings };
+        app.innerHTML = pages[state.page]();
+        app.inert = Boolean(state.modal);
+        renderModal();
+        hydrateIcons();
+      }
+      function showModal(name, data = {}) {
+        hideToast();
+        modalFocus = document.activeElement;
+        state.modal = name;
+        state.modalData = data;
+        renderModal();
+        app.inert = true;
+        hydrateIcons();
+        requestAnimationFrame(() => overlay.querySelector('button, input, textarea, select')?.focus({ preventScroll: true }));
+      }
+      function closeModal() {
+        state.modal = null;
+        state.modalData = {};
+        overlay.hidden = true;
+        overlay.innerHTML = '';
+        app.inert = false;
+        if (modalFocus?.isConnected) modalFocus.focus({ preventScroll: true });
+      }
+      function go(page) { hideToast(); closeModal(); state.page = page; state.focus = false; render(); persist(); }
+      function openDocument(id) {
+        if (!documents.some(doc => doc.id === id)) return;
+        hideToast();
+        closeModal();
+        state.activeId = id;
+        if (!state.opened.includes(id)) state.opened.push(id);
+        if (!isMarkdown(active())) state.mode = 'source';
+        else if (state.mode === 'source') state.mode = 'live';
+        state.page = 'editor';
+        render();
+        persist();
+      }
+      function recordEdit(body) {
+        const doc = active();
+        if (!doc || body === doc.body) return;
+        doc.undo.push(doc.body);
+        if (doc.undo.length > 30) doc.undo.shift();
+        doc.redo.length = 0;
+        doc.body = body;
+      }
+      function updateEditorFeedback() {
+        const doc = active();
+        const status = app.querySelector('[data-save-status]');
+        if (status) status.innerHTML = icon(doc.place === 'cloud' ? 'cloud' : 'check') + saveStatus(doc);
+        const words = app.querySelector('[data-word-count]');
+        if (words) words.textContent = `${doc.body.replace(/\s/g, '').length} 字 · ${doc.body.split('\n').length} 行`;
+        const undo = app.querySelector('[data-action="undo"]');
+        if (undo) undo.disabled = !doc.undo.length;
+        const preview = app.querySelector('[data-reading]');
+        if (preview) preview.innerHTML = markdown(doc.body);
+        const syntax = app.querySelector('.mm-syntax-underlay');
+        if (syntax) syntax.innerHTML = syntaxMarkup(doc);
+        const codeReading = app.querySelector('[data-reading-code]');
+        if (codeReading) codeReading.innerHTML = syntaxMarkup(doc);
+        hydrateIcons();
+      }
+      function insert(text) {
+        const doc = active();
+        if (!doc) return;
+        recordEdit(doc.body + '\n\n' + text);
+        closeModal();
+        state.page = 'editor';
+        if (state.mode === 'read') state.mode = 'live';
+        render();
+        toast('已插入到当前文档');
+      }
+      function formValue(name) { return overlay.querySelector(`[data-field="${name}"]`)?.value?.trim() || ''; }
+      function field(label, name, value = '', multiline = false) {
+        return `<label class="mm-field"><span>${escape(label)}</span>${multiline ? `<textarea class="mm-input" data-field="${name}" spellcheck="false">${escape(value)}</textarea>` : `<input class="mm-input" data-field="${name}" value="${escape(value)}">`}</label>`;
+      }
+      function renderModal() {
+        if (!state.modal) { overlay.hidden = true; overlay.innerHTML = ''; return; }
+        const factory = sheets[state.modal];
+        if (!factory) { state.modal = null; overlay.hidden = true; app.inert = false; return; }
+        const content = factory();
+        overlay.hidden = false;
+        overlay.innerHTML = `<section class="mm-sheet" role="dialog" aria-modal="true" aria-labelledby="mm-review-dialog-title"><header class="mm-sheet-head"><h2 id="mm-review-dialog-title">${escape(content.title)}</h2>${iconButton('关闭面板', 'dismiss', 'x')}</header><div class="mm-sheet-body">${content.body}</div>${content.actions ? `<footer class="mm-sheet-actions">${content.actions}</footer>` : ''}</section>`;
+      }
+      const sheets = {
+        'new-document': () => ({ title: '新建文档', body: menu('Markdown', 'create-document', 'file-text', '即时排版、公式、表格与任务清单', { kind: 'md' }) + menu('YAML', 'create-document', 'file-code-2', '配置文件与语法高亮', { kind: 'yaml' }) + menu('HTML', 'create-document', 'code-2', '网页源码与运行预览', { kind: 'html' }) + menu('纯文本', 'create-document', 'file', 'TXT 文本', { kind: 'txt' }) }),
+        'open-file': () => ({ title: '打开本地文件', body: '<p>从 Android 系统文件选择器选择文档。</p>' + documents.filter(doc => doc.place !== 'cloud').map(documentRow).join(''), actions: button('取消', 'dismiss') }),
+        'open-documents': () => ({ title: '打开的文档', body: documents.filter(doc => state.opened.includes(doc.id)).map(documentRow).join(''), actions: button('新建', 'sheet', 'plus', { name: 'new-document' }) }),
+        'document-menu': () => {
+          const doc = documents.find(item => item.id === state.modalData.id) || active();
+          return { title: doc.name, body: menu('打开文档', 'open-document', 'file-text', '', { id: doc.id }) + menu('重命名', 'rename-dialog', 'pencil-line', '', { id: doc.id }) + menu('另存为', 'sheet', 'save', '', { name: 'save-as', id: doc.id }) + menu('关闭文档', 'close-document', 'x', dirty(doc) ? '当前有未保存修改' : '保留原文件', { id: doc.id }) };
+        },
+        'save': () => {
+          const doc = active();
+          return { title: '保存与导出', body: `<div class="mm-path">${icon(doc.place === 'cloud' ? 'cloud' : 'hard-drive')}<span>${escape(doc.path || '本地草稿')} / ${escape(doc.name)}</span></div>` +
+            menu(doc.place === 'cloud' ? '保存到云端' : '保存文档', 'save-current', doc.place === 'cloud' ? 'cloud-upload' : 'save', doc.place === 'cloud' ? '同步当前文档的修改' : '保留源文件格式') +
+            menu('另存为', 'sheet', 'save-all', '选择本地位置和文件名', { name: 'save-as' }) + menu('保存至云文档', 'cloud-save-picker', 'cloud-upload', '选择 MiniMarkDisk 中的目录') +
+            menu('导出 PDF', 'sheet', 'file-down', '排版后的阅读副本', { name: 'export-pdf' }) + menu('导出 HTML', 'sheet', 'globe', '网页格式', { name: 'export-html' }) +
+            (doc.place === 'cloud' ? `<label class="mm-check-row"><span>云文档<small>保存时同步到此位置</small></span><input type="checkbox" data-input="cloud-binding" checked></label>` : '') };
+        },
+        'save-as': () => {
+          const doc = documents.find(item => item.id === state.modalData.id) || active();
+          return { title: '另存为本地文件', body: field('文件名', 'filename', doc.name) + `<div class="mm-root-folder">${icon('folder-open')}<div><strong>Documents / Notes</strong><small>通过系统文件选择器指定位置</small></div></div>`, actions: button('取消', 'dismiss') + button('保存', 'save-local-as', 'save', { id: doc.id }, 'primary') };
+        },
+        'save-cloud': () => ({ title: '保存至云文档', body: `<div class="mm-path"><button class="cursor-interaction" type="button" data-action="picker-root">MiniMarkDisk</button>${state.pickerPath ? `${icon('chevron-right')}<span>${escape(state.pickerPath)}</span>` : ''}</div>${cloudRows(state.pickerPath, true)}${field('文件名', 'filename', state.modalData.copy ? active().name.replace(/(\.[^.]+)$/, '-副本$1') : active().name)}<div class="mm-quiet">${icon('lock-keyhole')} mini-mark-demo / MiniMarkDisk</div><div class="mm-error" data-form-error role="alert"></div>`, actions: button('取消', 'dismiss') + button('保存到此目录', 'save-cloud-confirm', 'cloud-upload', {}, 'primary') }),
+        'unlink': () => ({ title: '切回本地文档', body: `<p>当前正文将保留为本地草稿，云端文件继续保存在 MiniMarkDisk。</p><div class="mm-root-folder">${icon('file-text')}<strong>${escape(active().name)}</strong></div>`, actions: button('取消', 'dismiss') + button('切回本地', 'unlink-confirm', 'hard-drive', {}, 'primary') }),
+        'more': () => ({ title: '更多功能', body: `<div class="mm-menu-grid">${[
+          ['outline', '大纲', 'list-tree'], ['find', '查找替换', 'search'], ['export-pdf', '导出 PDF', 'file-down'], ['export-html', '导出 HTML', 'globe'], ['table', '插入表格', 'table-2'], ['background', '主题背景', 'image'], ['plugins', '插件', 'puzzle'], ['new-document', '新建文档', 'file-plus-2'], ['updates', '版本更新', 'circle-arrow-up'],
+        ].map(([name, label, glyph]) => `<button class="mm-menu-tile cursor-interaction" type="button" data-action="sheet" data-name="${name}">${icon(glyph)}<span>${label}</span></button>`).join('')}</div><div class="mm-divider"></div>${menu('专注模式', 'focus', 'focus')}${menu('云文档', 'navigate', 'cloud', '目录、账号与同步状态', { page: 'cloud' })}${menu('重命名当前文档', 'rename-dialog', 'pencil-line', '', { id: active().id })}${menu('关闭当前文档', 'close-document', 'x', '', { id: active().id })}` }),
+        'commands': () => ({ title: '快捷指令', body: `<label class="mm-search">${icon('search')}<input aria-label="搜索快捷指令" placeholder="输入 / 搜索指令" data-input="command-search"></label><div data-command-list>${commandRows('')}</div>` }),
+        'format': () => ({ title: '格式工具', body: `<div class="mm-menu-grid">${[
+          ['标题', '# 新标题', 'heading-1'], ['加粗', '**加粗文字**', 'bold'], ['斜体', '*斜体文字*', 'italic'], ['链接', '[链接文字](https://example.com)', 'link-2'], ['引用', '> 引用文字', 'quote'], ['代码块', '```text\n代码\n```', 'code-2'], ['任务清单', '- [ ] 新任务', 'list-checks'], ['列表', '- 列表项', 'list'],
+        ].map(([label, text, glyph]) => `<button class="mm-menu-tile cursor-interaction" type="button" data-action="insert" data-text="${escape(text)}">${icon(glyph)}<span>${label}</span></button>`).join('')}</div><div class="mm-divider"></div><div class="mm-quiet">标题等级</div><div class="mm-form-row">${[1, 2, 3, 4, 5, 6].map(level => `<button class="mm-text-button cursor-interaction" type="button" data-action="insert" data-text="${'#'.repeat(level)} 标题">H${level}</button>`).join('')}</div>` }),
+        'outline': () => ({ title: '文档大纲', body: active().body.split('\n\n').map((block, index) => /^#{1,6} /.test(block) ? menu(block.replace(/^#+ /, ''), 'jump-heading', 'hash', '', { index }) : '').join('') || '<p>添加标题后会出现在这里。</p>' }),
+        'find': () => ({ title: '查找与替换', body: field('查找', 'find', '想法') + field('替换为', 'replace', '灵感') + '<div class="mm-inline-result" data-find-result aria-live="polite"></div>', actions: button('查找', 'find-text', 'search') + button('全部替换', 'replace-text', 'replace-all', {}, 'primary') }),
+        'formula': () => ({ title: '公式编辑器', body: `<div class="mm-equation" aria-label="公式预览" data-formula-preview>1 + 2 + ··· + n = <span class="mm-fraction"><span>n(n + 1)</span><span>2</span></span></div><div class="mm-form-row">${[['分数', '\\frac{a}{b}'], ['根号', '\\sqrt{x}'], ['积分', '\\int_0^1 x^2 dx'], ['矩阵', '\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix}']].map(([label, value]) => button(label, 'formula-template', '', { value })).join('')}</div>${field('LaTeX', 'formula', '1 + 2 + \\cdots + n = \\frac{n(n+1)}{2}', true)}${menu('复制 LaTeX', 'copy-formula', 'copy', '', { kind: 'latex' })}${menu('复制到 Word / WPS', 'copy-formula', 'clipboard', '接收应用支持时粘贴为可编辑公式', { kind: 'office' })}`, actions: button('取消', 'dismiss') + button('写入文档', 'insert-formula', 'check', {}, 'primary') }),
+        'image': () => ({ title: '插入图片', body: menu('选择图片', 'mock-image-file', 'image-plus', '系统照片或文件') + menu('粘贴剪贴板图片', 'mock-image-file', 'clipboard-paste') + field('HTTPS 图片网址或相对路径', 'image-url', '') + field('替代文字', 'image-alt', '图片说明') + '<p>本地文件使用 assets 资源目录，云文档使用内嵌图片或 HTTPS 地址。</p>', actions: button('取消', 'dismiss') + button('插入', 'insert-image', 'image-plus', {}, 'primary') }),
+        'table': () => ({ title: '插入表格', body: `<div class="mm-form-row">${field('列数', 'columns', '2')}${field('行数', 'rows', '3')}</div><div class="mm-preview-page"><table style="width:100%;text-align:left"><tr><th>名称</th><th>内容</th></tr><tr><td>项目</td><td>说明</td></tr></table></div>`, actions: button('取消', 'dismiss') + button('插入表格', 'insert-table', 'table-2', {}, 'primary') }),
+        'export-pdf': () => ({ title: '导出 PDF', body: field('文件名', 'filename', active().name.replace(/\.[^.]+$/, '.pdf')) + '<div class="mm-form-row"><label class="mm-field"><span>纸张</span><select class="mm-input"><option>A4</option><option>Letter</option></select></label><label class="mm-field"><span>方向</span><select class="mm-input"><option>纵向</option><option>横向</option></select></label></div><div class="mm-preview-page"><h3>今天的好想法</h3><p>把灵感先写下来，再慢慢整理成形。</p><p>正文、公式、表格和图片按阅读样式排版。</p></div>', actions: button('取消', 'dismiss') + button('保存 PDF', 'export-complete', 'file-down', { format: 'PDF' }, 'primary') }),
+        'export-html': () => ({ title: '导出 HTML', body: field('文件名', 'filename', active().name.replace(/\.[^.]+$/, '.html')) + '<p>导出正文的网页阅读版本。相对路径图片需连同资源目录一起分享。</p><div class="mm-preview-page"><h3>今天的好想法</h3><p>让文字、公式与表格在浏览器中继续阅读。</p></div>', actions: button('取消', 'dismiss') + button('保存 HTML', 'export-complete', 'globe', { format: 'HTML' }, 'primary') }),
+        'html-preview': () => ({ title: 'HTML 运行预览', body: `<div class="mm-path">${icon('lock-keyhole')}<span>index.html · 隔离预览</span></div><div class="mm-preview-page"><h3>留一点空白，给想法</h3><p>把灵感先写下来。</p></div><p style="margin-top:16px">运行前保存源码，通过已授权目录加载 CSS、JavaScript 和图片。</p>`, actions: button('返回源码', 'dismiss') + button('刷新预览', 'html-refresh', 'refresh-cw', {}, 'primary') }),
+        'html-browser': () => ({ title: '在浏览器运行', body: '<p>保存当前 HTML 后，通过 Android 浏览器打开预览。</p><div class="mm-root-folder">' + icon('globe') + '<strong>index.html</strong></div>', actions: button('取消', 'dismiss') + button('保存并打开', 'browser-demo', 'external-link', {}, 'primary') }),
+        'background': () => ({ title: '主题背景', body: `<div class="mm-background-preview ${state.background ? 'selected' : ''}">${icon('image')}<span>${state.background ? '背景预览' : '选择一张背景图片'}</span></div>${button(state.background ? '更换图片' : '导入图片', 'background-select', 'image-plus', {}, 'wide')}<label class="mm-field"><span>透明度 <output data-opacity-output>${state.opacity}%</output></span><input class="mm-range" type="range" min="0" max="40" value="${state.opacity}" data-input="background-opacity" aria-label="背景透明度"></label><label class="mm-check-row"><span>启用背景</span><input type="checkbox" data-input="background-enabled"${state.background ? ' checked' : ''}></label><p>背景只用于编辑界面，正文与导出使用各自的排版样式。</p>`, actions: button('移除', 'background-remove') + button('完成', 'dismiss', 'check', {}, 'primary') }),
+        'plugins': () => ({ title: '插件', body: `<div class="mm-form-row">${button('导入 .js', 'sheet', 'file-up', { name: 'plugin-import' })}${button('新建', 'sheet', 'plus', { name: 'plugin-edit' })}</div><div class="mm-plugin"><label class="mm-plugin-head">${icon('puzzle')}<strong>写作工具</strong><input aria-label="启用写作工具" type="checkbox" data-input="plugin-enabled"${state.pluginEnabled ? ' checked' : ''}></label><div class="mm-quiet">插入日期、选区引用与文档统计</div>${menu('插入日期', 'plugin-run', 'calendar-days', '', { command: 'date' })}${menu('选区引用', 'plugin-run', 'quote', '', { command: 'quote' })}${menu('文档统计', 'plugin-run', 'chart-no-axes-column', '', { command: 'stats' })}<div class="mm-form-row">${button('编辑源码', 'sheet', 'code-2', { name: 'plugin-edit' })}${button('导出源码', 'plugin-export', 'file-down')}</div></div><div class="mm-footnote">${icon('shield-check')}<span>插件通过隔离环境处理当前文档</span></div>` }),
+        'plugin-edit': () => ({ title: '编辑插件', body: field('名称', 'plugin-name', '我的写作工具') + field('JavaScript', 'plugin-code', 'miniMark.register({\n  id: "my-tools",\n  name: "我的写作工具",\n  version: "1.0.0",\n  commands: [{\n    id: "hello",\n    title: "插入问候",\n    run: () => ({ replaceSelection: "你好" })\n  }]\n});', true) + '<div class="mm-inline-result" data-plugin-result aria-live="polite"></div>', actions: button('返回插件', 'sheet', '', { name: 'plugins' }) + button('保存并检查', 'plugin-check', 'check', {}, 'primary') }),
+        'plugin-import': () => ({ title: '导入插件', body: '<p>通过系统文件选择器导入 .js 文件，然后检查源码。</p>' + menu('writing-tools.js', 'sheet', 'file-code-2', '示例文件 · 文字处理命令', { name: 'plugin-edit' }) }),
+        'updates': () => ({ title: '版本与更新', body: `<div class="mm-account"><img class="mm-logo" src="${logo}" alt=""><div><strong>Mini Mark</strong><div class="mm-quiet">Rev v1.0.3 · Android 设计预览</div></div></div><div class="mm-label"><span>版本内容</span></div><p>文档编辑与工作区、GitHub 云文档、公式图片、导出和主题插件。</p><label class="mm-check-row"><span>接收大版本更新提醒</span><input type="checkbox" checked></label><div class="mm-inline-result" data-update-result aria-live="polite">${state.updateChecked ? '更新检查完成 · 演示状态' : ''}</div>`, actions: button('关闭', 'dismiss') + button('检测更新', 'check-updates', 'refresh-cw', {}, 'primary') }),
+        'shortcuts': () => ({ title: '外接键盘快捷键', body: [['新建文档', 'Ctrl N'], ['打开文件', 'Ctrl O'], ['保存', 'Ctrl S'], ['另存为', 'Ctrl Shift S'], ['查找替换', 'Ctrl F'], ['标题等级', 'Ctrl 1 … 6'], ['关闭标签', 'Ctrl W']].map(([label, key]) => `<div class="mm-check-row"><span>${label}</span><kbd class="mm-key">${key}</kbd></div>`).join('') }),
+        'workspace-menu': () => ({ title: '工作区', body: menu('切换文件夹', 'choose-workspace', 'folder-open') + menu('刷新目录', 'refresh-workspace', 'refresh-cw') + menu('关闭工作区', 'close-workspace', 'folder-closed', '撤销目录访问，保留已打开的文档') }),
+        'assets': () => ({ title: 'assets', body: menu('mini-mark-image.png', 'asset-preview', 'image', '文档图片资源') }),
+        'unsupported': () => ({ title: 'archive.zip', body: '<p>此文件在工作区中可见。请使用适合此格式的应用打开。</p>', actions: button('返回工作区', 'dismiss') }),
+        'account': () => ({ title: 'GitHub 账号', body: `<div class="mm-account"><span class="mm-avatar">${icon('github')}</span><div><strong>mini-mark-demo</strong><div class="mm-quiet">演示账号 · MiniMarkDisk</div></div></div><div class="mm-label"><span>连接</span></div>${menu('MiniMarkDisk', 'navigate', 'folder-git-2', '私有仓库', { page: 'cloud' })}${menu('退出账号', 'sheet', 'log-out', '文档正文继续保留在此设备', { name: 'signout' })}` }),
+        'auth': () => ({ title: '登录 GitHub', body: '<p>复制授权码，再前往 GitHub 完成设备授权。</p><div class="mm-auth-code" aria-label="演示授权码">DEMO-CODE</div>' + button('复制授权码', 'copy-auth', 'copy', {}, 'wide') + '<div class="mm-divider"></div><p>授权需要 repo 权限，可读写私有仓库。Mini Mark 使用当前账号的 MiniMarkDisk。</p><div class="mm-inline-result" data-auth-result aria-live="polite"></div>', actions: button('取消', 'dismiss') + button('前往 GitHub 授权', 'authorize-demo', 'external-link', {}, 'primary') }),
+        'connect-repository': () => ({ title: '连接 MiniMarkDisk', body: '<p>示例账号尚未建立文档仓库。创建私有 MiniMarkDisk 后，即可选择目录保存文档。</p><div class="mm-root-folder">' + icon('lock-keyhole') + '<div><strong>mini-mark-demo / MiniMarkDisk</strong><small>私有仓库</small></div></div>', actions: button('稍后', 'dismiss') + button('创建并连接', 'connect-repository', 'folder-plus', {}, 'primary') }),
+        'signout': () => ({ title: '退出账号', body: '<p>退出后，已打开的正文保留在本机。再次登录后可继续访问云文档。</p>', actions: button('取消', 'dismiss') + button('退出账号', 'signout-confirm', 'log-out', {}, 'primary') }),
+        'new-folder': () => ({ title: '新建云文件夹', body: `<div class="mm-path">MiniMarkDisk / ${escape(state.cloudPath)}</div>${field('文件夹名', 'folder-name', '新文件夹')}<div class="mm-error" data-form-error role="alert"></div>`, actions: button('取消', 'dismiss') + button('创建', 'create-folder', 'folder-plus', {}, 'primary') }),
+        'cloud-menu': () => {
+          const entry = cloudEntries.find(item => item.id === state.modalData.id);
+          return { title: entry.name, body: menu(entry.folder ? '打开文件夹' : '打开文档', entry.folder ? 'cloud-folder' : 'cloud-open', entry.folder ? 'folder-open' : 'file-text', '', { id: entry.id }) + (entry.folder ? '' : menu('重命名', 'cloud-rename', 'pencil-line', '', { id: entry.id })) + menu(entry.folder ? '删除文件夹' : '删除云文档', 'delete-dialog', 'trash-2', entry.folder ? '包含此目录下的全部内容' : '已打开的正文保留为本地草稿', { id: entry.id }, true) };
+        },
+        'rename': () => {
+          const entry = state.modalData.cloud ? cloudEntries.find(item => item.id === state.modalData.id) : documents.find(item => item.id === state.modalData.id);
+          return { title: '重命名', body: field('文件名', 'filename', entry.name) + (state.modalData.cloud ? '<p>重命名保留云端正文。未保存的编辑仍在当前文档中。</p>' : '') + '<div class="mm-error" data-form-error role="alert"></div>', actions: button('取消', 'dismiss') + button('保存名称', 'rename-confirm', 'check', {}, 'primary') };
+        },
+        'delete': () => {
+          const entry = cloudEntries.find(item => item.id === state.modalData.id);
+          return { title: entry.folder ? '删除云文件夹' : '删除云文档', body: `<p>${entry.folder ? '将删除此文件夹及其全部内容。' : '将从云端删除此文件。'}已打开的文档保留为本地草稿。</p><div class="mm-root-folder">${icon(entry.folder ? 'folder' : 'file-text')}<span>MiniMarkDisk / ${escape([entry.parent, entry.name].filter(Boolean).join('/'))}</span></div>`, actions: button('取消', 'dismiss') + button('确认删除', 'delete-confirm', 'trash-2', {}, 'danger') };
+        },
+        'conflict': () => ({ title: '云端文档已更新', body: `<p>${escape(active().name)} 已在另一台设备修改。你在本机的正文已保留。</p><div class="mm-compare"><div><strong>本机修改</strong>补充项目计划和新的想法。<div class="mm-quiet">尚未同步</div></div><div><strong>云端版本</strong>更新任务清单和会议记录。<div class="mm-quiet">来自另一台设备</div></div></div>${menu('另存一份云文档', 'save-copy', 'files', '为本机修改使用新文件名')}${menu('打开云端版本', 'open-remote-copy', 'cloud-download', '保留当前草稿，在新标签中打开')}`, actions: button('返回编辑', 'dismiss', 'arrow-left') }),
+        'close-dirty': () => ({ title: '关闭前保存修改', body: `<p>“${escape(documents.find(doc => doc.id === state.modalData.id)?.name || '')}”有未保存修改。</p>${menu('保存后关闭', 'save-close', 'save')}${menu('放弃修改并关闭', 'discard-close', 'x', '', {}, true)}`, actions: button('继续编辑', 'dismiss') }),
+      };
+      function commandRows(query) {
+        return [
+          ['/公式', '公式编辑器', 'sigma', 'formula'], ['/图片', '插入图片', 'image-plus', 'image'], ['/表格', '插入表格', 'table-2', 'table'], ['/代码', '代码块', 'code-2', 'code'], ['/引用', '引用段落', 'quote', 'quote'], ['/待办', '任务清单', 'list-checks', 'task'],
+        ].filter(row => row.join('').includes(query.replace(/^\//, ''))).map(([label, detail, glyph, name]) => menu(label, 'command', glyph, detail, { name })).join('');
+      }
+      function cloudAllowed() {
+        if (state.cloudStatus === 'signedout' || state.cloudStatus === 'expired') { showModal('auth'); return false; }
+        if (state.cloudStatus === 'offline' || state.cloudStatus === 'error') { toast('连接恢复后可手动重试，当前正文已保留'); return false; }
+        return true;
+      }
+      function saveCurrent(closeAfter = false, target = active()) {
+        if (!target || state.busy) return;
+        if (target.place === 'cloud' && !cloudAllowed()) return;
+        if (target.place === 'cloud' && state.cloudStatus === 'conflict') { showModal('conflict'); return; }
+        if (target.place === 'draft') { showModal('save-as', { id: target.id, closeAfter }); return; }
+        const saved = target.body;
+        closeModal(); state.busy = true; render();
+        const number = ++operationNumber;
+        setTimeout(() => {
+          if (number !== operationNumber) return;
+          target.savedBody = saved; target.time = '刚刚'; state.busy = false;
+          if (closeAfter && target.body === saved) state.opened = state.opened.filter(id => id !== target.id);
+          if (closeAfter) state.page = 'library';
+          render(); toast(target.place === 'cloud' ? '演示同步完成' : '演示保存完成');
+        }, 650);
+      }
+      function validName(value) { return value.length > 0 && value.length <= 120 && !/[\\/:*?"<>|\u0000-\u001f]/.test(value); }
+      function formError(message) { const error = overlay.querySelector('[data-form-error]'); if (error) error.textContent = message; else toast(message); }
+      const actions = {
+        navigate: data => go(data.page),
+        sheet: data => showModal(data.name, { id: data.id }),
+        dismiss: closeModal,
+        filter: data => { state.filter = data.value; render(); },
+        'open-document': data => openDocument(data.id),
+        'document-menu': data => showModal('document-menu', { id: data.id }),
+        'create-document': data => {
+          const names = { md: '未命名.md', yaml: '未命名.yaml', html: '未命名.html', txt: '未命名.txt' };
+          const doc = { id: `draft-${Date.now()}`, name: names[data.kind], kind: data.kind, place: 'draft', path: '', body: data.kind === 'md' ? '# 新的想法\n\n从这里开始记录。' : data.kind === 'html' ? '<h1>新的页面</h1>' : '', savedBody: '', time: '刚刚', undo: [], redo: [] };
+          documents.unshift(doc); state.mode = data.kind === 'md' ? 'live' : 'source'; openDocument(doc.id);
+        },
+        mode: data => { state.mode = data.value; render(); persist(); },
+        undo: () => { const doc = active(); if (!doc.undo.length) return; doc.redo.push(doc.body); doc.body = doc.undo.pop(); render(); },
+        redo: () => { const doc = active(); if (!doc.redo.length) return; doc.undo.push(doc.body); doc.body = doc.redo.pop(); render(); },
+        insert: data => insert(data.text),
+        focus: () => { closeModal(); state.page = 'editor'; state.focus = !state.focus; render(); },
+        'jump-heading': data => { closeModal(); state.page = 'editor'; if (state.mode === 'source') state.mode = 'live'; render(); app.querySelector(`[data-heading-index="${data.index}"]`)?.scrollIntoView({ block: 'start', behavior: 'instant' }); },
+        'choose-workspace': () => { state.workspace = true; state.page = 'workspace'; closeModal(); render(); toast('已选择示例文件夹 Documents / Notes'); },
+        'toggle-folder': () => { state.folderOpen = !state.folderOpen; render(); },
+        'refresh-workspace': () => { closeModal(); render(); toast('示例目录已刷新'); },
+        'close-workspace': () => { state.workspace = false; closeModal(); render(); },
+        'asset-preview': () => toast('图片资源通过已授权工作区访问'),
+        'cloud-folder': data => { const entry = cloudEntries.find(item => item.id === data.id); if (!entry) return; state.cloudPath = [entry.parent, entry.name].filter(Boolean).join('/'); closeModal(); state.page = 'cloud'; render(); },
+        'cloud-root': () => { state.cloudPath = ''; render(); },
+        'cloud-menu': data => showModal('cloud-menu', { id: data.id }),
+        'cloud-open': data => {
+          const entry = cloudEntries.find(item => item.id === data.id); if (!entry) return;
+          if (!entry.docId) {
+            entry.docId = entry.id;
+            documents.push({ id: entry.id, name: entry.name, kind: 'md', place: 'cloud', path: entry.parent, body: entry.body, savedBody: entry.body, undo: [], redo: [], time: '刚刚' });
+          }
+          openDocument(entry.docId);
+        },
+        'refresh-cloud': () => {
+          if (!cloudAllowed()) return;
+          state.busy = true; render();
+          setTimeout(() => { state.busy = false; render(); toast('云目录已刷新 · 演示'); }, 500);
+        },
+        'cloud-recover': () => {
+          if (state.cloudStatus === 'conflict') { state.activeId = 'project'; showModal('conflict'); }
+          else if (state.cloudStatus === 'expired') showModal('auth');
+          else { state.cloudStatus = 'connected'; render(); persist(); toast('连接已恢复 · 演示'); }
+        },
+        'cloud-save-picker': () => { if (cloudAllowed()) { state.pickerPath = ''; showModal('save-cloud'); } },
+        'picker-folder': data => { const entry = cloudEntries.find(item => item.id === data.id); state.pickerPath = [entry.parent, entry.name].filter(Boolean).join('/'); renderModal(); hydrateIcons(); },
+        'picker-root': () => { state.pickerPath = ''; renderModal(); hydrateIcons(); },
+        'save-cloud-confirm': () => {
+          const name = formValue('filename');
+          if (!validName(name)) { formError('请输入有效的文件名。'); return; }
+          const existing = cloudEntries.find(entry => entry.parent === state.pickerPath && entry.name === name);
+          const doc = active();
+          if (existing && existing.docId !== doc.id) { formError('此目录已有同名文档，请使用其他名称。'); return; }
+          if (!existing) cloudEntries.push({ id: `cloud-${Date.now()}`, name, parent: state.pickerPath, docId: doc.id });
+          doc.name = name; doc.place = 'cloud'; doc.path = state.pickerPath;
+          state.cloudStatus = 'connected'; closeModal(); state.page = 'editor'; saveCurrent(); persist();
+        },
+        'save-current': () => saveCurrent(),
+        'save-local-as': data => {
+          const name = formValue('filename'); if (!validName(name)) { toast('请输入有效的文件名'); return; }
+          const doc = documents.find(item => item.id === data.id) || active();
+          doc.name = name; doc.place = 'local'; doc.path = 'Documents / Notes'; doc.savedBody = doc.body;
+          const closeAfter = state.modalData.closeAfter;
+          closeModal(); state.activeId = doc.id; state.page = closeAfter ? 'library' : 'editor'; render(); toast('演示保存完成');
+        },
+        'unlink-confirm': () => { active().place = 'draft'; active().path = ''; active().savedBody = ''; closeModal(); render(); toast('当前文档已切回本地草稿'); },
+        'copy-auth': () => { overlay.querySelector('[data-auth-result]').textContent = '演示授权码已准备好'; },
+        'authorize-demo': () => {
+          const result = overlay.querySelector('[data-auth-result]'); result.textContent = '正在等待 GitHub 授权…';
+          setTimeout(() => { if (state.modal === 'auth') showModal('connect-repository'); }, 700);
+        },
+        'connect-repository': () => { state.cloudStatus = 'connected'; go('cloud'); toast('示例私有仓库已连接'); },
+        'signout-confirm': () => { state.cloudStatus = 'signedout'; go('cloud'); persist(); },
+        'create-folder': () => {
+          const name = formValue('folder-name');
+          if (!validName(name) || cloudEntries.some(entry => entry.parent === state.cloudPath && entry.name === name)) { formError('请填写有效且未被占用的文件夹名。'); return; }
+          cloudEntries.push({ id: `folder-${Date.now()}`, name, parent: state.cloudPath, folder: true }); closeModal(); render(); toast('示例文件夹已创建');
+        },
+        'cloud-rename': data => showModal('rename', { id: data.id, cloud: true }),
+        'rename-dialog': data => showModal('rename', { id: data.id, cloud: false }),
+        'rename-confirm': () => {
+          const name = formValue('filename'); if (!validName(name)) { formError('请输入有效的文件名。'); return; }
+          if (state.modalData.cloud) {
+            const entry = cloudEntries.find(item => item.id === state.modalData.id);
+            if (cloudEntries.some(item => item.id !== entry.id && item.parent === entry.parent && item.name === name)) { formError('此目录已有同名文档。'); return; }
+            entry.name = name; const doc = documents.find(item => item.id === entry.docId); if (doc) doc.name = name;
+          } else { const doc = documents.find(item => item.id === state.modalData.id); if (doc) doc.name = name; }
+          closeModal(); render(); toast('名称已更新');
+        },
+        'delete-dialog': data => showModal('delete', { id: data.id }),
+        'delete-confirm': () => {
+          const entry = cloudEntries.find(item => item.id === state.modalData.id);
+          const path = [entry.parent, entry.name].filter(Boolean).join('/');
+          const deleting = cloudEntries.filter(item => item.id === entry.id || (entry.folder && (item.parent === path || item.parent.startsWith(path + '/'))));
+          deleting.forEach(item => {
+            const doc = documents.find(record => record.id === item.docId);
+            if (doc) { doc.place = 'draft'; doc.path = ''; doc.savedBody = ''; }
+            cloudEntries.splice(cloudEntries.indexOf(item), 1);
+          }); closeModal(); render(); toast('已删除示例云端条目');
+        },
+        'save-copy': () => { state.pickerPath = active().path || ''; showModal('save-cloud', { copy: true }); },
+        'open-remote-copy': () => {
+          const original = active(); original.place = 'draft'; original.name = original.name.replace(/(\.[^.]+)$/, '-本机草稿$1');
+          const id = `remote-${Date.now()}`;
+          documents.push({ id, name: '项目备忘.md', kind: 'md', place: 'cloud', path: '工作', body: '# 项目备忘\n\n## 会议记录\n\n另一台设备更新了任务清单。', savedBody: '# 项目备忘\n\n## 会议记录\n\n另一台设备更新了任务清单。', undo: [], redo: [], time: '刚刚' });
+          state.cloudStatus = 'connected'; openDocument(id); toast('云端版本已在新标签中打开');
+        },
+        'close-document': data => {
+          const doc = documents.find(item => item.id === data.id); if (!doc) return;
+          if (dirty(doc)) { showModal('close-dirty', { id: doc.id }); return; }
+          state.opened = state.opened.filter(id => id !== doc.id); go('library');
+        },
+        'save-close': () => saveCurrent(true, documents.find(doc => doc.id === state.modalData.id)),
+        'discard-close': () => { const doc = documents.find(item => item.id === state.modalData.id); doc.body = doc.savedBody; state.opened = state.opened.filter(id => id !== doc.id); go('library'); },
+        command: data => { const snippets = { code: '```text\n代码内容\n```', quote: '> 引用内容', task: '- [ ] 新任务' }; if (snippets[data.name]) insert(snippets[data.name]); else showModal(data.name); },
+        'find-text': () => { const query = formValue('find'); const count = query ? active().body.split(query).length - 1 : 0; overlay.querySelector('[data-find-result]').textContent = `找到 ${count} 处匹配`; },
+        'replace-text': () => { const query = formValue('find'); if (!query) return; recordEdit(active().body.split(query).join(formValue('replace'))); closeModal(); render(); toast('已完成替换，可撤销'); },
+        'formula-template': data => {
+          const input = overlay.querySelector('[data-field="formula"]'); input.value = data.value; input.focus();
+          overlay.querySelector('[data-formula-preview]').innerHTML = formulaMarkup(data.value);
+        },
+        'copy-formula': data => toast(data.kind === 'office' ? '演示复制结构化公式，接收应用兼容性待验收' : '演示复制 LaTeX'),
+        'insert-formula': () => insert('$$\n' + formValue('formula') + '\n$$'),
+        'mock-image-file': () => { overlay.querySelector('[data-field="image-url"]').value = 'assets/示例图片.png'; toast('已选择示例图片'); },
+        'insert-image': () => { const url = formValue('image-url'); if (!url) { toast('请先选择图片或填写图片地址'); return; } insert(`![${formValue('image-alt') || '图片'}](${url})`); },
+        'insert-table': () => {
+          const columns = Math.min(6, Math.max(1, Number(formValue('columns')) || 2));
+          const rows = Math.min(12, Math.max(1, Number(formValue('rows')) || 3));
+          const line = values => '| ' + values.join(' | ') + ' |';
+          insert([line(Array.from({ length: columns }, (_, index) => `列 ${index + 1}`)), line(Array(columns).fill('---')), ...Array.from({ length: rows }, () => line(Array(columns).fill('内容')))].join('\n'));
+        },
+        'export-complete': data => { closeModal(); toast(`${data.format} 导出流程演示完成`); },
+        'html-refresh': () => toast('HTML 预览已刷新 · 演示'),
+        'browser-demo': () => { closeModal(); toast('演示进入 Android 浏览器预览流程'); },
+        theme: data => { state.theme = data.value; render(); persist(); },
+        'background-select': () => { state.background = true; applyAppearance(); renderModal(); hydrateIcons(); },
+        'background-remove': () => { state.background = false; applyAppearance(); renderModal(); hydrateIcons(); },
+        'plugin-run': data => {
+          if (!state.pluginEnabled) { toast('请先启用此插件'); return; }
+          if (data.command === 'stats') toast(`当前文档 ${active().body.replace(/\s/g, '').length} 字，${active().body.split('\n').length} 行`);
+          else insert(data.command === 'date' ? '2026-11-18' : '> 选区引用示例');
+        },
+        'plugin-check': () => { overlay.querySelector('[data-plugin-result]').textContent = '检查通过 · 演示状态'; },
+        'plugin-export': () => toast('插件源码导出流程演示完成'),
+        'check-updates': () => {
+          overlay.querySelector('[data-update-result]').textContent = '正在检测…';
+          setTimeout(() => { state.updateChecked = true; if (state.modal === 'updates') { renderModal(); hydrateIcons(); } }, 650);
+        },
+      };
+      root.addEventListener('click', event => {
+        const control = event.target.closest('[data-action]');
+        if (!control || !root.contains(control) || control.disabled) return;
+        const handler = actions[control.dataset.action];
+        if (handler) handler(control.dataset);
+      });
+      root.addEventListener('input', event => {
+        const input = event.target;
+        const name = input.dataset.input;
+        if (name === 'document-search') { state.query = input.value; app.querySelector('[data-library-list]').innerHTML = libraryList(); hydrateIcons(); }
+        if (name === 'command-search') { overlay.querySelector('[data-command-list]').innerHTML = commandRows(input.value); hydrateIcons(); }
+        if (name === 'source') { recordEdit(input.value); updateEditorFeedback(); }
+        if (name === 'font-size') { state.fontSize = Number(input.value); applyAppearance(); app.querySelector('[data-font-output]').textContent = `${state.fontSize} px`; persist(); }
+        if (name === 'background-opacity') { state.opacity = Number(input.value); applyAppearance(); overlay.querySelector('[data-opacity-output]').textContent = `${state.opacity}%`; }
+        if (input.dataset.field === 'formula') overlay.querySelector('[data-formula-preview]').innerHTML = formulaMarkup(input.value.trim());
+        if (input.hasAttribute('data-block')) {
+          const blocks = active().body.split(/\n\n/); const index = Number(input.dataset.block); const prefix = blocks[index].match(/^#{1,6} /)?.[0] || '';
+          blocks[index] = prefix + input.innerText; recordEdit(blocks.join('\n\n')); updateEditorFeedback();
+        }
+      });
+      root.addEventListener('change', event => {
+        const input = event.target;
+        if (input.dataset.input === 'show-tabs') { state.showTabs = input.checked; persist(); }
+        if (input.dataset.input === 'plugin-enabled') state.pluginEnabled = input.checked;
+        if (input.dataset.input === 'background-enabled') { state.background = input.checked; applyAppearance(); }
+        if (input.dataset.input === 'cloud-binding' && !input.checked) showModal('unlink');
+        if (input.hasAttribute('data-task-block')) {
+          const blocks = active().body.split(/\n\n/); const index = Number(input.dataset.taskBlock); const lines = blocks[index].split('\n');
+          lines[Number(input.dataset.taskLine)] = lines[Number(input.dataset.taskLine)].replace(/^- \[[ x]\]/, input.checked ? '- [x]' : '- [ ]');
+          blocks[index] = lines.join('\n'); recordEdit(blocks.join('\n\n')); updateEditorFeedback();
+        }
+      });
+      root.addEventListener('scroll', event => {
+        const editor = event.target;
+        if (editor.dataset?.input !== 'source') return;
+        const syntax = editor.parentElement.querySelector('.mm-syntax-underlay');
+        syntax.scrollTop = editor.scrollTop;
+        syntax.scrollLeft = editor.scrollLeft;
+      }, true);
+      root.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && state.modal) { event.preventDefault(); closeModal(); }
+        if (event.key === 'Tab' && state.modal) {
+          const controls = [...overlay.querySelectorAll('button:not(:disabled), input:not(:disabled), textarea, select')].filter(control => control.offsetParent !== null);
+          if (!controls.length) return;
+          if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls.at(-1).focus(); }
+          else if (!event.shiftKey && document.activeElement === controls.at(-1)) { event.preventDefault(); controls[0].focus(); }
+        }
+      });
+      overlay.addEventListener('click', event => { if (event.target === overlay) closeModal(); });
+      window.addEventListener('openai:set_globals', event => { const saved = event.detail?.globals?.widgetState; if (saved) { restore(saved); render(); } });
+      restore(window.openai?.widgetState);
+      render();
+      if (globalThis.Tweak) {
+        const tweak = new Tweak({ container: root, onChange: () => { closeModal(); render(); persist(); } });
+        tweak.addSelect(state, 'theme', { label: '外观', options: [{ label: '浅色', value: 'light' }, { label: '深色', value: 'dark' }, { label: '跟随系统', value: 'system' }] });
+        tweak.addSelect(state, 'device', { label: '设备布局', options: [{ label: '手机', value: 'phone' }, { label: '平板', value: 'tablet' }] });
+        tweak.addSlider(state, 'fontSize', { label: '正文字号', min: 14, max: 20, unit: 'px' });
+        tweak.addToggle(state, 'showTabs', { label: '显示多文档标签' });
+        tweak.addSelect(state, 'cloudStatus', { label: '云文档状态', options: [{ label: '已连接', value: 'connected' }, { label: '未登录', value: 'signedout' }, { label: '离线', value: 'offline' }, { label: '登录过期', value: 'expired' }, { label: '云端冲突', value: 'conflict' }, { label: '读取失败', value: 'error' }] });
+      }
+    })();
+  </script>
+</div>

@@ -1,4 +1,5 @@
-import { ArrowUp, Cloud, Copy, ExternalLink, FileText, Folder, FolderPlus, LogIn, LogOut, RefreshCw, Save, Trash2, X, createIcons } from 'lucide';
+import { ArrowUp, Cloud, Copy, ExternalLink, FileText, Folder, FolderPlus, LogIn, LogOut, RefreshCw, Save, Trash2, PencilLine, X, createIcons } from 'lucide';
+import { isAndroid } from '../../platform/android';
 import { isDesktop, send } from '../../platform/bridge';
 import { cloudRequest, handleCloudResponse } from './client';
 import { cloudFileName, cloudFolderName, isCloudSha, joinCloudPath, parentCloudPath, readCloudDeletion, readCloudEntries, type CloudAccount, type CloudBinding, type CloudEntry, type CloudRepository, type DeviceAuthorization, type LoginPoll } from './model';
@@ -69,7 +70,7 @@ export function initializeCloud(options: Options) {
     <div id="cloud-status" role="status" aria-live="polite"></div>
     <footer><span id="cloud-document-path"></span><button data-action="save-current"><i data-lucide="save"></i>保存当前文档到云端</button></footer>`;
   document.body.append(dialog);
-  const icons = { ArrowUp, Cloud, Copy, ExternalLink, FileText, Folder, FolderPlus, LogIn, LogOut, RefreshCw, Save, Trash2, X };
+  const icons = { ArrowUp, Cloud, Copy, ExternalLink, FileText, Folder, FolderPlus, LogIn, LogOut, RefreshCw, Save, Trash2, PencilLine, X };
   createIcons({ icons, root: dialog, attrs: { 'stroke-width': 1.65 } });
   const get = <T extends HTMLElement>(id: string) => dialog.querySelector<T>(`#${id}`)!;
   const action = (name: string) => dialog.querySelector<HTMLButtonElement>(`[data-action="${name}"]`)!;
@@ -124,6 +125,7 @@ export function initializeCloud(options: Options) {
       const entry = entries.find(entry => entry.path === item.dataset.path);
       item.disabled = busy || !entry || !canDelete(entry);
     });
+    get('cloud-entries').querySelectorAll<HTMLButtonElement>('.cloud-rename').forEach(item => { item.disabled = busy || !listingReady || intent === 'save'; });
     get('cloud-breadcrumb').querySelectorAll<HTMLButtonElement>('button').forEach(item => { item.disabled = busy; });
   }
   async function perform(operation: (signal: AbortSignal) => Promise<void>) {
@@ -192,7 +194,23 @@ export function initializeCloud(options: Options) {
       remove.title = deleteLabel; remove.setAttribute('aria-label', deleteLabel);
       const trash = document.createElement('i'); trash.dataset.lucide = 'trash-2'; remove.append(trash);
       remove.onclick = () => { if (!busy && canDelete(entry)) void perform(signal => deleteEntry(entry, signal)); };
-      row.append(button, remove); list.append(row);
+      row.append(button);
+      if (isAndroid && entry.type === 'file') {
+        const rename = document.createElement('button'); rename.type = 'button'; rename.className = 'icon-button cloud-rename';
+        rename.setAttribute('aria-label', `重命名 ${entry.name}`); rename.innerHTML = '<i data-lucide="pencil-line"></i>';
+        rename.onclick = () => void perform(async signal => {
+          if (!listingReady || !entry.sha || intent !== 'browse') return;
+          const requested = prompt('新文件名', entry.name);
+          if (!requested || signal.aborted) return;
+          const nextName = cloudFileName(requested);
+          if (nextName === entry.name) return;
+          if (entries.some(item => item.name === nextName)) throw new Error('此目录已有同名文件。');
+          await cloudRequest('rename', { owner: account.login, path: entry.path, sha: entry.sha, name: nextName }, signal);
+          if (!signal.aborted) await listFolder(folder, signal);
+        });
+        row.append(rename);
+      }
+      row.append(remove); list.append(row);
     }
     if (!entries.length) { const empty = document.createElement('p'); empty.className = 'cloud-empty'; empty.textContent = '此目录没有文档'; list.append(empty); }
     const breadcrumb = get('cloud-breadcrumb'); breadcrumb.replaceChildren();
@@ -390,7 +408,10 @@ export function initializeCloud(options: Options) {
       folderForm.hidden = true; folderName.value = ''; renderEntries();
       currentDocumentId = ''; documentChanged();
       if (next === 'save') beginSave();
-      if (!dialog.open) dialog.showModal();
+      if (dialog.open) { dialog.close(); }
+      const mobilePage = isAndroid && document.querySelector<HTMLElement>('#app')?.dataset.mobilePage === 'cloud' && next === 'browse';
+      dialog.classList.toggle('mobile-cloud-page', mobilePage);
+      if (mobilePage) dialog.show(); else dialog.showModal();
       void perform(refresh);
     },
     handleMessage: handleCloudResponse,

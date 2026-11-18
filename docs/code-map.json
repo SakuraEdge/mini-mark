@@ -5,7 +5,8 @@
     "index.html",
     "src/app/main.ts",
     "native/Program.cs",
-    "macos/App/Main.swift"
+    "macos/App/Main.swift",
+    "android-app/app/src/main/java/com/sakuraedge/minimark/MainActivity.kt"
   ],
   "groups": [
     {
@@ -57,6 +58,7 @@
       "path": "src/platform",
       "purpose": "宿主通信",
       "files": [
+        "src/platform/android.ts",
         "src/platform/bridge.ts"
       ]
     },
@@ -153,6 +155,14 @@
         "src/features/workspace/manager.ts",
         "src/features/workspace/model.test.ts",
         "src/features/workspace/model.ts"
+      ]
+    },
+    {
+      "path": "src/features/android",
+      "purpose": "Android 移动导航、工具栏与审核设计实现",
+      "files": [
+        "src/features/android/shell.css",
+        "src/features/android/shell.ts"
       ]
     },
     {
@@ -389,21 +399,46 @@
     },
     {
       "path": "android-app",
-      "purpose": "Android Compose 应用与移动端界面",
+      "purpose": "Android WebView 宿主、SAF 工作区、云文档与设备验证",
       "files": [
         "android-app/.gitignore",
+        "android-app/.kotlin/errors/errors-1794970827187.log",
+        "android-app/.kotlin/errors/errors-1794985371221.log",
         "android-app/app/build.gradle.kts",
         "android-app/app/proguard-rules.pro",
+        "android-app/app/src/androidTest/java/com/sakuraedge/minimark/WebEditorFlowTest.kt",
+        "android-app/app/src/debug/assets/web/diagnostics/bridge-probe.html",
+        "android-app/app/src/debug/assets/web/diagnostics/bridge-probe.js",
         "android-app/app/src/main/AndroidManifest.xml",
         "android-app/app/src/main/java/com/sakuraedge/minimark/MainActivity.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/cloud/CloudCredentials.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/cloud/CloudPaths.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/cloud/CloudTransport.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/cloud/CloudTreeMutation.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/cloud/GitHubCloud.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/documents/DocumentFormats.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/documents/DocumentSession.kt",
         "android-app/app/src/main/java/com/sakuraedge/minimark/documents/DocumentStore.kt",
-        "android-app/app/src/main/java/com/sakuraedge/minimark/updates/UpdateDialog.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/documents/ImageAssets.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/host/AndroidBridge.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/host/AndroidHostState.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/host/PreviewServer.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/host/WebResources.kt",
+        "android-app/app/src/main/java/com/sakuraedge/minimark/workspace/FolderWorkspace.kt",
         "android-app/app/src/main/res/drawable/mini_mark_logo.xml",
+        "android-app/app/src/main/res/values-night/themes.xml",
         "android-app/app/src/main/res/values/strings.xml",
         "android-app/app/src/main/res/values/themes.xml",
+        "android-app/app/src/test/java/com/sakuraedge/minimark/cloud/GitHubCloudTest.kt",
         "android-app/app/src/test/java/com/sakuraedge/minimark/documents/DocumentHelpersTest.kt",
+        "android-app/app/src/test/java/com/sakuraedge/minimark/documents/DocumentSessionTest.kt",
+        "android-app/app/src/test/java/com/sakuraedge/minimark/documents/DocumentStoreTest.kt",
         "android-app/build.gradle.kts",
         "android-app/gradle.properties",
+        "android-app/gradle/wrapper/gradle-wrapper.jar",
+        "android-app/gradle/wrapper/gradle-wrapper.properties",
+        "android-app/gradlew",
+        "android-app/gradlew.bat",
         "android-app/settings.gradle.kts"
       ]
     },
@@ -446,6 +481,7 @@
       "path": "docs",
       "purpose": "开发与发布记录",
       "files": [
+        "docs/android-development.md",
         "docs/branding/README.md",
         "docs/branding/concepts/mini-mark-a.png",
         "docs/branding/concepts/mini-mark-a.svg",
@@ -460,12 +496,10 @@
         "docs/code-map.json",
         "docs/collaboration.md",
         "docs/design/README.md",
+        "docs/design/android-approved.html",
         "docs/design/android-ui.html",
         "docs/editor-v1.png",
         "docs/editor.png",
-        "docs/handoff/CONVERSATION.md",
-        "docs/handoff/NEW_DEVICE_PROMPT.md",
-        "docs/handoff/README.md",
         "docs/images.md",
         "docs/mac-signing.md",
         "docs/mini-mark-editor.png",

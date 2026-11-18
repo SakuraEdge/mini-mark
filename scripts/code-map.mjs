@@ -12,6 +12,7 @@ const areas = [
   ['src/features/formulas', '可视化公式与 Office 复制'], ['src/features/html', 'HTML 编辑入口与隔离运行'],
   ['src/features/documents', '文档右键菜单与重命名'],
   ['src/features/workspace', '工作区目录树、分页和文件夹协议'],
+  ['src/features/android', 'Android 移动导航、工具栏与审核设计实现'],
   ['native/Host', 'Windows 宿主'], ['native/Documents', 'Windows 文件与会话'],
   ['native/Infrastructure', 'Windows 路径与进程'], ['native/Export', 'Windows PDF'], ['native/Updates', 'Windows 更新'],
   ['native/Cloud', 'Windows GitHub 请求、凭据续期与云同步'],
@@ -23,7 +24,7 @@ const areas = [
   ['macos/Preview', 'macOS HTML 运行'],
   ['tests', '界面回归'], ['native-tests', '原生单元检查'], ['native-ui-tests', '真实 WebView2 交互'],
   ['native-pdf-tests', '真实 PDF 引擎'], ['installer', 'Windows 安装'], ['scripts', '开发脚本'],
-  ['android-app', 'Android Compose 应用与移动端界面'],
+  ['android-app', 'Android WebView 宿主、SAF 工作区、云文档与设备验证'],
   ['.github/workflows', '构建与发布'], ['public', '应用资源'], ['docs', '开发与发布记录'],
 ];
 const groups = [];
@@ -34,6 +35,6 @@ for (const [path, purpose] of areas) {
     .filter(file => !file.endsWith('/local.properties')).sort();
   groups.push({ path, purpose, files });
 }
-const map = { guide: 'CODE_MAP.md', regenerate: 'npm run docs:map', entryPoints: ['index.html', 'src/app/main.ts', 'native/Program.cs', 'macos/App/Main.swift'], groups };
+const map = { guide: 'CODE_MAP.md', regenerate: 'npm run docs:map', entryPoints: ['index.html', 'src/app/main.ts', 'native/Program.cs', 'macos/App/Main.swift', 'android-app/app/src/main/java/com/sakuraedge/minimark/MainActivity.kt'], groups };
 await writeFile(join(root, 'docs/code-map.json'), JSON.stringify(map, null, 2) + '\n');
 console.log(`Saved docs/code-map.json: ${groups.reduce((count, group) => count + group.files.length, 0)} files in ${groups.length} areas`);

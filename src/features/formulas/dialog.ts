@@ -3,6 +3,7 @@ import { createIcons, X, Copy, Check, Undo2, Redo2, ArrowLeft, ArrowRight, Delet
 import { renderMath } from '../../markdown/render';
 import { copyEquation } from './clipboard';
 import { equationData, validateFormula, MAX_FORMULA_LENGTH } from './equation';
+import { isAndroid } from '../../platform/android';
 
 MathfieldElement.fontsDirectory = new URL('vendor/mathlive/fonts', document.baseURI).href;
 MathfieldElement.soundsDirectory = null;
@@ -114,7 +115,7 @@ export function openFormulaDialog(options: Options) {
     copying = true; copy.disabled = true;
     try {
       await copyEquation(equationData(latex()));
-      status.textContent = '已复制可编辑公式';
+      status.textContent = isAndroid ? '已复制公式，粘贴格式由接收应用决定。' : '已复制可编辑公式';
     } catch (error) { status.textContent = error instanceof Error ? error.message : '复制失败，请重试。'; }
     finally { copying = false; copy.disabled = !latex().trim(); }
   });

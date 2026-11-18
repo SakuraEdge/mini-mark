@@ -1,6 +1,7 @@
 import { send, isDesktop, type HostMessage } from '../../platform/bridge';
 import { Download, ExternalLink, RefreshCw, X, createIcons } from 'lucide';
 import currentRelease from './current-release.json';
+import { isAndroid } from '../../platform/android';
 import '../../styles/updates.css';
 
 export const APP_VERSION = __APP_VERSION__;
@@ -187,7 +188,7 @@ export function handleUpdateMessage(message: HostMessage): boolean {
   clearDeferredPrompt();
   if (message.error) { setResult(message.error); return true; }
   try {
-    candidate = latestRelease(message.releases, APP_VERSION);
+    candidate = latestRelease(message.releases, isAndroid ? APP_RELEASE_VERSION : APP_VERSION);
     offlineResult = Boolean(message.cacheNotice);
     installSupported = message.installSupported === true;
     const summary = candidate ? `发现${majorCandidate(candidate) ? '大版本' : '新版本'} ${releaseLabel(candidate)}。` : message.cacheNotice ? '缓存中没有高于当前版本的更新。' : `当前已是最新正式版本（${APP_DISPLAY_VERSION}）。`;

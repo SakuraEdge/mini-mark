@@ -1,12 +1,14 @@
 const key = 'moye.theme';
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const preferredTheme = matchMedia('(prefers-color-scheme: dark)');
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 export function initializeTheme() {
   const saved = localStorage.getItem(key);
   document.documentElement.dataset.theme = saved === 'light' || saved === 'dark'
-    ? saved : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    ? saved : preferredTheme.matches ? 'dark' : 'light';
 }
+preferredTheme.addEventListener('change', () => { if (!localStorage.getItem(key)) initializeTheme(); });
 
 export function toggleTheme() {
   const root = document.documentElement;

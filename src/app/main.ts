@@ -23,6 +23,8 @@ import type { CloudBinding } from '../features/cloud/model';
 import { initializeRename } from '../features/documents/rename';
 import { initializeWorkspace } from '../features/workspace/manager';
 import '../styles/app.css';
+import { initializeAndroidShell } from '../features/android/shell';
+import { isAndroid } from '../platform/android';
 
 const app = mountApp(isDesktop, APP_DISPLAY_VERSION);
 initializeUpdates();
@@ -58,6 +60,7 @@ let outlineTimer: ReturnType<typeof setTimeout>;
 let persistTimer: ReturnType<typeof setTimeout>;
 let previewTimer: ReturnType<typeof setTimeout>;
 let toastTimer: ReturnType<typeof setTimeout>;
+let mobileShell: ReturnType<typeof initializeAndroidShell> | undefined;
 let fontSize = Number(localStorage.getItem('moye.font')) || 16;
 initializeTheme();
 const view = createEditor(document.querySelector('#editor')!, (update) => {
@@ -162,6 +165,7 @@ function updateSaved(text = view.state.doc.toString()) {
   const tab = tabs.find(item => item.id === activeId);
   if (tab) { tab.dirty = dirty; tab.revision = revision; }
   renderTabs();
+  mobileShell?.refresh();
 }
 
 function snapshotCurrent() {
@@ -172,6 +176,7 @@ function setTransitionPending(pending: boolean, keepEditable = false) {
   transitionPending = pending;
   setEditorEditable(view, !pending || keepEditable);
   app.classList.toggle('transition-pending', pending);
+  mobileShell?.refresh();
 }
 function cacheCurrent() {
   if (!activeId) return;
@@ -309,6 +314,9 @@ function setMode(next: EditorMode) {
   if (language === 'yaml' && next === 'live') next = 'source';
   const changed = mode !== next;
   mode = next;
+  if (isAndroid && activeId) {
+    try { localStorage.setItem(`minimark.android.mode.${activeId}`, next); } catch { /* Current editing remains available when preferences cannot persist. */ }
+  }
   document.querySelector('#editor')!.toggleAttribute('hidden', next === 'read');
   const reading = document.querySelector<HTMLElement>('#reading-view')!;
   reading.hidden = next !== 'read' && next !== 'split';
@@ -328,6 +336,7 @@ function setMode(next: EditorMode) {
   updateDocumentFormatUi();
   document.querySelector('#surface')!.setAttribute('data-mode', next);
   cacheCurrent();
+  mobileShell?.refresh();
   if (changed) animateDocumentSwitch();
 }
 
@@ -479,9 +488,23 @@ document.addEventListener('keydown', (event) => {
   if (actions[key]) { event.preventDefault(); actions[key](); }
 }, true);
 document.addEventListener('visibilitychange', () => { if (document.hidden && activeId) send('edit', snapshotCurrent()); });
+if (isAndroid) window.miniMarkFlush = () => { if (activeId) { clearTimeout(persistTimer); send('edit', snapshotCurrent()); } };
+
+mobileShell = initializeAndroidShell({
+  snapshot: () => ({ id: activeId, name, tabs, mode, markdown: language === 'markdown', busy: transitionPending }),
+  action: nativeAction,
+  insert: command => insertCommand(view, command === 'task' ? 'todo' : command),
+  heading: level => setHeadingLevel(view, level),
+  setMode,
+  setFont: size => { fontSize = size; applyFont(); localStorage.setItem('moye.font', String(size)); },
+  openCloud: intent => cloudActions.open(intent),
+  rename: id => renameActions.open(id),
+  measure: () => view.requestMeasure(),
+});
 
 let updateScheduled = false;
 connect((message) => {
+  if (message.type === 'cloudConflict') { mobileShell?.conflict(message); return; }
   if (workspaceActions.handleMessage(message)) return;
   if (cloudActions.handleMessage(message)) return;
   if (handleFormulaMessage(message)) return;
@@ -513,7 +536,9 @@ connect((message) => {
     revision = current.revision;
     loading = true;
     const nextLanguage = documentLanguage(doc.name);
-    mode = nextLanguage === 'html' ? 'source' : cached?.mode ?? (nextLanguage === 'yaml' ? 'source' : mode);
+    const savedMode = isAndroid ? localStorage.getItem(`minimark.android.mode.${doc.id}`) : null;
+    const restoredMode = savedMode && ['live', 'source', 'read', 'split'].includes(savedMode) ? savedMode as EditorMode : undefined;
+    mode = nextLanguage === 'html' ? 'source' : cached?.mode ?? restoredMode ?? (nextLanguage === 'yaml' ? 'source' : mode);
     if (nextLanguage === 'yaml' && mode === 'live') mode = 'source';
     language = nextLanguage;
     if (cached && cached.document.text === current.text) {
@@ -552,8 +577,9 @@ connect((message) => {
     });
     if (message.recovered) showToast('已恢复上次打开的文档和未保存草稿');
     setTransitionPending(false);
+    mobileShell?.receiveWorkspace();
     if (switchingDocument) animateDocumentSwitch();
-    if (mode !== 'read') view.focus();
+    if (mode !== 'read' && !isAndroid) view.focus();
     if (localIsNewer) send('edit', snapshotCurrent());
     void document.fonts.ready.then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
       window.__MOYE_READY__ = performance.now();
@@ -602,10 +628,11 @@ connect((message) => {
     }).catch(error => send('pdfError', { requestId: message.requestId, documentId: message.documentId, message: error instanceof Error ? error.message : 'PDF 排版失败' }));
   } else if (message.type === 'operationComplete') {
     setTransitionPending(false);
+    mobileShell?.completeOperation();
     cloudOperation?.resolve(); cloudOperation = undefined;
   }
   else {
-    if (message.type === 'error') { setTransitionPending(false); cloudOperation?.reject(new Error(message.message)); cloudOperation = undefined; }
+    if (message.type === 'error') { setTransitionPending(false); mobileShell?.completeOperation(); cloudOperation?.reject(new Error(message.message)); cloudOperation = undefined; }
     if ('message' in message) showToast(message.message);
   }
 });

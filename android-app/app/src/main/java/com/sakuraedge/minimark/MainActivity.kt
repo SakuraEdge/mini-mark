@@ -1,190 +1,260 @@
 package com.sakuraedge.minimark
 
+import android.annotation.SuppressLint
+import android.app.AlertDialog
+import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.print.PrintAttributes
+import android.print.PrintManager
+import android.print.PrintDocumentAdapter
+import android.os.CancellationSignal
+import android.os.ParcelFileDescriptor
+import android.print.PageRange
+import android.view.ViewGroup
+import android.webkit.JsPromptResult
+import android.webkit.JsResult
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.activity.ComponentActivity
-import androidx.activity.viewModels
-import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.sakuraedge.minimark.updates.UpdateDialog
+import androidx.activity.viewModels
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import com.sakuraedge.minimark.documents.DocumentStore
 import com.sakuraedge.minimark.documents.LocalDocument
-import io.noties.markwon.Markwon
-import android.widget.ScrollView
-import android.widget.TextView
+import com.sakuraedge.minimark.host.AndroidBridge
+import com.sakuraedge.minimark.host.AndroidHostState
+import com.sakuraedge.minimark.host.DocumentAccess
+import com.sakuraedge.minimark.host.HostActions
+import com.sakuraedge.minimark.host.WebResources
+import com.sakuraedge.minimark.host.PreviewServer
 
-private val Canvas = Color(0xFFF4F7FB)
-private val Ink = Color(0xFF263246)
-private val Muted = Color(0xFF6F7B8D)
-private val Blue = Color(0xFF286BD6)
-
-private enum class Page { Library, Editor }
-private enum class Mode { Source, Reading, Split }
-
-class MainActivity : ComponentActivity() {
+internal class MainActivity : ComponentActivity(), HostActions {
     private val documents by viewModels<DocumentStore>()
-    override fun onCreate(state: Bundle?) {
-        super.onCreate(state)
-        setContent { App(documents) }
+    private val host by viewModels<AndroidHostState>()
+    private lateinit var web: WebView
+    private lateinit var bridge: AndroidBridge
+    private lateinit var resources: WebResources
+    private var webFileCallback: ValueCallback<Array<Uri>>? = null
+    private var previewDialog: AlertDialog? = null
+    private val printViews = mutableSetOf<WebView>()
+    private val filePicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        bridge.pickerResult(if (result.resultCode == RESULT_OK) result.data?.data else null)
     }
-}
+    private val webPicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uris = if (result.resultCode == RESULT_OK) {
+            val data = result.data
+            data?.clipData?.let { clip -> Array(clip.itemCount) { clip.getItemAt(it).uri } } ?: data?.data?.let { arrayOf(it) }
+        } else null
+        webFileCallback?.onReceiveValue(uris); webFileCallback = null
+    }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun App(store: DocumentStore) {
-    var page by rememberSaveable { mutableStateOf(Page.Library) }
-    var mode by rememberSaveable { mutableStateOf(Mode.Source) }
-    var update by rememberSaveable { mutableStateOf(false) }
-    var more by rememberSaveable { mutableStateOf(false) }
-    var commands by rememberSaveable { mutableStateOf(false) }
-    var saveTarget by rememberSaveable { mutableStateOf<String?>(null) }
-    val current = store.active
-    val open = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) store.open(uri) { page = Page.Editor }
-    }
-    val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
-        val id = saveTarget
-        saveTarget = null
-        if (uri != null && id != null) store.save(id, uri)
-    }
-    fun saveAs() {
-        val doc = current ?: return
-        saveTarget = doc.id
-        save.launch(doc.name)
-    }
-    fun saveCurrent() {
-        val doc = current ?: return
-        if (doc.uri == null) saveAs() else store.save(doc.id)
-    }
-    MaterialTheme {
-        Surface(Modifier.fillMaxSize(), color = Canvas) {
-            if (page == Page.Library || current == null) Library(
-                store.documents, store.loaded && !store.busy,
-                { store.select(it); page = Page.Editor },
-                { store.newDocument(); page = Page.Editor },
-                { open.launch(arrayOf("text/*", "application/yaml", "application/x-yaml", "application/octet-stream")) },
-                { update = true },
-            )
-            else Editor(
-                current, mode, store.busy, { mode = it }, { store.edit(current.id, it) },
-                { page = Page.Library }, ::saveCurrent, { more = true }, { commands = true },
-                store::undo, store::redo, store::insert,
-            )
-            if (update) UpdateDialog { update = false }
-            if (more) More(
-                { more = false }, { more = false; mode = Mode.Split },
-                { more = false; saveAs() }, { more = false; store.insert("| 列 1 | 列 2 |\n| --- | --- |\n| 内容 | 内容 |\n") },
-            )
-            if (commands) Commands({ commands = false }, store::insert)
-            store.error?.let { AlertDialog(onDismissRequest = { store.error = null }, title = { Text("Mini Mark") }, text = { Text(it) }, confirmButton = { TextButton({ store.error = null }) { Text("确定") } }) }
+    @SuppressLint("SetJavaScriptEnabled")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        resources = host.resources
+        host.actions = this
+        bridge = AndroidBridge(applicationContext, documents, host)
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            setContentView(TextView(this).apply { setText(R.string.webview_update_required); setPadding(32, 80, 32, 32) })
+            return
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun Library(docs: List<LocalDocument>, enabled: Boolean, open: (String) -> Unit, new: () -> Unit, openFile: () -> Unit, brand: () -> Unit) {
-    var query by rememberSaveable { mutableStateOf("") }
-    Scaffold(containerColor = Canvas, topBar = { TopAppBar(title = { Brand(brand) }, actions = { IconButton(openFile, enabled = enabled) { Icon(Icons.Outlined.FolderOpen, "打开文件") } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)) }) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                item {
-                    OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("搜索文档") }, leadingIcon = { Icon(Icons.Outlined.Search, null) })
-                    Text("最近编辑", Modifier.padding(top = 16.dp), color = Muted, fontSize = 12.sp)
+        val container = FrameLayout(this).apply { setBackgroundColor(Color.WHITE) }
+        web = WebView(this)
+        configureWeb(web)
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            WebViewCompat.addWebMessageListener(web, "MiniMarkNative", setOf(APP_ORIGIN)) { _, message, sourceOrigin, isMainFrame, reply ->
+                if (!isMainFrame || sourceOrigin.toString() != APP_ORIGIN) return@addWebMessageListener
+                host.emit = { value -> runOnUiThread {
+                    if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) reply.postMessage(value.toString())
+                } }
+                bridge.receive(message.data ?: "")
+            }
+        }
+        web.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? = resources.respond(request.url)
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                if (!request.isForMainFrame) return false
+                if (request.url.toString().startsWith("$APP_ORIGIN/") && request.url.path == "/index.html") return false
+                openExternal(request.url.toString()); return true
+            }
+        }
+        web.webChromeClient = object : WebChromeClient() {
+            override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, parameters: FileChooserParams): Boolean {
+                webFileCallback?.onReceiveValue(null); webFileCallback = callback
+                return try {
+                    val intent = parameters.createIntent().apply { addCategory(Intent.CATEGORY_OPENABLE) }
+                    webPicker.launch(intent); true
+                } catch (_: Exception) { callback.onReceiveValue(null); webFileCallback = null; false }
+            }
+            override fun onJsConfirm(view: WebView, url: String, message: String, result: JsResult): Boolean {
+                if (!trusted(url)) { result.cancel(); return true }
+                confirm(message, result::confirm, result::cancel); return true
+            }
+            override fun onJsAlert(view: WebView, url: String, message: String, result: JsResult): Boolean {
+                if (!trusted(url)) { result.cancel(); return true }
+                AlertDialog.Builder(this@MainActivity).setTitle("Mini Mark").setMessage(message).setPositiveButton("确定") { _, _ -> result.confirm() }
+                    .setOnCancelListener { result.cancel() }.show()
+                return true
+            }
+            override fun onJsPrompt(view: WebView, url: String, message: String, defaultValue: String?, result: JsPromptResult): Boolean {
+                if (!trusted(url)) { result.cancel(); return true }
+                val input = EditText(this@MainActivity).apply { setText(defaultValue.orEmpty()); isSingleLine = true }
+                AlertDialog.Builder(this@MainActivity).setTitle(message).setView(input)
+                    .setPositiveButton("确定") { _, _ -> result.confirm(input.text.toString()) }.setNegativeButton("取消") { _, _ -> result.cancel() }
+                    .setOnCancelListener { result.cancel() }.show()
+                return true
+            }
+        }
+        container.addView(web, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        ViewCompat.setOnApplyWindowInsetsListener(container) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime())
+            view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, keyboard.bottom))
+            insets
+        }
+        setContentView(container)
+        web.loadUrl("$APP_ORIGIN/index.html")
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (previewDialog?.isShowing == true) { previewDialog?.dismiss(); return }
+                web.evaluateJavascript("Boolean(window.miniMarkBack && window.miniMarkBack())") { handled ->
+                    if (handled != "true") moveTaskToBack(true)
                 }
-                if (docs.isEmpty()) item { Text(if (enabled) "暂无文档" else "正在读取文档…", color = Muted) }
-                items(docs.filter { it.name.contains(query, true) }, key = { it.id }) { doc -> Row(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(8.dp)).clickable(enabled) { open(doc.id) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Description, null, tint = Blue); Column(Modifier.padding(start = 10.dp)) { Text(doc.name, color = Ink); Text(if (doc.uri == null) "本地草稿" else if (doc.dirty) "有未保存修改" else "本地文件", color = Muted, fontSize = 11.sp) } } }
             }
-            Button(new, Modifier.align(Alignment.BottomEnd).padding(20.dp), enabled = enabled) { Icon(Icons.Outlined.Add, null); Text("新建") }
+        })
+    }
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun configureWeb(view: WebView) {
+        view.settings.javaScriptEnabled = true
+        view.settings.domStorageEnabled = true
+        view.settings.allowFileAccess = false
+        view.settings.allowContentAccess = true
+        view.settings.javaScriptCanOpenWindowsAutomatically = false
+        view.settings.setSupportMultipleWindows(false)
+        view.settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+        view.settings.mediaPlaybackRequiresUserGesture = true
+    }
+    override fun chooseFile() { filePicker.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE)
+        .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/*", "application/yaml", "application/octet-stream"))) }
+    override fun chooseFolder() { filePicker.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)) }
+    override fun createFile(name: String, mime: String) { filePicker.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).setType(mime).addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE, name)) }
+    override fun appearance(dark: Boolean) {
+        val color = if (dark) Color.rgb(35, 38, 43) else Color.WHITE
+        (web.parent as? FrameLayout)?.setBackgroundColor(color)
+        WindowInsetsControllerCompat(window, web).apply {
+            isAppearanceLightStatusBars = !dark
+            isAppearanceLightNavigationBars = !dark
         }
     }
-}
-
-@Composable
-private fun Brand(click: () -> Unit) {
-    Row(Modifier.heightIn(min = 48.dp).clickable(role = Role.Button, onClickLabel = "版本与更新", onClick = click), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(Modifier.size(28.dp).background(Color(0xFF4476DD), RoundedCornerShape(7.dp)), contentAlignment = Alignment.Center) { Text("MM", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-        Text("Mini Mark", color = Ink, fontWeight = FontWeight.Medium)
+    override fun openExternal(url: String) {
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return
+        if (uri.scheme !in setOf("https", "http") || uri.host.isNullOrBlank() || uri.userInfo != null) return
+        runCatching { startActivity(Intent(Intent.ACTION_VIEW, uri)) }.onFailure { android.widget.Toast.makeText(this, "没有可用的浏览器。", android.widget.Toast.LENGTH_SHORT).show() }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun Editor(doc: LocalDocument, mode: Mode, busy: Boolean, changeMode: (Mode) -> Unit, edit: (TextFieldValue) -> Unit, back: () -> Unit, save: () -> Unit, more: () -> Unit, commands: () -> Unit, undo: () -> Unit, redo: () -> Unit, insert: (String) -> Unit) {
-    Scaffold(topBar = { TopAppBar(navigationIcon = { IconButton(back) { Icon(Icons.Outlined.ArrowBack, "返回") } }, title = { Column { Text(doc.name, color = Ink, fontSize = 15.sp); Text(if (busy) "正在保存…" else if (doc.dirty) "有未保存修改" else "已保存", color = Muted, fontSize = 11.sp) } }, actions = { IconButton(save, enabled = !busy) { Icon(Icons.Outlined.Save, "保存") }; IconButton(more) { Icon(Icons.Outlined.MoreVert, "更多") } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)) }, bottomBar = { BottomAppBar(containerColor = Color.White) { IconButton(undo, enabled = !busy) { Icon(Icons.Outlined.Undo, "撤销") }; IconButton(redo, enabled = !busy) { Icon(Icons.Outlined.Redo, "重做") }; IconButton({ insert("\n# ") }) { Icon(Icons.Outlined.Code, "标题") }; IconButton({ insert("\n![图片](图片地址)") }) { Icon(Icons.Outlined.Image, "图片") }; IconButton(commands) { Text("/?") }; IconButton(more) { Icon(Icons.Outlined.MoreHoriz, "更多") } } }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            ModeSelector(mode, changeMode)
-            when (mode) {
-                Mode.Reading -> Preview(doc.value.text)
-                Mode.Split -> Row(Modifier.fillMaxSize().weight(1f).padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(doc.value, edit, Modifier.weight(1f).fillMaxHeight(), textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, lineHeight = 24.sp), placeholder = { Text("源码") })
-                    Preview(doc.value.text, Modifier.weight(1f))
+    override fun confirm(message: String, accepted: () -> Unit, cancelled: () -> Unit) {
+        AlertDialog.Builder(this).setTitle("Mini Mark").setMessage(message)
+            .setPositiveButton("确定") { _, _ -> accepted() }.setNegativeButton("取消") { _, _ -> cancelled() }
+            .setOnCancelListener { cancelled() }.show()
+    }
+    @SuppressLint("SetJavaScriptEnabled")
+    override fun previewHtml(document: LocalDocument, browser: Boolean) {
+        if (browser) {
+            host.previewServer?.close()
+            val server = PreviewServer(applicationContext, host.folders, document.value.text, document.parentUri)
+            host.previewServer = server
+            openExternal(server.url)
+            return
+        }
+        previewDialog?.dismiss()
+        val preview = WebView(this)
+        configureWeb(preview)
+        preview.settings.domStorageEnabled = false
+        preview.settings.allowContentAccess = false
+        val previewResources = WebResources(this, host.folders).apply {
+            previewDocument = DocumentAccess(document.id, document.uri, document.parentUri)
+            previewText = document.value.text
+        }
+        preview.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                if (request.url.host == "app.minimark.local" || request.url.host == "document.moye.local") return previewResources.missing()
+                return previewResources.respond(request.url, preview = true)
+            }
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                if (request.url.host == "preview.minimark.local") return false
+                if (request.isForMainFrame) openExternal(request.url.toString())
+                return request.isForMainFrame
+            }
+        }
+        preview.loadUrl("https://preview.minimark.local/index.html")
+        previewDialog = AlertDialog.Builder(this).setTitle(if (browser) "HTML 浏览器预览" else "HTML 运行预览")
+            .setView(preview).setPositiveButton("返回编辑") { _, _ -> }.create().apply {
+                setOnDismissListener { preview.stopLoading(); preview.destroy(); previewDialog = null }
+                show(); window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            }
+    }
+    override fun printDocument(html: String, name: String, document: LocalDocument) {
+        val printView = WebView(this)
+        printViews.add(printView)
+        configureWeb(printView)
+        printView.settings.javaScriptEnabled = false
+        printView.settings.domStorageEnabled = false
+        val base = "https://document.moye.local/"
+        val token = Uri.encode("${document.id}:${document.uri.orEmpty()}")
+        val content = html.replace("</head>", "<style>@page{margin:16mm} @media print{body{padding:0;margin:0}}</style></head>").replace(Regex("(<img\\b[^>]*\\bsrc=[\"'])(?![a-z]+:|//)([^\"']+)", RegexOption.IGNORE_CASE)) { match ->
+            match.groupValues[1] + base + match.groupValues[2] + "?document=" + token
+        }
+        printView.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest) = resources.respond(request.url)
+            override fun onPageFinished(view: WebView, url: String) {
+                if (view.tag == true) return
+                view.tag = true
+                val manager = getSystemService(PRINT_SERVICE) as PrintManager
+                val delegate = view.createPrintDocumentAdapter(name.substringBeforeLast('.'))
+                val adapter = object : PrintDocumentAdapter() {
+                    override fun onStart() { delegate.onStart() }
+                    override fun onLayout(oldAttributes: PrintAttributes?, newAttributes: PrintAttributes?, cancellationSignal: CancellationSignal?, callback: LayoutResultCallback?, extras: Bundle?) {
+                        delegate.onLayout(oldAttributes, newAttributes, cancellationSignal, callback, extras)
+                    }
+                    override fun onWrite(pages: Array<out PageRange>?, destination: ParcelFileDescriptor?, cancellationSignal: CancellationSignal?, callback: WriteResultCallback?) {
+                        delegate.onWrite(pages, destination, cancellationSignal, callback)
+                    }
+                    override fun onFinish() { delegate.onFinish(); printViews.remove(view); view.destroy() }
                 }
-                Mode.Source -> OutlinedTextField(doc.value, edit, Modifier.fillMaxSize().weight(1f).padding(top = 14.dp), textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, lineHeight = 24.sp), placeholder = { Text("开始输入 Markdown…") })
+                manager.print(name.substringBeforeLast('.'), adapter, PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                    .setMinMargins(PrintAttributes.Margins(630, 630, 630, 630)).build())
             }
         }
+        printView.loadDataWithBaseURL(APP_ORIGIN + "/", content, "text/html", "UTF-8", null)
     }
-}
-
-@Composable
-private fun ModeSelector(mode: Mode, set: (Mode) -> Unit) {
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        listOf(Mode.Source to "源码", Mode.Reading to "阅读", Mode.Split to "分屏").forEachIndexed { i, pair -> SegmentedButton(pair.first == mode, { set(pair.first) }, shape = SegmentedButtonDefaults.itemShape(i, 3)) { Text(pair.second, fontSize = 12.sp) } }
+    override fun onStop() {
+        if (::web.isInitialized) web.evaluateJavascript("window.miniMarkFlush?.()") { documents.flushDrafts() }
+        documents.flushDrafts(); super.onStop()
     }
-}
-
-@Composable
-private fun Preview(body: String, modifier: Modifier = Modifier) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val markwon = remember(context) { Markwon.create(context) }
-    AndroidView(
-        modifier = modifier.fillMaxSize().padding(top = 14.dp),
-        factory = { viewContext ->
-            ScrollView(viewContext).apply {
-                addView(TextView(viewContext).apply {
-                    textSize = 16f
-                    setTextColor(android.graphics.Color.rgb(38, 50, 70))
-                    setTextIsSelectable(true)
-                    setLineSpacing(4f, 1.2f)
-                })
-            }
-        },
-        update = { markwon.setMarkdown(it.getChildAt(0) as TextView, body) },
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun More(close: () -> Unit, reading: () -> Unit, saveAs: () -> Unit, table: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = close) { Column(Modifier.padding(20.dp).navigationBarsPadding()) { Text("更多功能", fontSize = 18.sp, fontWeight = FontWeight.Medium); TextButton(reading, Modifier.fillMaxWidth()) { Text("分屏阅读") }; TextButton(saveAs, Modifier.fillMaxWidth()) { Text("另存为") }; TextButton(table, Modifier.fillMaxWidth()) { Text("插入表格") }; Spacer(Modifier.height(8.dp)) } }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun Commands(close: () -> Unit, insert: (String) -> Unit) {
-    ModalBottomSheet(onDismissRequest = close) { Column(Modifier.padding(20.dp).navigationBarsPadding()) { Text("快捷指令", fontSize = 18.sp, fontWeight = FontWeight.Medium); listOf("/公式\n$$\n\n$$", "/图片\n![图片](图片地址)", "/表格\n|列|值|\n|---|---|", "/代码\n```text\n\n```").forEach { command -> TextButton({ insert(command.substringAfter('\n')); close() }, Modifier.fillMaxWidth()) { Text(command.substringBefore('\n'), Modifier.fillMaxWidth()) } } }
+    override fun onDestroy() {
+        if (host.actions === this) { host.actions = null; host.emit = null }
+        webFileCallback?.onReceiveValue(null); webFileCallback = null
+        previewDialog?.dismiss()
+        printViews.toList().forEach { it.destroy() }; printViews.clear()
+        if (::web.isInitialized) { web.stopLoading(); (web.parent as? ViewGroup)?.removeView(web); web.destroy() }
+        super.onDestroy()
+    }
+    private fun trusted(url: String) = runCatching { Uri.parse(url).let { it.scheme == "https" && it.host == "app.minimark.local" } }.getOrDefault(false)
+    companion object { const val APP_ORIGIN = "https://app.minimark.local" }
 }

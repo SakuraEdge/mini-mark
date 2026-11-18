@@ -16,6 +16,7 @@ src/
   features/cloud/      GitHub 登录、目录浏览、云文档选择与请求协议
   features/documents/  文档右键菜单与重命名交互
   features/workspace/  工作区目录树、分页、请求协议与浏览器文件夹预览
+  features/android/    Android 四入口导航、移动编辑工具与响应式样式
   features/theme/      主题偏好与渐变切换
   features/images/     图片插入、粘贴与拖入
   features/formulas/   按需加载的公式编辑器、Office 公式转换与复制
@@ -48,7 +49,12 @@ scripts/               打包、图标、性能、PDF 验证、文件索引生�
 .github/workflows/     两平台构建、测试与经验证的发布流程
 public/                图标和初始文档
 docs/                  发布记录、验证记录、性能记录和生成索引
-android-app/           Android Compose 应用与移动端界面
+android-app/           Android 原生宿主与共享 Web 编辑器
+  app/src/main/        Activity、可信消息桥、文档、工作区与 GitHub 云文档
+  app/src/test/        UTF-8、会话、存储、OAuth、云版本与 Git tree 单元测试
+  app/src/androidTest/ Android WebView、系统文件选择和 Keystore 验证
+  app/src/debug/       调试专用的 iframe 原生桥隔离探针
+  gradle/wrapper/      固定 Gradle 8.9 与分发包校验和
 ```
 
 ## 按需求找代码
@@ -79,6 +85,11 @@ android-app/           Android Compose 应用与移动端界面
 | 数据盘、单实例 | `native/Infrastructure/` |
 | 安装位置、快捷方式、旧文件清理 | `installer/Moye.iss`、`scripts/package-win.ps1` |
 | 网络受限时的维护安装包 | `.github/workflows/local-patch.yml`；基于已经通过验证的发行包生成差异，并校验其余程序文件 |
+| Android 文档库与编辑 | `src/features/android/`、`src/platform/android.ts`；复用 `src/editor/` 与公式、图片、插件模块 |
+| Android 原生消息与导出 | `android-app/app/src/main/java/com/sakuraedge/minimark/host/`、`MainActivity.kt`；可信 origin、文件选择、PDF 与隔离 HTML 预览 |
+| Android 文件与草稿 | `android-app/app/src/main/java/com/sakuraedge/minimark/documents/`、`workspace/`；SAF 文档身份、UTF-8、目录授权与草稿队列 |
+| Android 云文档 | `android-app/app/src/main/java/com/sakuraedge/minimark/cloud/`；Device Flow、Keystore、版本校验与 Git tree 修改 |
+| Android 构建与验证 | `android-app/gradlew`、`android-app/app/src/test/`、`android-app/app/src/androidTest/`、`.github/workflows/android.yml` |
 
 ## 消息和文档约定
 
