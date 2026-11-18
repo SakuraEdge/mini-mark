@@ -1,5 +1,19 @@
 # 验证记录
 
+## Rev v1.0.4 正式发布
+
+2026-11-18 17:33（Asia/Shanghai）。已发布包含拖选修复的 `Mini Mark Rev v1.0.4`，标签 `rev-v1.0.4`，Release 编号 `449765487`，已设为 latest。公开版本为 `1.0.4`，内部版本为 `4.0.4`，Android versionCode 为 `104`。
+
+- 发布源码与标签均为 `0ae3b478d0f0faaaaaa2d92da4a3f2a6f1f75ca0`。桌面构建 `44271495591` 和 Android 构建 `44271495514` 均来自该 main 提交并成功，发布工作流 `44277017166` 成功。[发布工作流](https://github.com/SakuraEdge/mini-mark/actions/runs/44277017166)
+- 本地生产构建、36 项前端与 4 项清单测试、98 项浏览器回归、Windows 实际 WebView2 拖选与保存回归通过。Windows CI 同时通过原生检查、安装器、覆盖升级和用户数据保护检查。桌面 CI 首次遇到既有云目录测试的初始标签显示超时，同样代码与断言重跑全部通过，该云测试另在本地连续通过 5 次。
+- macOS CI 的 arm64/x86_64 构建、原生存储及实际 WKWebView/PDF 验证通过。Android 的 47 项 JVM 测试、7 组 API 35 设备测试、lint 与签名发行构建通过。修复后的 CI APK 已在隔离模拟器安装启动。
+- 匿名下载了全部 7 个公开附件，逐一核对实际大小、SHA-256 和 GitHub digest，5 个安装包均与 `SHA256SUMS-Rev-v1.0.4.txt` 一致。Windows 安装器为 55,359,303 字节，SHA-256 为 `be13a3d0db655dd03c8a3d406fbed4e80545f3c0eaa691d1a5f048891347b29b`。APK 为 5,975,619 字节，SHA-256 为 `66c1f72e24261149df98510a912707fab1152ba7ef88490b1548a08ee6d6f6bc`，与已验证 CI 产物一致。[正式发布](https://github.com/SakuraEdge/mini-mark/releases/tag/rev-v1.0.4)
+- 公开 APK 的 v2 签名、既有预览证书、版本、最低 API 26、目标 API 35 和四种 ABI 已再次核对。Windows ZIP 中程序的产品版本包含修复提交，macOS ZIP 的展示版本、内部版本、最低 macOS 13 和双架构均正确。APK 关闭调试，继续沿用预览版开发证书以支持覆盖升级。
+- `update.json` 和 `updates` 分支中的两份清单均为同一 schema 2 内容，包含修复说明及正确的 Windows 安装器哈希。主通道 `rev-stable.json` 匿名读取通过。旧路径 `stable.json` 在本机网络重复返回 HTTP 503 `Backend.max_conn reached`，已通过匿名 Contents API 核对该路径的实际文件与发布清单一致。
+- 初次发布被暂停后，GitHub 将旧 Release `449683133` 转为 untagged 草稿。修复后的工作流创建正式 Release `449765487`，确认新附件与标签后移除旧草稿，其 7 个旧附件下载计数仍全部为零。最终校验文件保存在忽略目录 `release/rev104-published-fixed-44277017166/`。
+
+Android 真实 GitHub 账号跨设备全流程、实机输入法、API 26 设备与不同文件提供者仍待验收。现有 npm 开发依赖的 5 项 high 结果保持记录。Windows 商业签名与 macOS Developer ID/公证状态见发布说明。
+
 ## Rev v1.0.4 拖选修复
 
 2026-11-18 用户提供录屏 `QQ20261118-160600.mp4`，报告拖选 JSON 时的反复跳动。收到反馈时初次发布工作流 `44264494638` 已完成，随即将 Release `449683133` 转回草稿，并把两份更新清单恢复至 v1.0.3。暂停时七个附件的下载计数均为零。
@@ -7,7 +21,7 @@
 - 在浏览器按录屏结构复现，JSON 上方表格随选区变化反复替换为源码，导致相邻 JSON 上下移动约 161 CSS px。鼠标保持按下时 CodeMirror 根据新布局重算选区，随后又触发表格渲染。
 - 编辑器在鼠标拖选期间保持即时排版和公式入口装饰，松开后更新为最终选区的显示。点击表格编辑、键盘选区和真实正文修改继续正常处理。失焦、窗口外松开及文档切换恢复会清理暂存状态。
 - 新增浏览器真实鼠标拖选回归，逐步检查表格可见性与 JSON 行位置，确认选区包含目标文字、正文逐行保持，释放后仍可点击编辑表格。回归在修复前失败，修复后通过。
-- Windows 实际 WebView2 新增按下期间选区变化的布局与滚动保持验证，释放后恢复表格源码，并保存核对完整原文，测试通过。完整前端、浏览器与跨平台构建结果在发布验收后补充。
+- Windows 实际 WebView2 新增按下期间选区变化的布局与滚动保持验证，释放后恢复表格源码，并保存核对完整原文，测试通过。完整前端、浏览器与跨平台构建结果见本页正式发布记录。
 
 ## Rev v1.0.4 发布前验证
 
@@ -18,7 +32,7 @@
 - `gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease :app:connectedDebugAndroidTest` 成功，47 项 JVM 测试和 7 组设备测试通过。图标资源调整后另行执行 `assembleRelease` 和 `lintRelease`。
 - 发行 APK 关闭调试，沿用上一版 APK 证书，签名材料配置在仓库 Actions 加密 secrets。APK v2 签名、版本、API 26 最低版本和四种 ABI 已核对。实际将 1.0.3 预览覆盖升级为 1.0.4 发行构建，中文草稿名称与完整正文恢复成功。
 - `npm test` 的 36 项前端与 4 项清单测试、97 项浏览器回归、520 项 Windows 原生检查通过。Windows 实际 WebView2 验证第一次遇到剪贴板占用，单独重跑后全部通过。更新测试从 package.json 读取发布版本，继续逐字核对界面版本。
-- `release.yml` 接入同一 main 提交的 Android 验证产物，发布时与 Windows、macOS 包共同生成 5 项包哈希。远程三平台构建和发布附件校验将在发布完成后补充。
+- `release.yml` 接入同一 main 提交的 Android 验证产物，发布时与 Windows、macOS 包共同生成 5 项包哈希。远程三平台构建和发布附件校验结果见本页正式发布记录。
 
 现有 npm 开发依赖仍报告 5 项 high。Android 真实 GitHub 账号全流程、实机输入法、API 26 设备和不同文件提供者的验收范围沿用前节记录。构建日志保存在源码外工具链，设备图标和升级截图保存在本地 `test-results/rev104-device/`。
 
