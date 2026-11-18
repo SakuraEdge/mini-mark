@@ -31,7 +31,7 @@ const groups = [];
 for (const [path, purpose] of areas) {
   const entries = await readdir(join(root, path), { withFileTypes: true, recursive: true });
   const files = entries.filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name).slice(root.length + 1).replaceAll('\\', '/'))
-    .filter(file => !/(^|\/)(bin|obj|vendor|build|\.gradle)(\/|$)/.test(file))
+    .filter(file => !/(^|\/)(bin|obj|vendor|build|\.gradle|\.kotlin)(\/|$)/.test(file))
     .filter(file => !file.endsWith('/local.properties')).sort();
   groups.push({ path, purpose, files });
 }

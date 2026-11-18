@@ -9,8 +9,9 @@
 - macOS CI 的 arm64/x86_64 构建、原生存储及实际 WKWebView/PDF 验证通过。Android 的 47 项 JVM 测试、7 组 API 35 设备测试、lint 与签名发行构建通过。修复后的 CI APK 已在隔离模拟器安装启动。
 - 匿名下载了全部 7 个公开附件，逐一核对实际大小、SHA-256 和 GitHub digest，5 个安装包均与 `SHA256SUMS-Rev-v1.0.4.txt` 一致。Windows 安装器为 55,359,303 字节，SHA-256 为 `be13a3d0db655dd03c8a3d406fbed4e80545f3c0eaa691d1a5f048891347b29b`。APK 为 5,975,619 字节，SHA-256 为 `66c1f72e24261149df98510a912707fab1152ba7ef88490b1548a08ee6d6f6bc`，与已验证 CI 产物一致。[正式发布](https://github.com/SakuraEdge/mini-mark/releases/tag/rev-v1.0.4)
 - 公开 APK 的 v2 签名、既有预览证书、版本、最低 API 26、目标 API 35 和四种 ABI 已再次核对。Windows ZIP 中程序的产品版本包含修复提交，macOS ZIP 的展示版本、内部版本、最低 macOS 13 和双架构均正确。APK 关闭调试，继续沿用预览版开发证书以支持覆盖升级。
-- `update.json` 和 `updates` 分支中的两份清单均为同一 schema 2 内容，包含修复说明及正确的 Windows 安装器哈希。主通道 `rev-stable.json` 匿名读取通过。旧路径 `stable.json` 在本机网络重复返回 HTTP 503 `Backend.max_conn reached`，已通过匿名 Contents API 核对该路径的实际文件与发布清单一致。
+- `update.json` 和 `updates` 分支中的两份清单均为同一 schema 2 内容，包含修复说明及正确的 Windows 安装器哈希。`rev-stable.json` 与 `stable.json` 均已匿名读取并核对。旧路径初次检查遇到 HTTP 503 `Backend.max_conn reached`，通过匿名 Contents API 核对文件后继续重试，最终原始路径读取通过。
 - 初次发布被暂停后，GitHub 将旧 Release `449683133` 转为 untagged 草稿。修复后的工作流创建正式 Release `449765487`，确认新附件与标签后移除旧草稿，其 7 个旧附件下载计数仍全部为零。最终校验文件保存在忽略目录 `release/rev104-published-fixed-44277017166/`。
+- 源码已快进整合回 `D:\GPTProject\Mini Mark`。整合后重新执行 `npm ci`、生产构建、36 项前端与 4 项清单测试，使用独立端口 4195 通过 5 项 HTML/选区回归。目录索引排除本机 `.kotlin` 编译缓存，共记录 262 个源码与文档文件。
 
 Android 真实 GitHub 账号跨设备全流程、实机输入法、API 26 设备与不同文件提供者仍待验收。现有 npm 开发依赖的 5 项 high 结果保持记录。Windows 商业签名与 macOS Developer ID/公证状态见发布说明。
 
