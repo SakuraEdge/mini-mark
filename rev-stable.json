@@ -1,12 +1,12 @@
 {
   "schemaVersion": 2,
-  "version": "4.0.4",
-  "releaseVersion": "1.0.4",
-  "tag": "rev-v1.0.4",
-  "notes": "# Mini Mark Rev v1.0.4\n\n- Android 启动图标与应用内渐变双 M 图标统一，包含相同的字形、位置和下划线。\n- 修复即时编辑中拖选 JSON 等文字时，相邻表格反复切换显示引发的跳动与闪屏。\n- Android 提供文档、工作区、云文档和设置四个入口，支持多标签、即时编辑、源码、阅读、分屏、公式、图片、主题背景和插件。\n- Android 支持系统文件保存、文件夹工作区、HTML 运行和 PDF/HTML 导出。\n- GitHub 云文档支持登录、MiniMarkDisk 浏览、保存、重命名、删除和冲突处理。\n\nAndroid 8.0 及以上，需要近期版本的 Android System WebView。APK 沿用此前本地预览版的签名，支持覆盖升级和保留草稿。GitHub 账号跨设备全流程与不同手机输入法仍待实机验收。\n\nWindows 10 / 11 x64。macOS 13 及以上，支持 Apple Silicon 和 Intel。macOS 使用 ad-hoc 签名，Windows 使用现有未商业签名的安装包。\n",
+  "version": "4.0.5",
+  "releaseVersion": "1.0.5",
+  "tag": "rev-v1.0.5",
+  "notes": "# Mini Mark Rev v1.0.5\n\n- 点击状态栏的编码名称，可用「切换为…」预览旧文件的原始字节，用「转换为…」指定下次保存的编码。支持 UTF-8（含 BOM）、UTF-16 LE/BE、GBK、GB18030 和 Windows-1252。转换前会检查全文能否用目标编码保存。\n- 在代码块或表格中第一次按 Ctrl+A 选中当前区域，再按一次选中整篇文档。\n- 代码围栏支持下拉选择语言，新围栏沿用上次选择。即时模式下输入 `---` 并回车即可显示分割线。\n- Ctrl+F 可打开或关闭查找面板，查找与替换的按钮和提示已中文化。\n\nAndroid 8.0 及以上，APK 沿用此前的签名，可覆盖升级。Windows 安装器适用于 Windows 10 / 11 x64。macOS 通用包适用于 macOS 13 及以上的 Apple Silicon 和 Intel 设备。macOS 使用 ad-hoc 签名，Windows 安装器未使用商业代码签名。\n",
   "windows": {
-    "url": "https://github.com/SakuraEdge/mini-mark/releases/download/rev-v1.0.4/MiniMark-Rev-1.0.4-Setup-windows-x64.exe",
-    "sha256": "be13a3d0db655dd03c8a3d406fbed4e80545f3c0eaa691d1a5f048891347b29b",
-    "size": 55359303
+    "url": "https://github.com/SakuraEdge/mini-mark/releases/download/rev-v1.0.5/MiniMark-Rev-1.0.5-Setup-windows-x64.exe",
+    "sha256": "8c9b9949945e3d5e73c969cc7c3515282cf451091a0837477562d09b61da1a04",
+    "size": 55445283
   }
 }
