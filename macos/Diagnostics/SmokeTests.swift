@@ -21,6 +21,12 @@ func runStoreTests() throws {
     guard try FileEncoding.decode(fixture, path: path, offerChoice: true).needsEncoding == true,
           legacy.text == "中文\n", legacy.newline == "\r\n",
           try FileEncoding.encode(legacy.text, as: "gbk", bom: false, newline: legacy.newline) == fixture else { throw Store.failure("GBK recovery failed") }
+    let supplementary = Data([0x95, 0x32, 0x82, 0x36])
+    guard try FileEncoding.decode(supplementary, path: path, requested: "gb18030").text == "𠀀",
+          try FileEncoding.encode("𠀀", as: "gb18030", bom: false, newline: "\n") == supplementary,
+          (try? FileEncoding.decode(Data([0x95, 0x32, 0x82]), path: path, requested: "gb18030")) == nil else {
+        throw Store.failure("GB18030 four-byte mapping failed")
+    }
     for (name, sample) in [("gb18030", "𠀀"), ("utf-16le", "𠀀"), ("utf-16be", "中文"), ("windows-1252", "café €")] {
         let encoded = try FileEncoding.encode(sample, as: name, bom: true, newline: "\n")
         guard try FileEncoding.decode(encoded, path: path, requested: name).text == sample else { throw Store.failure("Encoding round trip failed: " + name) }

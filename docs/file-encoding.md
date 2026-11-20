@@ -6,4 +6,4 @@
 
 宿主在应用选择后先发 `workspace`，再发带两种 ID 及 `preview` 或 `error` 的 `encodingResponse`。工作区与本地保存回执携带 `encoding`、`pendingEncoding`、`needsEncoding`、`canReinterpret`，缺失的旧字段按 UTF-8 与无待转换处理。只有真实编辑递增 revision。面板忽略过期回执，关闭取消试读。持久化的待保存编码使标签保持未保存状态。完成本地写入后清除待保存编码。
 
-浏览器的本地文件选择器与文件夹共用编解码器。IndexedDB 按快照 ID 保留原始字节以供重载后试读。浏览器保存通过下载副本完成。Android 在打开 SAF 输出流前校验完整编码，写完后读取并验证哈希。Windows 使用原子替换，macOS 使用系统 iconv 与原子写入。
+浏览器的本地文件选择器与文件夹共用编解码器。IndexedDB 按快照 ID 保留原始字节以供重载后试读。浏览器保存通过下载副本完成。Android 在打开 SAF 输出流前校验完整编码，写完后读取并验证哈希。Windows 使用原子替换，macOS 使用 Foundation 处理 GB18030 四字节字符，其他旧编码交给系统 iconv，再原子写入。
