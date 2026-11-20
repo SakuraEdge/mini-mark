@@ -1,6 +1,17 @@
 # 验证记录
 
-## Rev v1.0.5 文件编码与发布候选验证
+## Rev v1.0.5 正式发布
+
+2026-11-20，正式标签 `rev-v1.0.5` 指向 `06880624e75d25a03c2253e3912613e257dfb742`。Release 编号为 452369591，已设为 latest。[正式发布](https://github.com/SakuraEdge/mini-mark/releases/tag/rev-v1.0.5)
+
+- Windows 与 macOS 通过同一提交的安装包构建、真实 WebView2 与 WKWebView 验证。Android 通过 8 组 API 35 设备测试、lint、49 项 JVM 测试及签名构建。[桌面构建](https://github.com/SakuraEdge/mini-mark/actions/runs/44690499338) · [Android 构建](https://github.com/SakuraEdge/mini-mark/actions/runs/44690499197)
+- Windows 的首轮浏览器回归在打开页面时超时。Android 的首轮有 4 项测试等待系统界面超时。两个工作流在相同源码与断言上重跑通过。本地文件编码界面回归另连续通过 3 次。
+- 发布后重新下载了全部 7 个附件，逐一核对公开 digest 和实际大小，5 个安装包与 SHA256SUMS 条目相符。Windows 安装器为 55,445,283 字节，SHA-256 为 `8c9b9949945e3d5e73c969cc7c3515282cf451091a0837477562d09b61da1a04`。APK 为 6,061,359 字节，SHA-256 为 `44886d35d2ffacbc61f093754b9e0dca9c0a50e2e88b0984aa7934a38239042d`。[发布工作流](https://github.com/SakuraEdge/mini-mark/actions/runs/44692191678)
+- APK 的 v2 签名证书、versionCode 105、最低 API 26 与目标 API 35 均已复核。Windows ZIP 程序的产品版本包含标签提交。macOS ZIP 的公开版本为 1.0.5，构建版本为 4.0.5，最低系统为 macOS 13。
+- 匿名下载的两份更新源 `rev-stable.json`、`stable.json` 与正式附件 `update.json` 逐字节一致，schema 2 中的 Windows 下载链接、大小和哈希匹配公开安装器。
+- 已快进整合至原工作区。重新执行依赖安装、生产构建、44 项前端测试和 4 项清单测试均通过。
+
+## Rev v1.0.5 文件编码验证
 
 2026-11-20 用户确认编码面板后，接入 Windows、macOS、Android 和浏览器的实际文件读写。内部版本 4.0.5，Android versionCode 105。
 
@@ -13,7 +24,7 @@
 
 ## Rev v1.0.5 编辑器修复与编码界面审核
 
-2026-11-20。当前为本地审核阶段。四项编辑器修复已实现，文件编码以 `docs/design/file-encoding-review.html` 的内置示例供审核。
+2026-11-20 的本地审核记录。四项编辑器修复已实现，文件编码以 `docs/design/file-encoding-review.html` 的内置示例供审核。
 
 - `npm ci`、`npm run build`、36 项前端与 4 项清单测试通过。独立端口 4196 上完整 Playwright 回归 104 项通过。首次运行的公式测试将固定端口以外的同源字体误判为外部资源，改为精确比较测试基址的 origin 后完整重跑通过。
 - 6 项新增交互测试用按键和下载的 Markdown 验证代码与表格的两级全选、保留围栏及语言元数据、撤销、跨重载的语言偏好、即时分割线、中文替换和在输入框内再次按 Ctrl+F 关闭面板。Windows 生产构建后的 `npm run test:native-ui` 通过，包括实际 WebView2 的拖选及保存回归。
