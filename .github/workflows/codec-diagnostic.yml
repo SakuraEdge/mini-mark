@@ -1,0 +1,32 @@
+name: Diagnose macOS encoding fixtures
+on:
+  push:
+    branches: ['diagnostics/rev105-mac-codec']
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          cat > "$RUNNER_TEMP/main.swift" <<'SWIFT'
+          import Foundation
+          import CoreFoundation
+          let path = "/tmp/fixture.txt"
+          for (name, bytes) in [("gbk", Data([214,208,206,196,13,10])), ("gb18030", Data([149,50,130,54])), ("utf-16le", Data([255,254,64,216,0,220])), ("utf-16be", Data([254,255,78,45])), ("windows-1252", Data([128,233]))] {
+              do { print("decode", name, try FileEncoding.decode(bytes, path: path, requested: name).text) } catch {print("DECODE ERROR",name,error)}
+          }
+          for (name, sample) in [("gbk", "中文\n"), ("gb18030", "𠀀"), ("utf-16le", "𠀀"), ("utf-16be", "中文"), ("windows-1252", "café €")] {
+              do {print("encode", name, Array(try FileEncoding.encode(sample, as: name, bom: true, newline: "\r\n")))} catch {print("ENCODE ERROR",name,error)}
+          }
+          for id in [0x631, 0x632, 0x500] {
+              let ns = String.Encoding(rawValue:CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(id)))
+              for sample in ["中文", "𠀀", "café €"] {
+                  if let bytes = sample.data(using: ns, allowLossyConversion:false) {print("Foundation", id, Array(bytes), String(data:bytes,encoding:ns) ?? "invalid")}
+              }
+          }
+          SWIFT
+          clang -c macos/Documents/StrictTranscode.c -o "$RUNNER_TEMP/c.o"
+          swiftc -import-objc-header macos/Documents/StrictTranscode.h -liconv "$RUNNER_TEMP/c.o" -swift-version 5 macos/Documents/FileEncoding.swift macos/Documents/DocumentStore.swift macos/Documents/DocumentNames.swift macos/Documents/FolderWorkspace.swift "$RUNNER_TEMP/main.swift" -o "$RUNNER_TEMP/encoding-check"
+          "$RUNNER_TEMP/encoding-check"
