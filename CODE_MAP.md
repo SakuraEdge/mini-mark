@@ -76,7 +76,9 @@ android-app/           Android 原生宿主与共享 Web 编辑器
 | 自定义插件 | `src/features/plugins/`、`public/plugin-host.html`、`public/plugin-host.js`、`docs/plugins.md` |
 | 公式编辑与 Word/WPS 复制 | `src/features/formulas/`、`src/editor/math-blocks.ts`、两平台 `Export/EquationClipboard`、`scripts/formula-assets.mjs` |
 | HTML 编辑与运行 | `src/documents/formats.ts`、`src/features/html/`、两平台 `Preview/`；`runHtml` 保存成功后才运行 |
-| 文字选区 | `src/editor/editor.ts` 使用原生选区；`src/styles/app.css` 的 `::selection` 在有背景的代码行上仍可见 |
+| 文字选区 | `src/editor/block-selection.ts` 处理 Markdown 块内与整篇的两级全选。`src/editor/editor.ts` 处理原生鼠标选区，`src/styles/app.css` 定义 `::selection` 对比度 |
+| 围栏语言、分割线、查找替换 | `src/editor/fence-language.ts` 管理语言选择与新围栏偏好，`src/editor/editor.ts` 渲染即时分割线，`src/editor/search.ts` 提供查找开关与中文词条。交互回归见 `tests/editor-block-actions.spec.ts` |
+| 文件编码设计审核 | `docs/design/file-encoding-review.html` 演示试读与转换，状态见 `docs/design/README.md` |
 | 更新、提醒、下载 | `src/features/updates/`、两平台的 `Updates/`、`docs/updates-development.md` |
 | GitHub 登录与云文档 | `src/features/cloud/`、两平台的 `Cloud/`、`docs/cloud-development.md` |
 | macOS 网页确认框 | `macos/Host/ScriptDialogs.swift`；主编辑器可信主框架才显示，HTML 预览不继承此权限 |

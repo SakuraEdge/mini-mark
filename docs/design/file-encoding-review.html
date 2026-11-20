@@ -1,0 +1,141 @@
+<div id="mm-encoding-review" lang="zh-CN" aria-label="Mini Mark 文件编码审核稿">
+  <header class="mm-head"><strong><b class="mm-mark" aria-hidden="true">Mᴍ</b> Mini Mark</strong><span class="mm-path">文档 / 旧稿.md</span></header>
+  <div class="mm-stage">
+    <article class="mm-document" aria-label="当前文档"><div class="mm-file"><i data-lucide="file-text" aria-hidden="true"></i><strong>旧稿.md</strong></div><small data-field="doc-state"></small><pre data-field="document"></pre><button data-action="save" type="button" hidden><i data-lucide="save" aria-hidden="true"></i>保存示例</button></article>
+    <section class="mm-panel" id="mm-enc-panel" aria-label="文件编码"><header><h2>文件编码</h2><button class="mm-close" data-action="close" type="button" aria-label="关闭文件编码" data-tooltip="关闭"><i data-lucide="x" aria-hidden="true"></i></button></header>
+      <div class="mm-modes" role="group" aria-label="编码操作"><button data-mode="read" type="button" aria-pressed="true"><i data-lucide="book-open" aria-hidden="true"></i>切换为…</button><button data-mode="convert" type="button" aria-pressed="false"><i data-lucide="arrow-right-left" aria-hidden="true"></i>转换为…</button></div>
+      <label class="mm-label" for="mm-enc-target" data-field="label">查看编码</label>
+      <select id="mm-enc-target"><option value="utf-8">UTF-8</option><option value="utf-8-bom">UTF-8（带 BOM）</option><option value="gbk">GBK（简体中文 ANSI · CP936）</option><option value="gb18030">GB18030（中文）</option><option value="windows-1252">Windows-1252（西欧 ANSI）</option><option value="utf-16le">UTF-16 LE</option><option value="utf-16be">UTF-16 BE</option></select>
+      <div class="mm-caption"><span data-field="preview-title">试读预览</span><span class="mm-tag" data-field="preview-code"></span></div>
+      <pre class="mm-preview" data-field="preview" aria-live="polite"></pre><p class="mm-hint" data-field="hint" aria-live="polite"></p>
+      <div class="mm-actions"><button type="button" data-action="cancel">取消</button><button type="button" class="mm-primary" data-action="apply"></button></div>
+    </section>
+  </div>
+  <footer><span class="mm-path">Markdown</span><span class="mm-message" data-field="message" role="status"></span><button data-action="open" type="button" aria-controls="mm-enc-panel" aria-expanded="true" aria-label="文件编码"><i data-lucide="type" aria-hidden="true"></i><span data-field="status-code">UTF-8</span><i data-lucide="chevron-up" aria-hidden="true"></i></button></footer>
+</div>
+<style>
+#mm-encoding-review { color-scheme:light dark; --mm-paper:light-dark(#fff,#24272b); --mm-faint:light-dark(#f5f7fb,#1d2025); --mm-ink:light-dark(#263246,#e7ebf1); --mm-quiet:light-dark(#56647a,#b0bbc9); --mm-line:light-dark(#dce3ec,#404852); --mm-blue:light-dark(#235eb3,#a3c6ff); --mm-button:light-dark(#245fb7,#96bdff); --mm-on:light-dark(#fff,#102746); --mm-wash:light-dark(#eaf2ff,#26394e); --mm-warn:light-dark(#875210,#efc887); container-type:inline-size; width:100%; color:var(--mm-ink); background:var(--mm-paper); border:1px solid var(--mm-line); border-radius:8px; box-sizing:border-box; font:14px/1.55 "Segoe UI","Microsoft YaHei UI","PingFang SC",sans-serif; }
+#mm-encoding-review * {box-sizing:border-box} #mm-encoding-review [hidden] {display:none!important}
+#mm-encoding-review button,#mm-encoding-review select {font:inherit;color:var(--mm-ink);background:var(--mm-paper);border:1px solid var(--mm-line);border-radius:5px;min-height:34px;padding:5px 11px} #mm-encoding-review button {display:inline-flex;align-items:center;justify-content:center;gap:7px} #mm-encoding-review button:hover:enabled {border-color:var(--mm-blue)} #mm-encoding-review button:disabled {opacity:.55}
+#mm-encoding-review .mm-head,#mm-encoding-review footer,#mm-encoding-review .mm-panel header,#mm-encoding-review .mm-file,#mm-encoding-review .mm-head strong,#mm-encoding-review .mm-caption {display:flex;align-items:center;gap:9px}
+#mm-encoding-review .mm-head {padding:11px 18px;border-bottom:1px solid var(--mm-line)} #mm-encoding-review .mm-mark {background:linear-gradient(140deg,#6fbfbf,#637fdb 55%,#b464ab);border-radius:5px;color:white;padding:2px 4px;font-size:15px} #mm-encoding-review .mm-head strong {font-size:16px} #mm-encoding-review .mm-path {color:var(--mm-quiet);font-size:12px}
+#mm-encoding-review .mm-head .mm-path {margin-left:10px;padding-left:14px;border-left:1px solid var(--mm-line)} #mm-encoding-review .mm-stage {display:grid;grid-template-columns:minmax(0,1fr) minmax(270px,1.05fr);align-items:start;gap:12px;background:var(--mm-faint);padding:14px;min-height:305px} #mm-encoding-review .mm-stage:has(.mm-panel[hidden]) {grid-template-columns:1fr}
+#mm-encoding-review .mm-document {padding:8px 5px;min-width:0} #mm-encoding-review small,#mm-encoding-review .mm-caption,#mm-encoding-review .mm-hint {color:var(--mm-quiet);font-size:12px} #mm-encoding-review .mm-document small {display:block;margin:4px 0 15px} #mm-encoding-review pre {margin:0;color:var(--mm-ink);white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65;font-family:Consolas,"Microsoft YaHei UI",monospace} #mm-encoding-review .mm-document button {margin-top:14px}
+#mm-encoding-review .mm-panel {background:var(--mm-paper);border:1px solid var(--mm-line);border-radius:8px;box-shadow:0 4px 16px #15233315;padding:14px;min-width:0} #mm-encoding-review .mm-panel header {justify-content:space-between;margin-bottom:10px} #mm-encoding-review h2 {margin:0;font-size:17px;font-weight:600} #mm-encoding-review .mm-close {min-width:34px;border-color:transparent;padding:5px} #mm-encoding-review .mm-modes {display:grid;grid-template-columns:1fr 1fr;background:var(--mm-faint);border:1px solid var(--mm-line);border-radius:6px;padding:2px;gap:2px} #mm-encoding-review .mm-modes button {border-color:transparent;background:transparent;color:var(--mm-quiet)} #mm-encoding-review .mm-modes button[aria-pressed=true] {background:var(--mm-wash);color:var(--mm-blue);font-weight:600} #mm-encoding-review .mm-label {display:block;margin:12px 0 4px;font-weight:500} #mm-encoding-review select {width:100%;max-width:100%;padding-right:5px}
+#mm-encoding-review .mm-caption {justify-content:space-between;margin:12px 0 5px} #mm-encoding-review .mm-tag {font-family:Consolas,monospace} #mm-encoding-review .mm-preview {padding:9px 11px;background:var(--mm-faint);border-left:2px solid var(--mm-blue);border-radius:2px} #mm-encoding-review .mm-hint {margin:8px 0 0;min-height:1.5em} #mm-encoding-review .mm-hint[data-warn=true] {color:var(--mm-warn)} #mm-encoding-review .mm-actions {display:flex;gap:6px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap} #mm-encoding-review .mm-primary {color:var(--mm-on);background:var(--mm-button);border-color:var(--mm-button)}
+#mm-encoding-review footer {padding:6px 12px;border-top:1px solid var(--mm-line);flex-wrap:wrap} #mm-encoding-review footer button {margin-left:auto;color:var(--mm-blue);background:var(--mm-wash);border-color:transparent;min-height:30px} #mm-encoding-review .mm-message {font-size:12px;color:var(--mm-quiet)} #mm-encoding-review svg {width:15px;height:15px;flex-shrink:0}
+@container (max-width:550px) {#mm-encoding-review .mm-stage {grid-template-columns:minmax(0,1fr);gap:8px;padding:10px} #mm-encoding-review .mm-document {padding:2px 4px} #mm-encoding-review .mm-document small {margin:2px 0 6px} #mm-encoding-review .mm-document pre {max-height:3.3em;overflow:hidden} #mm-encoding-review .mm-stage:has(.mm-panel[hidden]) .mm-document pre {max-height:none} #mm-encoding-review .mm-panel {box-shadow:none} #mm-encoding-review .mm-head {padding:9px 12px}}
+@media (pointer:coarse) {#mm-encoding-review button,#mm-encoding-review select,#mm-encoding-review footer button {min-height:44px} #mm-encoding-review select {font-size:16px}}
+</style>
+<script>
+(() => {
+  const root = document.getElementById('mm-encoding-review');
+  const field = name => root.querySelector('[data-field="' + name + '"]');
+  const action = name => root.querySelector('[data-action="' + name + '"]');
+  const modes = [...root.querySelectorAll('[data-mode]')];
+  const panel = root.querySelector('.mm-panel');
+  const select = root.querySelector('select');
+  const names = {'utf-8':'UTF-8','utf-8-bom':'UTF-8 BOM',gbk:'GBK',gb18030:'GB18030','windows-1252':'Windows-1252','utf-16le':'UTF-16 LE','utf-16be':'UTF-16 BE'};
+  const original = Uint8Array.from(atob('IyDP7sS/scq8xwoKtLrM7LXEtdrSu7Oh0+qhowrD98zsvMzQ+NX7wO3K1rjloaM='), c => c.charCodeAt(0));
+  const specimen = new TextDecoder('gbk').decode(original);
+  const decode = (bytes, id, fatal = false) => new TextDecoder(id === 'utf-8-bom' ? 'utf-8' : id, {fatal}).decode(bytes);
+  // The sample contains only these Chinese characters. Legacy encodings are fixture data.
+  function encode(text,id) {
+    if (id === 'utf-8' || id === 'utf-8-bom') {
+      const bytes = new TextEncoder().encode(text);
+      return id === 'utf-8' ? bytes : new Uint8Array([239,187,191,...bytes]);
+    }
+    if (id === 'utf-16le' || id === 'utf-16be') {
+      const little = id === 'utf-16le';
+      const bytes = new Uint8Array(2 + text.length * 2);
+      const data = new DataView(bytes.buffer);
+      data.setUint16(0,65279,little);
+      for (let i = 0; i < text.length; i++) data.setUint16(2 + i * 2,text.charCodeAt(i),little);
+      return bytes;
+    }
+    if (text === specimen && (id === 'gbk' || id === 'gb18030')) return original;
+    return null;
+  }
+  // Only the built-in specimen can be saved by this review surface.
+  const state = {disk:'gbk',read:'utf-8',pending:null,mode:'read',target:'gbk',open:true};
+  let message = '';
+  const valid = value => Object.hasOwn(names,value);
+  function restore(saved) {
+    const item = saved?.modelContent ?? saved;
+    if (item?.design !== 'minimark-encoding-v1') return;
+    if (valid(item.disk) && encode(specimen,item.disk)) state.disk = item.disk;
+    if (valid(item.read)) state.read = item.read;
+    state.pending = valid(item.pending) ? item.pending : null;
+    state.mode = item.mode === 'convert' ? 'convert' : 'read';
+    if (valid(item.target)) state.target = item.target;
+    state.open = item.open !== false;
+  }
+  function snapshot() {
+    window.openai?.setWidgetState?.({modelContent:{design:'minimark-encoding-v1',...state},privateContent:null})?.catch(() => {});
+  }
+  function facts() {
+    const bytes = encode(specimen,state.disk);
+    const text = decode(bytes,state.read);
+    const reading = state.mode === 'read';
+    const preview = reading ? decode(bytes,state.target) : text;
+    let hint, ok;
+    if (reading) {
+      try { decode(bytes,state.target,true); ok = true; } catch { ok = false; }
+      hint = ok ? '将按所选编码查看原始文件。' : '该编码无法完整读取文件，请选择其他编码。';
+    } else {
+      ok = text === specimen && !!encode(text,state.target);
+      hint = text !== specimen ? '先切换查看编码，确认中文显示正确。' : ok ? '下次保存时使用所选编码。' : '该编码无法表示当前中文，请选择其他编码。';
+    }
+    return {bytes,text,reading,preview,hint,ok};
+  }
+  function render() {
+    const {text,reading,preview,hint,ok} = facts();
+    panel.hidden = !state.open;
+    action('open').setAttribute('aria-expanded', String(state.open));
+    for (const button of modes) button.setAttribute('aria-pressed',String(button.dataset.mode === state.mode));
+    select.value = state.target;
+    field('document').textContent = text;
+    field('doc-state').textContent = state.pending ? '待保存为 ' + names[state.pending] : '当前按 ' + names[state.read] + ' 查看';
+    field('status-code').textContent = names[state.pending || state.read] + (state.pending ? ' · 待保存' : '');
+    field('label').textContent = reading ? '查看编码' : '保存编码';
+    field('preview-title').textContent = reading ? '试读预览' : '待保存正文';
+    field('preview-code').textContent = names[state.target];
+    field('preview').textContent = preview;
+    field('hint').textContent = hint;
+    field('hint').dataset.warn = String(!ok);
+    field('message').textContent = message;
+    action('apply').textContent = (reading ? '切换为 ' : '转换为 ') + names[state.target];
+    action('apply').disabled = !ok || (!reading && state.target === (state.pending || state.read));
+    action('save').hidden = !state.pending;
+  }
+  function update() { render(); snapshot(); }
+  function close() { state.open = false; update(); action('open').focus(); }
+  action('close').onclick = action('cancel').onclick = close;
+  root.addEventListener('keydown', e => { if (e.key === 'Escape' && state.open) { e.preventDefault(); close(); } });
+  action('open').onclick = () => { if (state.open) return close(); state.open = true; update(); select.focus(); };
+  for (const button of modes) button.onclick = () => {
+    if (state.mode === button.dataset.mode) return;
+    state.mode = button.dataset.mode;
+    state.target = state.mode === 'convert' ? (state.pending || 'utf-8') : state.read;
+    message = ''; update();
+  };
+  select.onchange = () => { state.target = select.value; message = ''; update(); };
+  action('apply').onclick = () => {
+    if (!facts().ok) return;
+    if (state.mode === 'read') { state.read = state.target; state.pending = null; message = '已按 ' + names[state.read] + ' 查看'; }
+    else { state.pending = state.target; message = '已设置保存编码'; }
+    close();
+  };
+  action('save').onclick = () => {
+    if (!state.pending || !encode(facts().text,state.pending)) return;
+    state.disk = state.read = state.pending; state.pending = null; message = '示例已保存为 ' + names[state.disk]; update(); action('open').focus();
+  };
+  restore(window.openai?.widgetState); render();
+  window.addEventListener('openai:set_globals',e => { if (e.detail?.globals?.widgetState) { restore(e.detail.globals.widgetState); render(); } });
+  if (globalThis.Tweak) {
+    const options = {preview:true};
+    const tweak = new Tweak({container:panel,onChange:() => { field('preview').hidden = !options.preview; root.querySelector('.mm-caption').hidden = !options.preview; }});
+    tweak.addToggle(options,'preview',{label:'显示正文预览'});
+  }
+})();
+</script>

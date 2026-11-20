@@ -13,6 +13,9 @@ import { renderMarkdown, renderMath } from '../markdown/render';
 import type { DocumentLanguage } from '../documents/formats';
 import { createIcons, PencilLine, Sigma } from 'lucide';
 import { EDIT_FORMULA_EVENT, mathBlocks } from './math-blocks';
+import { blockSelection } from './block-selection';
+import { fenceLanguages } from './fence-language';
+import { chineseSearchPhrases, toggleDocumentSearch } from './search';
 
 export type EditorMode = 'live' | 'source' | 'read' | 'split';
 export const modeCompartment = new Compartment();
@@ -42,7 +45,7 @@ const stablePointerLayout = ViewPlugin.fromClass(class {
     }
   }
   private start = (event: MouseEvent) => {
-    if (event.button !== 0 || !(event.target instanceof Element) || event.target.closest('.rendered-block,button')) return;
+    if (event.button !== 0 || !(event.target instanceof Element) || event.target.closest('.rendered-block,button,select')) return;
     clearTimeout(this.releaseTimer);
     if (!this.active) {
       this.active = true;
@@ -110,7 +113,7 @@ class RenderedBlock extends WidgetType {
     const element = document.createElement('div');
     element.className = `rendered-block markdown-body ${this.kind}`;
     element.innerHTML = this.html;
-    element.setAttribute('aria-label', this.kind === 'math-block' ? '数学公式，点击编辑' : this.kind === 'image-block' ? '图片，点击编辑' : '表格，点击编辑');
+    element.setAttribute('aria-label', this.kind === 'live-rule' ? '分割线，点击编辑' : this.kind === 'image-block' ? '图片，点击编辑' : '表格，点击编辑');
     for (const image of element.querySelectorAll('img')) {
       image.addEventListener('load', () => view.requestMeasure(), { once: true });
       image.addEventListener('error', () => {
@@ -189,6 +192,10 @@ function liveDecorations(state: EditorState): DecorationSet {
           const line = state.doc.line(n);
           add(line.from, line.from, Decoration.line({ class: `code-line${n === fromLine ? ' code-first' : ''}${n === toLine ? ' code-last' : ''}` }));
         }
+        return false;
+      }
+      if (node.name === 'HorizontalRule' && !active(node.from, node.to)) {
+        add(node.from, node.to, Decoration.replace({ widget: new RenderedBlock('<hr>', node.from, 'live-rule'), block: true }));
         return false;
       }
       if (node.name === 'Table' && !active(node.from, node.to)) {
@@ -366,6 +373,8 @@ function languageExtensions(language: DocumentLanguage): Extension {
   }
   return [
     parser,
+    blockSelection,
+    fenceLanguages,
     formulaEntries,
     Prec.highest(slashPlugin),
     keymap.of([...markdownKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
@@ -377,6 +386,8 @@ function makeState(doc: string, onChange: (update: ViewUpdate) => void, mode: Ed
       doc,
       extensions: [
         history(), indentOnInput(), bracketMatching(), highlightSelectionMatches(),
+        chineseSearchPhrases,
+        keymap.of([{ key: 'Mod-f', run: toggleDocumentSearch, scope: 'editor search-panel' }]),
         pointerSelection, stablePointerLayout,
         languageCompartment.of(languageExtensions(language)),
         syntaxHighlighting(colors),

@@ -106,9 +106,13 @@ test('formula controls do not appear in fenced code or YAML', async ({ page }) =
   await expect(page.locator('.formula-entry')).toHaveCount(0);
 });
 
-test('formula dialog fits desktop and mobile and uses local font assets', async ({ page }) => {
+test('formula dialog fits desktop and mobile and uses local font assets', async ({ page, baseURL }) => {
   const external: string[] = [];
-  page.on('request', request => { if (!request.url().startsWith('http://127.0.0.1:4173') && !request.url().startsWith('data:')) external.push(request.url()); });
+  const origin = new URL(baseURL!).origin;
+  page.on('request', request => {
+    const url = new URL(request.url());
+    if (url.protocol !== 'data:' && url.origin !== origin) external.push(url.href);
+  });
   await page.getByRole('button', { name: '公式', exact: true }).click();
   await setLatex(page, '\\sum_{i=1}^{n}\\frac{i^2}{\\sqrt{i+1}}');
   await expect(page.locator('math-field')).toBeVisible();

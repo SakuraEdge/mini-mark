@@ -136,6 +136,9 @@ svg { width: 17px; height: 17px; flex-shrink: 0; }
 .code-line { background: var(--code); font-family: Consolas, "Cascadia Code", "Microsoft YaHei UI", monospace; font-size: 14px; line-height: 1; padding: 0 20px !important; }
 .code-first { border-radius: 5px 5px 0 0; color: var(--muted); }
 .code-last { border-radius: 0 0 5px 5px; color: var(--muted); }
+.cm-editor .fence-language { float: right; max-width: 42%; margin-inline-start: 8px; padding: 2px 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--soft); font: 12px/1.4 "Segoe UI", "Microsoft YaHei UI", sans-serif; }
+.rendered-block.live-rule { display: flex; align-items: center; min-height: calc(var(--editor-size) * 1.95); padding: 0 6px; }
+.rendered-block.live-rule hr { width: 100%; margin: 0; border: 0; border-top: 1px solid var(--soft); }
 .quote-line { border-left: 3px solid #a8c6eb; padding-left: 18px !important; color: var(--soft); background: var(--sidebar); }
 .rendered-block { cursor: text; padding: 12px 6px; }
 .math-block { text-align: center; overflow-x: auto; }

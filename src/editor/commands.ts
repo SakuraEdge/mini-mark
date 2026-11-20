@@ -1,3 +1,5 @@
+import { preferredFenceLanguage } from './fence-language';
+
 export interface SlashCommand {
   id: string;
   label: string;
@@ -11,7 +13,8 @@ export interface SlashCommand {
 export const commands: SlashCommand[] = [
   { id: 'math', label: '公式', aliases: ['gongshi', 'math', 'gs'], hint: 'LaTeX 块级公式', icon: 'sigma', text: '$$\n\n$$', cursor: 3 },
   { id: 'inline-math', label: '行内公式', aliases: ['inline', 'hangneigongshi'], hint: '段落中的数学表达式', icon: 'variable', text: '$ $', cursor: 1 },
-  { id: 'code', label: '代码', aliases: ['code', 'daima', 'dm'], hint: '带语法高亮的代码块', icon: 'code-2', text: '```cpp\n\n```', cursor: 7 },
+  { id: 'code', label: '代码', aliases: ['code', 'daima', 'dm'], hint: '带语法高亮的代码块', icon: 'code-2',
+    get text() { return '```' + preferredFenceLanguage() + '\n\n```'; }, get cursor() { return this.text.indexOf('\n') + 1; } },
   { id: 'table', label: '表格', aliases: ['table', 'biaoge', 'bg'], hint: '两列 Markdown 表格', icon: 'table-2', text: '| 标题 | 内容 |\n| --- | --- |\n|  |  |', cursor: 2 },
   { id: 'todo', label: '待办', aliases: ['todo', 'daiban'], hint: '任务清单', icon: 'square-check', text: '- [ ] ', cursor: 6 },
   { id: 'quote', label: '引用', aliases: ['quote', 'yinyong'], hint: '引用段落', icon: 'quote', text: '> ', cursor: 2 },

@@ -28,10 +28,13 @@
       "path": "src/editor",
       "purpose": "编辑器与中文命令",
       "files": [
+        "src/editor/block-selection.ts",
         "src/editor/commands.test.ts",
         "src/editor/commands.ts",
         "src/editor/editor.ts",
-        "src/editor/math-blocks.ts"
+        "src/editor/fence-language.ts",
+        "src/editor/math-blocks.ts",
+        "src/editor/search.ts"
       ]
     },
     {
@@ -325,6 +328,7 @@
         "tests/cloud-delete.spec.ts",
         "tests/cloud.spec.ts",
         "tests/document-names.spec.ts",
+        "tests/editor-block-actions.spec.ts",
         "tests/editor.spec.ts",
         "tests/features.spec.ts",
         "tests/fixtures/pdf.md",
@@ -499,6 +503,7 @@
         "docs/design/README.md",
         "docs/design/android-approved.html",
         "docs/design/android-ui.html",
+        "docs/design/file-encoding-review.html",
         "docs/editor-v1.png",
         "docs/editor.png",
         "docs/images.md",
