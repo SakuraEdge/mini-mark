@@ -22,9 +22,18 @@ struct Document: Codable {
     var revision = 0
     var cloud: CloudBinding?
     var autoName: Bool?
+    var encoding: String?
+    var pendingEncoding: String?
+    var needsEncoding: Bool?
+    var folderSource: Bool?
+    var currentEncoding: String { encoding ?? (bom ? "utf-8-bom" : "utf-8") }
+    var outputEncoding: String { pendingEncoding ?? currentEncoding }
+    var outputBom: Bool { outputEncoding == "utf-8-bom" || (outputEncoding.hasPrefix("utf-16") && (pendingEncoding != nil || bom)) }
+    var encodingFields: [String: Any] { ["encoding": cloud == nil ? currentEncoding : "utf-8", "pendingEncoding": pendingEncoding as Any? ?? NSNull(),
+                                         "needsEncoding": needsEncoding == true, "canReinterpret": cloud == nil && path != nil] }
     var name: String { (cloud?.path ?? path).map { URL(fileURLWithPath: $0).lastPathComponent } ?? untitledName }
     var savedText: String { cloud?.baseline ?? baseline }
-    var dirty: Bool { text != savedText }
+    var dirty: Bool { text != savedText || pendingEncoding != nil }
 }
 struct Session: Codable {
     var version = 1
@@ -35,19 +44,20 @@ struct Session: Codable {
 enum Store {
     static func normalize(_ text: String) -> String { text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n") }
     static func hash(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
-    static func read(_ path: String) throws -> Document {
+    static func read(_ path: String, encoding: String? = nil, offerChoice: Bool = false, folderSource: Bool = false) throws -> Document {
         let url = URL(fileURLWithPath: path).standardizedFileURL
+        if folderSource {
+            var doc = try FileEncoding.decode(FolderWorkspace.reread(url.path), path: url.path, requested: encoding, offerChoice: offerChoice)
+            doc.folderSource = true; return doc
+        }
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         if (attributes[.size] as? NSNumber)?.intValue ?? 0 > 20 * 1024 * 1024 { throw failure("文件超过 20 MB。") }
         let data = try Data(contentsOf: url)
-        let bom = data.starts(with: [0xef, 0xbb, 0xbf])
-        guard let raw = String(data: bom ? data.dropFirst(3) : data, encoding: .utf8), !raw.contains("\0") else { throw failure("文件不是 UTF-8 文本文档。") }
-        return Document(untitledName: url.lastPathComponent, path: url.path, text: normalize(raw), baseline: normalize(raw), fingerprint: hash(data), bom: bom, newline: raw.contains("\r\n") ? "\r\n" : "\n", autoName: false)
+        return try FileEncoding.decode(data, path: url.path, requested: encoding, offerChoice: offerChoice)
     }
     static func write(_ document: Document, to path: String) throws -> String {
-        let text = normalize(document.text).replacingOccurrences(of: "\n", with: document.newline)
-        var data = document.bom ? Data([0xef, 0xbb, 0xbf]) : Data()
-        data.append(Data(text.utf8))
+        guard document.needsEncoding != true else { throw failure("请先选择能正确读取正文的编码。") }
+        let data = try FileEncoding.encode(document.text, as: document.outputEncoding, bom: document.outputBom, newline: document.newline)
         try data.write(to: URL(fileURLWithPath: path), options: .atomic)
         return hash(data)
     }
@@ -56,7 +66,8 @@ enum Store {
     }
     static func conflict(_ document: Document) -> Bool {
         guard let path = document.path else { return false }
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return true }
+        let bytes = document.folderSource == true ? (try? FolderWorkspace.reread(path)) : (try? Data(contentsOf: URL(fileURLWithPath: path)))
+        guard let data = bytes else { return true }
         return hash(data) != document.fingerprint
     }
     static func restore(_ file: URL) throws -> Session {
@@ -75,7 +86,7 @@ enum Store {
         for i in session.documents.indices where !session.documents[i].dirty {
             if session.documents[i].cloud != nil { continue }
             guard let path = session.documents[i].path else { continue }
-            if var disk = try? read(path) { disk.id = session.documents[i].id; session.documents[i] = disk }
+            if var disk = try? read(path, encoding: session.documents[i].needsEncoding == true ? nil : session.documents[i].encoding, offerChoice: true, folderSource: session.documents[i].folderSource == true) { disk.id = session.documents[i].id; disk.revision = session.documents[i].revision; session.documents[i] = disk }
             else { session.documents[i].path = nil; session.documents[i].baseline = "" }
         }
         if !session.documents.contains(where: { $0.id == session.activeId }) { session.activeId = session.documents.first?.id ?? "" }

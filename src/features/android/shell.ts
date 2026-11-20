@@ -64,7 +64,7 @@ export function initializeAndroidShell(options: Options) {
   format.remove(); editor.append(extras, tools);
   $('more-menu').classList.add('mobile-more-menu');
   $('more-menu').insertAdjacentHTML('afterbegin', '<h2>更多功能</h2>' + iconButton('mobile-more-close', '关闭更多功能', 'x'));
-  for (const [id, text, icon] of [['mobile-menu-outline', '文档大纲', 'list-tree'], ['mobile-menu-search', '查找替换', 'search'], ['mobile-menu-pdf', '导出 PDF', 'download'], ['mobile-menu-focus', '专注模式', 'files'], ['mobile-menu-cloud', '云文档', 'cloud'], ['mobile-menu-rename', '重命名', 'type'], ['mobile-menu-close', '关闭文档', 'x']]) {
+  for (const [id, text, icon] of [['mobile-menu-outline', '文档大纲', 'list-tree'], ['mobile-menu-search', '查找替换', 'search'], ['mobile-menu-encoding', '文件编码', 'type'], ['mobile-menu-pdf', '导出 PDF', 'download'], ['mobile-menu-focus', '专注模式', 'files'], ['mobile-menu-cloud', '云文档', 'cloud'], ['mobile-menu-rename', '重命名', 'type'], ['mobile-menu-close', '关闭文档', 'x']]) {
     $('more-menu').insertAdjacentHTML('beforeend', `<button id="${id}">${glyph(icon)}<span>${text}</span></button>`);
   }
   $('save-menu').insertAdjacentHTML('afterbegin', '<h2>保存与导出</h2>' + iconButton('mobile-save-close', '关闭保存菜单', 'x'));
@@ -157,7 +157,7 @@ export function initializeAndroidShell(options: Options) {
   $('mobile-back').onclick = () => { app.classList.remove('focus-mode'); showPage('library'); };
   $('mobile-outline').onclick = showOutline;
   $('mobile-menu-outline').onclick = () => { $('more-menu').hidden = true; showOutline(); };
-  for (const [id, target] of [['mobile-menu-search', 'search'], ['mobile-menu-pdf', 'save-pdf'], ['mobile-menu-focus', 'focus-mode']]) $(id).onclick = () => { $('more-menu').hidden = true; click(target); };
+  for (const [id, target] of [['mobile-menu-encoding', 'file-encoding'], ['mobile-menu-search', 'search'], ['mobile-menu-pdf', 'save-pdf'], ['mobile-menu-focus', 'focus-mode']]) $(id).onclick = () => { $('more-menu').hidden = true; click(target); };
   $('mobile-menu-cloud').onclick = () => { $('more-menu').hidden = true; options.openCloud(); };
   $('mobile-menu-rename').onclick = () => { $('more-menu').hidden = true; options.rename(options.snapshot().id); };
   $('mobile-menu-close').onclick = () => { $('more-menu').hidden = true; options.action('closeTab', { targetId: options.snapshot().id }); };

@@ -72,6 +72,19 @@ class DocumentHelpersTest {
         assertArrayEquals(bytes, encodeDocument(result.body, result.crlf, result.bom))
     }
 
+    @Test fun legacyEncodingsRecoverWithoutChangingOriginalBytes() {
+        val gbk = byteArrayOf(0xd6.toByte(), 0xd0.toByte(), 0xce.toByte(), 0xc4.toByte(), 13, 10)
+        assertEquals(true, decodeDocument(gbk, null, true).needsEncoding)
+        val old = decodeDocument(gbk, "gbk")
+        assertEquals("中文\n", old.body)
+        assertArrayEquals(gbk, encodeDocument(old.body, old.crlf, old.bom, old.encoding))
+        for ((name, text) in mapOf("gb18030" to "𠀀", "utf-16le" to "𠀀", "utf-16be" to "中文", "windows-1252" to "café €")) {
+            val bytes = encodeDocument(text, false, true, name)
+            assertEquals(text, decodeDocument(bytes, name).body)
+        }
+        assertEquals(true, runCatching { encodeDocument("中文", false, false, "windows-1252") }.isFailure)
+    }
+
     @Test fun emptyAndLoneCrDecode() {
         assertEquals(DecodedDocument("", false, false), decodeDocument(byteArrayOf()))
         assertEquals(DecodedDocument("", false, true), decodeDocument("\uFEFF".toByteArray(Charsets.UTF_8)))

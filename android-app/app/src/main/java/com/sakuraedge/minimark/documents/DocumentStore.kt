@@ -39,6 +39,9 @@ internal class LocalDocument(
     var revision: Long = 0,
     cloud: CloudBinding? = null,
     var parentUri: String? = null,
+    var encoding: String = if (bom) "utf-8-bom" else "utf-8",
+    var pendingEncoding: String? = null,
+    var needsEncoding: Boolean = false,
 ) {
     var name by mutableStateOf(name)
     var value by mutableStateOf(TextFieldValue(normalizeLines(body)))
@@ -48,10 +51,10 @@ internal class LocalDocument(
     var cloud by mutableStateOf(cloud)
     val undo = mutableStateListOf<TextFieldValue>()
     val redo = mutableStateListOf<TextFieldValue>()
-    val dirty: Boolean get() = (cloud?.baseline ?: savedBody) != value.text || writeFailed
+    val dirty: Boolean get() = (cloud?.baseline ?: savedBody) != value.text || writeFailed || pendingEncoding != null
 
     fun snapshot() = DocumentSnapshot(
-        id, name, value.text, uri, savedBody, diskHash, crlf, bom, autoName, writeFailed, revision, cloud, parentUri,
+        id, name, value.text, uri, savedBody, diskHash, crlf, bom, autoName, writeFailed, revision, cloud, parentUri, encoding, pendingEncoding, needsEncoding,
     )
 }
 
@@ -111,6 +114,7 @@ internal class DocumentStore(application: Application) : AndroidViewModel(applic
 
     fun edit(id: String, next: TextFieldValue) {
         val doc = documents.firstOrNull { it.id == id } ?: return
+        if (doc.needsEncoding) return
         val normalized = normalizeTextValue(next)
         if (normalized.text.length > MAX_TEXT) {
             error = "文档超过 20 MB 文本大小限制。"
@@ -133,7 +137,7 @@ internal class DocumentStore(application: Application) : AndroidViewModel(applic
         val doc = documents.firstOrNull { it.id == id } ?: return false
         val normalized = normalizeLines(text)
         require(normalized.length <= MAX_TEXT) { "文档超过 20 MB 文本大小限制。" }
-        if (revision < doc.revision || revision == doc.revision && normalized != doc.value.text) return false
+        if ((doc.needsEncoding && normalized != doc.value.text) || revision < doc.revision || revision == doc.revision && normalized != doc.value.text) return false
         if (normalized == doc.value.text && revision == doc.revision) return true
         doc.value = TextFieldValue(normalized)
         doc.revision = revision
@@ -221,11 +225,12 @@ internal class DocumentStore(application: Application) : AndroidViewModel(applic
                 val record = withContext(Dispatchers.IO) {
                     keepPermission(uri)
                     val bytes = readBytes(uri)
-                    val decoded = decodeDocument(bytes)
+                    val decoded = decodeDocument(bytes, requested = null, offerChoice = true)
                     require(decoded.body.length <= MAX_TEXT) { "文档超过 20 MB 文本大小限制。" }
                     DocumentSnapshot(
                         UUID.randomUUID().toString(), displayName(uri), decoded.body, uri.toString(),
                         decoded.body, digest(bytes), decoded.crlf, decoded.bom, false, parentUri = parentUri,
+                        encoding = decoded.encoding, needsEncoding = decoded.needsEncoding,
                     )
                 }
                 documents.add(record.toDocument())
@@ -246,6 +251,7 @@ internal class DocumentStore(application: Application) : AndroidViewModel(applic
         val doc = documents.firstOrNull { it.id == id } ?: return
         val uri = target ?: doc.uri?.let(Uri::parse) ?: return
         if (busy || !loaded) return
+        if (doc.needsEncoding) { error = "请先选择能正确读取正文的编码。"; return }
         val targetIdentity = uriIdentity(uri)
         if (documents.any { it.id != id && it.uri?.let(Uri::parse)?.let(::uriIdentity) == targetIdentity }) {
             error = "该文件已在另一份文档中打开，请切换到对应文档，或另存为其他文件。"
@@ -267,7 +273,7 @@ internal class DocumentStore(application: Application) : AndroidViewModel(applic
                             "文件已被其他应用修改，请另存为以保留双方内容。"
                         }
                     }
-                    val bytes = encodeDocument(snapshot.body, snapshot.crlf, snapshot.bom)
+                    val bytes = encodeDocument(snapshot.body, snapshot.crlf, snapshot.outputBom, snapshot.outputEncoding)
                     check(bytes.size <= MAX_BYTES) { "文档超过 20 MB。" }
                     val name = runCatching { displayName(uri) }.getOrDefault(snapshot.name)
                     // SAF providers do not offer atomic replacement. A failed write requires a fresh target.
@@ -282,6 +288,7 @@ internal class DocumentStore(application: Application) : AndroidViewModel(applic
                 doc.uri = uri.toString()
                 if (!sameTarget) doc.parentUri = null
                 doc.name = result.first
+                doc.encoding = snapshot.outputEncoding; doc.bom = snapshot.outputBom; doc.pendingEncoding = null
                 doc.savedBody = snapshot.body
                 doc.diskHash = result.second
                 doc.writeFailed = false
@@ -301,6 +308,39 @@ internal class DocumentStore(application: Application) : AndroidViewModel(applic
                 busy = false
             }
         }
+    }
+
+    suspend fun encodingAction(id: String, revision: Long, text: String, action: String, encoding: String): String {
+        val doc = checkNotNull(active) { "文档已关闭。" }
+        val snapshot = doc.snapshot()
+        fun checkCurrent() = check(!busy && active === doc && doc.cloud == null && doc.id == id && doc.revision == revision &&
+            doc.value.text == text && doc.snapshot() == snapshot) { "文档已变化，请重新打开编码面板。" }
+        checkCurrent()
+        val decoded = withContext(Dispatchers.IO) {
+            val bytes = snapshot.uri?.let { readBytes(Uri.parse(it)) }
+            if (bytes != null) check(digest(bytes) == snapshot.diskHash) { "文件已被其他应用修改，请重新打开。" }
+            when (action) {
+                "previewRead", "switch" -> {
+                    check(bytes != null && snapshot.body == snapshot.savedBody && !snapshot.writeFailed && snapshot.pendingEncoding == null) { "请先保存修改，再切换查看编码。" }
+                    decodeDocument(bytes, encoding)
+                }
+                "previewConvert", "convert" -> {
+                    check(!snapshot.needsEncoding) { "请先选择能正确读取正文的编码。" }
+                    encodeDocument(text, snapshot.crlf, snapshot.bom || snapshot.encoding != encoding, encoding)
+                    null
+                }
+                else -> error("未知的编码操作。")
+            }
+        }
+        checkCurrent()
+        if (action == "switch" && decoded != null) {
+            doc.encoding = decoded.encoding; doc.bom = decoded.bom; doc.crlf = decoded.crlf
+            doc.value = TextFieldValue(decoded.body); doc.savedBody = decoded.body; doc.needsEncoding = false
+            doc.undo.clear(); doc.redo.clear(); persist(immediate = true)
+        } else if (action == "convert") {
+            doc.pendingEncoding = encoding.takeUnless { it == doc.encoding }; persist(immediate = true)
+        }
+        return (decoded?.body ?: text).take(1000)
     }
 
     suspend fun renameLocal(id: String, requested: String) {

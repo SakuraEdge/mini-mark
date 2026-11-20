@@ -131,6 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             publish(recovered: session.documents.contains { $0.dirty }); persist(); return
         }
         if type == "rendered" { if smokeOutput != nil && !smokeStarted { smokeStarted = true; runSmoke() }; return }
+        if type == "encodingRequest" { handleEncoding(body); return }
         if type == "folderRequest" {
             guard ready else { return }
             handleFolderRequest(body); return
@@ -202,7 +203,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         }
         if let rawText = body["text"] as? String, let revision = body["revision"] as? Int {
             let text = Store.normalize(rawText)
-            if revision < session.documents[index].revision || (revision == session.documents[index].revision && text != session.documents[index].text) {
+            if (session.documents[index].needsEncoding == true && text != session.documents[index].text) || revision < session.documents[index].revision || (revision == session.documents[index].revision && text != session.documents[index].text) {
                 publish()
                 if type != "edit" {
                     if type == "closingText" { closingRequest = nil }
@@ -292,13 +293,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
     func openPath(_ path: String) throws {
         if let doc = session.documents.first(where: { $0.path.map { Store.samePath($0, path) } ?? false }) { session.activeId = doc.id; return }
-        let doc = try Store.read(path); session.documents.append(doc); session.activeId = doc.id
+        let doc = try Store.read(path, offerChoice: true); session.documents.append(doc); session.activeId = doc.id
     }
     func publish(recovered: Bool = false) {
         let doc = session.documents[activeIndex]
         scheme.documentFolder = doc.path.map { URL(fileURLWithPath: $0).deletingLastPathComponent() }
         post(["type": "workspace", "recovered": recovered, "tabs": session.documents.map { ["id": $0.id, "name": $0.name, "path": $0.path as Any? ?? NSNull(), "cloud": $0.cloud?.metadataMessage as Any? ?? NSNull(), "autoName": $0.automaticNameEnabled, "dirty": $0.dirty, "revision": $0.revision] },
-              "document": ["id": doc.id, "name": doc.name, "path": doc.path as Any? ?? NSNull(), "text": doc.text, "baseline": doc.savedText, "cloud": doc.cloud?.message as Any? ?? NSNull(), "autoName": doc.automaticNameEnabled, "revision": doc.revision]])
+              "document": ["id": doc.id, "name": doc.name, "path": doc.path as Any? ?? NSNull(), "text": doc.text, "baseline": doc.savedText, "cloud": doc.cloud?.message as Any? ?? NSNull(), "autoName": doc.automaticNameEnabled, "revision": doc.revision].merging(doc.encodingFields) { _, value in value }])
         title()
     }
     func title() { if !session.documents.isEmpty { let doc = session.documents[activeIndex]; window.title = "\(doc.dirty ? "• " : "")\(doc.name) · Mini Mark" } }
@@ -315,6 +316,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
     func save(_ index: Int, saveAs: Bool, allowPdf: Bool) throws -> Bool {
         var doc = session.documents[index], path = doc.path
+        if doc.needsEncoding == true { throw Store.failure("请先选择能正确读取正文的编码。") }
         if doc.cloud != nil && !saveAs { throw Store.failure("云文档保存必须通过同步操作。") }
         let isHtml = ["html", "htm"].contains(documentExtension(doc.name))
         let allowPdf = allowPdf && !isHtml
@@ -341,8 +343,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         guard let target = path else { return false }
         if session.documents.contains(where: { $0.id != doc.id && ($0.path.map { Store.samePath($0, target) } ?? false) }) { throw Store.failure("该文件已在另一个标签打开，请选择其他文件名。") }
         if !isHtml { try ImageAssets.copyForSaveAs(doc.text, previousPath: doc.path, targetPath: target) }
-        doc.fingerprint = try Store.write(doc, to: target); doc.path = target; doc.baseline = doc.text; doc.cloud = nil; doc.autoName = false; session.documents[index] = doc
-        persist(); post(["type": "saved", "documentId": doc.id, "name": doc.name, "path": target, "cloud": NSNull(), "autoName": false, "text": doc.text])
+        doc.fingerprint = try Store.write(doc, to: target); doc.bom = doc.outputBom; doc.encoding = doc.outputEncoding; doc.pendingEncoding = nil
+        if doc.path != target { doc.folderSource = nil }; doc.path = target; doc.baseline = doc.text; doc.cloud = nil; doc.autoName = false; session.documents[index] = doc
+        persist(); post(["type": "saved", "documentId": doc.id, "name": doc.name, "path": target, "cloud": NSNull(), "autoName": false, "text": doc.text].merging(doc.encodingFields) { _, value in value })
         if doc.id == session.activeId { scheme.documentFolder = URL(fileURLWithPath: target).deletingLastPathComponent() }; title(); return true
     }
     func saveDecision(_ document: Document) -> NSApplication.ModalResponse {

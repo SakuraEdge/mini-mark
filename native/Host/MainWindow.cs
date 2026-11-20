@@ -121,6 +121,7 @@ public sealed partial class MainWindow : Form {
                 return;
             }
             if (!initialized) return;
+            if (type == "encodingRequest") { HandleEncoding(message); return; }
             if (type == "folderRequest") { _ = FolderRequest(message.Clone()); return; }
             if (type == "cloudRequest") {
                 var request = message.Clone();
@@ -303,7 +304,7 @@ public sealed partial class MainWindow : Form {
         Post(new {
             type = "workspace", recovered,
             tabs = workspace.Documents.Select(item => new { id = item.Id, name = item.Name, path = item.Path, autoName = item.AutoName == true, cloud = item.Cloud is null ? null : new { owner = item.Cloud.Owner, path = item.Cloud.Path, sha = item.Cloud.Sha }, dirty = item.Dirty, revision = item.Revision }),
-            document = new { id = document.Id, text = document.Text, baseline = document.SavedBaseline, name = document.Name, path = document.Path, autoName = document.AutoName == true, cloud = document.Cloud, revision = document.Revision }
+            document = new { id = document.Id, text = document.Text, baseline = document.SavedBaseline, encoding = document.Cloud is null ? document.CurrentEncoding : "utf-8", pendingEncoding = document.PendingEncoding, needsEncoding = document.NeedsEncoding, canReinterpret = document.Cloud is null && document.Path is not null, name = document.Name, path = document.Path, autoName = document.AutoName == true, cloud = document.Cloud, revision = document.Revision }
         });
         UpdateTitle();
     }
@@ -319,6 +320,7 @@ public sealed partial class MainWindow : Form {
     private static string PreferredExtension(string name) => HtmlResources.IsHtml(name) ? Path.GetExtension(name).ToLowerInvariant() : Path.GetExtension(name).Equals(".yml", StringComparison.OrdinalIgnoreCase) ? ".yml" : IsYaml(name) ? ".yaml" : ".md";
 
     private bool Save(OpenDocument document, bool saveAs, bool allowPdf) {
+        if (document.NeedsEncoding) throw new IOException("请先选择能正确读取正文的编码。");
         // A cloud document's local copy must be chosen explicitly before leaving cloud mode.
         saveAs |= document.Cloud is not null;
         allowPdf &= !HtmlResources.IsHtml(document.Name);
@@ -344,10 +346,11 @@ public sealed partial class MainWindow : Form {
         if (workspace.PathOwnedByAnother(target, document.Id)) throw new IOException("该文件已在另一个标签页打开，请选择其他文件名。");
         var saved = document.Text;
         if (!HtmlResources.IsHtml(document.Name)) ImageAssets.CopyForSaveAs(saved, document.Path, target);
-        document.Fingerprint = DocumentStore.Write(target, saved, document.Bom, document.Newline);
+        document.Fingerprint = DocumentStore.Write(target, saved, document.OutputBom, document.Newline, document.OutputEncoding);
+        document.Bom = document.OutputBom; document.EncodingName = document.OutputEncoding; document.PendingEncoding = null;
         document.Path = target; document.Baseline = saved; document.Cloud = null; document.AutoName = false;
         Persist();
-        Post(new { type = "saved", documentId = document.Id, name = document.Name, path = document.Path, autoName = false, cloud = document.Cloud, text = saved });
+        Post(new { type = "saved", documentId = document.Id, name = document.Name, path = document.Path, autoName = false, cloud = document.Cloud, encoding = document.CurrentEncoding, pendingEncoding = (string?)null, needsEncoding = false, canReinterpret = true, text = saved });
         UpdateTitle(); return true;
     }
 
@@ -388,7 +391,7 @@ public sealed partial class MainWindow : Form {
         foreach (var (document, decision) in decisions) {
             if (decision != DialogResult.No) continue;
             if (document.Path is null && document.Cloud is null) workspace.Remove(document.Id);
-            else document.Text = document.SavedBaseline;
+            else { document.Text = document.SavedBaseline; document.PendingEncoding = null; }
         }
         Persist(); InstallerToRun = preparedInstaller; closingConfirmed = true; Close();
     }

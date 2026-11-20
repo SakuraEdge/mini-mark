@@ -28,7 +28,7 @@ Android 新增的 `appearance` 请求仅控制系统栏明暗。保存遇到 Git
 
 系统 Storage Access Framework 负责授权，应用保存可持久化 URI 权限。文档按 provider authority 与 document ID 去重。创建文件按扩展名选 MIME，保存与重名另存为保留后缀。旧的 Compose 预览草稿 `documents.json` 可直接恢复。
 
-正文与保存基线统一为 LF，BOM 与 CRLF 作为独立元数据写回。UTF-8 使用严格编解码并拒绝 NUL。本地文档上限为 20 MB。覆盖前比较 SHA-256，写入后读回校验。保存捕获快照，稍后的编辑继续保留未保存状态。SAF 直接写入由提供者实现，写入中断可能让目标成为空文件或部分内容，应用会保留草稿并引导另存为。
+正文与保存基线统一为 LF，BOM 与 CRLF 作为独立元数据写回。本地文件默认 UTF-8，可试读或转换为 GBK、GB18030、Windows-1252、UTF-16 或带 BOM 的 UTF-8。保存前严格校验全文。云文档使用 UTF-8。本地文档上限为 20 MB。覆盖前比较 SHA-256，写入后读回校验。保存捕获快照，稍后的编辑继续保留未保存状态。SAF 直接写入由提供者实现，写入中断可能让目标成为空文件或部分内容，应用会保留草稿并引导另存为。
 
 `workspace/FolderWorkspace.kt` 保存树授权，按相对路径逐级枚举直接子项。在 API 29 及以上系统额外调用 `DocumentsContract.isChildDocument` 核对从属关系，API 26–28 依靠提供者的直接子项和树授权校验。每页 500 项，虚拟文档禁用。关闭工作区清除应用中的根授权登记，已打开文件保留其 URI 访问能力。Android 文档提供者决定实际后端路径，验证范围以系统 SAF 和提供者能力为准。
 

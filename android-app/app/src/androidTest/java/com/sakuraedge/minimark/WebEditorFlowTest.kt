@@ -91,6 +91,22 @@ class WebEditorFlowTest {
         await { evaluate("Boolean(window.__MOYE_READY__) && innerWidth<600") == "true" }
     }
 
+    @Test fun encodingPanelConvertsAndWritesGbkThroughSaf() {
+        newDocument()
+        val body = "# 编码验收-" + System.nanoTime() + "\n\n中文正文"
+        edit(body)
+        click("#more"); click("#mobile-menu-encoding")
+        await { evaluate("document.getElementById('encoding-panel').open") == "true" }
+        evaluate("(()=>{let s=document.getElementById('encoding-target');s.value='gbk';s.dispatchEvent(new Event('change'));return true})()")
+        await { evaluate("document.querySelector('#encoding-panel [data-apply]').disabled") == "false" }
+        click("#encoding-panel [data-apply]"); await { text("#file-encoding").contains("→ GBK") }
+        click("#save-file"); click("#save-markdown"); finishPicker()
+        await { text("#file-encoding") == "GBK" }
+        val uri = android.net.Uri.parse(currentSessionDocument().getString("uri"))
+        val bytes = instrumentation.targetContext.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+        assertArrayEquals(body.toByteArray(charset("GBK")), bytes)
+    }
+
     @Test fun systemSaveSaveAsCancelAndReopen() {
         newDocument()
         val title = "MiniMark-${System.nanoTime()}"

@@ -68,7 +68,7 @@ jobs:
             .variantName == "debug" and
             (.elements | length) == 1 and
             .elements[0].versionName == $version and
-            .elements[0].versionCode == 104 and
+            .elements[0].versionCode == 105 and
             .elements[0].outputFile == "app-debug.apk"
           ' app/build/outputs/apk/debug/output-metadata.json
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify app/build/outputs/apk/debug/app-debug.apk
@@ -95,7 +95,7 @@ jobs:
             .variantName == "release" and
             (.elements | length) == 1 and
             .elements[0].versionName == $version and
-            .elements[0].versionCode == 104 and
+            .elements[0].versionCode == 105 and
             .elements[0].outputFile == "app-release.apk"
           ' app/build/outputs/apk/release/output-metadata.json
           if "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/release/app-release.apk | grep -q application-debuggable; then

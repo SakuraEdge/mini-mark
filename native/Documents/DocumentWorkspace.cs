@@ -14,15 +14,21 @@ public sealed class OpenDocument {
     public string? Fingerprint { get; set; }
     public bool Bom { get; set; }
     public string Newline { get; set; } = "\n";
+    public string? EncodingName { get; set; }
+    public string? PendingEncoding { get; set; }
+    public bool NeedsEncoding { get; set; }
+    [JsonIgnore] public string CurrentEncoding => EncodingName ?? (Bom ? "utf-8-bom" : "utf-8");
+    [JsonIgnore] public string OutputEncoding => PendingEncoding ?? CurrentEncoding;
+    [JsonIgnore] public bool OutputBom => OutputEncoding == "utf-8-bom" || ((OutputEncoding is "utf-16le" or "utf-16be") && (PendingEncoding != null || Bom));
     public long Revision { get; set; }
     public bool? AutoName { get; set; }
     public CloudBinding? Cloud { get; set; }
     [JsonIgnore] public string Name => Cloud is not null ? Cloud.Path.Split('/')[^1] : Path is null ? UntitledName : System.IO.Path.GetFileName(Path);
     [JsonIgnore] public string SavedBaseline => Cloud?.Baseline ?? Baseline;
-    [JsonIgnore] public bool Dirty => Text != SavedBaseline;
+    [JsonIgnore] public bool Dirty => Text != SavedBaseline || PendingEncoding is not null;
     public bool Update(string text, long revision, string? autoTitle = null) {
         text = DocumentStore.Normalize(text);
-        if (revision < Revision || (revision == Revision && text != Text)) return false;
+        if ((NeedsEncoding && text != Text) || revision < Revision || (revision == Revision && text != Text)) return false;
         Text = text; Revision = revision; UpdateAutoName();
         if (AutoName == true && Path is null && Cloud is null && DocumentNames.FirstHeading(Text) is null && autoTitle is not null) {
             try {
@@ -39,6 +45,7 @@ public sealed class OpenDocument {
     }
     public void Load(LoadedDocument loaded) {
         Path = loaded.Path; Text = Baseline = loaded.Text;
+        EncodingName = loaded.EncodingName; NeedsEncoding = loaded.NeedsEncoding; PendingEncoding = null;
         Fingerprint = loaded.Fingerprint; Bom = loaded.Bom; Newline = loaded.Newline;
         AutoName = false;
     }
@@ -66,7 +73,7 @@ public sealed class DocumentWorkspace {
         var absolute = System.IO.Path.GetFullPath(path);
         var existing = Documents.Find(document => document.Path is not null && SamePath(document.Path, absolute));
         if (existing is not null) { ActiveId = existing.Id; return existing; }
-        return Open(DocumentStore.Read(absolute));
+        return Open(DocumentStore.Read(absolute, offerChoice: true));
     }
     public OpenDocument Open(LoadedDocument loaded) {
         var existing = Documents.Find(document => document.Path is not null && SamePath(document.Path, loaded.Path));
@@ -103,7 +110,7 @@ public sealed class DocumentWorkspace {
             workspace.NextUntitled = 1;
             workspace.ActiveId = workspace.Find(session.ActiveId)?.Id ?? workspace.Documents.FirstOrDefault()?.Id ?? "";
             foreach (var document in workspace.Documents.Where(document => !document.Dirty && document.Path is not null && document.Cloud is null)) {
-                try { document.Load(DocumentStore.Read(document.Path!)); }
+                try { document.Load(DocumentStore.Read(document.Path!, document.NeedsEncoding ? null : document.EncodingName, true)); }
                 catch (IOException) { document.UntitledName = document.Name; document.Path = null; document.Baseline = ""; }
                 catch (UnauthorizedAccessException) { document.UntitledName = document.Name; document.Path = null; document.Baseline = ""; }
             }

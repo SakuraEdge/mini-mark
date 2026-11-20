@@ -15,6 +15,7 @@ src/
   features/updates/    检测更新界面、版本比较、提醒偏好
   features/cloud/      GitHub 登录、目录浏览、云文档选择与请求协议
   features/documents/  文档右键菜单与重命名交互
+  features/encoding/   编码试读与转换面板、浏览器字节编解码与原文件缓存
   features/workspace/  工作区目录树、分页、请求协议与浏览器文件夹预览
   features/android/    Android 四入口导航、移动编辑工具与响应式样式
   features/theme/      主题偏好与渐变切换
@@ -78,6 +79,7 @@ android-app/           Android 原生宿主与共享 Web 编辑器
 | HTML 编辑与运行 | `src/documents/formats.ts`、`src/features/html/`、两平台 `Preview/`；`runHtml` 保存成功后才运行 |
 | 文字选区 | `src/editor/block-selection.ts` 处理 Markdown 块内与整篇的两级全选。`src/editor/editor.ts` 处理原生鼠标选区，`src/styles/app.css` 定义 `::selection` 对比度 |
 | 围栏语言、分割线、查找替换 | `src/editor/fence-language.ts` 管理语言选择与新围栏偏好，`src/editor/editor.ts` 渲染即时分割线，`src/editor/search.ts` 提供查找开关与中文词条。交互回归见 `tests/editor-block-actions.spec.ts` |
+| 文件编码 | `src/features/encoding/`、Windows/macOS 的 `Documents/FileEncoding` 和 `Host/EncodingRequests`、Android `DocumentFormats.kt`。详见 [文件编码](docs/file-encoding.md)。 |
 | 文件编码设计审核 | `docs/design/file-encoding-review.html` 演示试读与转换，状态见 `docs/design/README.md` |
 | 更新、提醒、下载 | `src/features/updates/`、两平台的 `Updates/`、`docs/updates-development.md` |
 | GitHub 登录与云文档 | `src/features/cloud/`、两平台的 `Cloud/`、`docs/cloud-development.md` |

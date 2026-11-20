@@ -1,0 +1,21 @@
+#encoding-panel { position: fixed; inset: auto 14px 40px auto; margin: 0; box-sizing: border-box; width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 48px); overflow: auto; padding: 16px; background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); font-family: inherit; font-size: 13px; line-height: 1.5; }
+#encoding-panel::backdrop { background: rgb(16 24 40 / 8%); }
+#encoding-panel header, #encoding-panel footer, .encoding-caption { display: flex; align-items: center; justify-content: space-between; }
+#encoding-panel h2 { margin: 0; font-size: 15px; }
+#encoding-panel svg { width: 16px; height: 16px; }
+#encoding-panel button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--text); border-radius: 6px; min-height: 30px; padding: 3px 10px; font-size: 13px; }
+#encoding-panel button:hover { background: var(--hover); }
+#encoding-panel button:disabled { opacity: .52; }
+.encoding-modes { display: flex; padding: 3px; margin: 12px 0; border-radius: 8px; background: var(--sidebar); border: 1px solid var(--line); }
+.encoding-modes button { flex: 1; }
+#encoding-panel .encoding-modes [aria-pressed=true] { background: var(--raised); color: var(--accent); box-shadow: 0 1px 4px #0002; }
+#encoding-panel label, .encoding-caption, #encoding-panel p { color: var(--soft); font-size: 12px; }
+#encoding-panel select { display: block; width: 100%; min-height: 36px; margin: 4px 0 12px; padding-inline: 8px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+.encoding-caption small { color: var(--accent); }
+.encoding-preview { box-sizing: border-box; min-height: 64px; max-height: 130px; margin: 6px 0; padding: 8px; border-radius: 6px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--code); color: var(--text); font: 12px/1.55 Consolas, monospace; }
+#encoding-panel p { margin: 8px 0 12px; min-height: 18px; }
+#encoding-panel footer { justify-content: flex-end; gap: 8px; }
+#encoding-panel [data-apply] { background: var(--accent); color: var(--bg); }
+.statusbar #file-encoding { color: var(--accent); max-width: 40vw; text-overflow: ellipsis; overflow: hidden; }
+@media(max-width:550px) { #encoding-panel { inset: auto 12px max(12px, env(safe-area-inset-bottom)) auto; } }
+@media(pointer:coarse) { #encoding-panel button, #encoding-panel select { min-height: 44px; } }

@@ -1,7 +1,9 @@
+import type { EncodingMetadata } from '../features/encoding/model';
 import type { CloudBinding } from '../features/cloud/model';
 import { automaticDocumentName, canAutoName, documentName, headingDocumentName } from './naming';
 
-export interface DocumentData {
+export interface DocumentData extends EncodingMetadata {
+  bom?: boolean; crlf?: boolean; originalKey?: string;
   id: string; text: string; name: string; path?: string; baseline: string; revision: number; cloud?: CloudBinding | null; autoName?: boolean;
 }
 export interface TabData { id: string; name: string; path?: string; dirty: boolean; revision: number; cloud?: Omit<CloudBinding, 'baseline'> | null; autoName?: boolean }
@@ -14,7 +16,7 @@ export class BrowserWorkspace {
   activeId = '';
   nextUntitled = 1;
   get active() { return this.documents.find(document => document.id === this.activeId)!; }
-  get tabs(): TabData[] { return this.documents.map(document => ({ id: document.id, name: document.name, path: document.path, dirty: document.text !== document.baseline, revision: document.revision, autoName: document.autoName, cloud: document.cloud })); }
+  get tabs(): TabData[] { return this.documents.map(document => ({ id: document.id, name: document.name, path: document.path, dirty: Boolean(document.pendingEncoding) || document.text !== document.baseline, revision: document.revision, autoName: document.autoName, cloud: document.cloud })); }
   add(text = '', name?: string, baseline = '') {
     const document: DocumentData = { id: crypto.randomUUID(), text: normalizeText(text), name: name ?? this.nextUntitledName(), baseline: normalizeText(baseline), revision: 0, autoName: name === undefined };
     if (canAutoName(document)) document.name = headingDocumentName(document.text) ?? document.name;
@@ -29,7 +31,7 @@ export class BrowserWorkspace {
   update(id: string, text: string, revision: number, autoTitle?: string) {
     text = normalizeText(text);
     const document = this.documents.find(item => item.id === id);
-    if (!document || revision < document.revision || (revision === document.revision && text !== document.text)) return false;
+    if (!document || document.needsEncoding && text !== document.text || revision < document.revision || (revision === document.revision && text !== document.text)) return false;
     document.text = text; document.revision = revision;
     if (canAutoName(document)) document.name = automaticDocumentName(text, document.name, autoTitle);
     return true;

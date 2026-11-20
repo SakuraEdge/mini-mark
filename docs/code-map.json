@@ -143,6 +143,20 @@
       ]
     },
     {
+      "path": "src/features/encoding",
+      "purpose": "编码面板、原始文件缓存和字节编解码",
+      "files": [
+        "src/features/encoding/browser.ts",
+        "src/features/encoding/codec.test.ts",
+        "src/features/encoding/codec.ts",
+        "src/features/encoding/legacy-encoder.ts",
+        "src/features/encoding/model.ts",
+        "src/features/encoding/originals.ts",
+        "src/features/encoding/panel.css",
+        "src/features/encoding/panel.ts"
+      ]
+    },
+    {
       "path": "src/features/documents",
       "purpose": "文档右键菜单与重命名",
       "files": [
@@ -173,6 +187,7 @@
       "purpose": "Windows 宿主",
       "files": [
         "native/Host/DocumentRenaming.cs",
+        "native/Host/EncodingRequests.cs",
         "native/Host/FolderRequests.cs",
         "native/Host/MainWindow.cs"
       ]
@@ -185,6 +200,7 @@
         "native/Documents/DocumentRenaming.cs",
         "native/Documents/DocumentStore.cs",
         "native/Documents/DocumentWorkspace.cs",
+        "native/Documents/FileEncoding.cs",
         "native/Documents/ImageAssets.cs"
       ]
     },
@@ -257,6 +273,7 @@
       "purpose": "macOS 资源宿主",
       "files": [
         "macos/Host/AppScheme.swift",
+        "macos/Host/EncodingRequests.swift",
         "macos/Host/FolderWorkspaceBridge.swift",
         "macos/Host/ScriptDialogs.swift"
       ]
@@ -268,8 +285,11 @@
         "macos/Documents/DocumentNames.swift",
         "macos/Documents/DocumentRenaming.swift",
         "macos/Documents/DocumentStore.swift",
+        "macos/Documents/FileEncoding.swift",
         "macos/Documents/FolderWorkspace.swift",
-        "macos/Documents/ImageAssets.swift"
+        "macos/Documents/ImageAssets.swift",
+        "macos/Documents/StrictTranscode.c",
+        "macos/Documents/StrictTranscode.h"
       ]
     },
     {
@@ -331,6 +351,7 @@
         "tests/editor-block-actions.spec.ts",
         "tests/editor.spec.ts",
         "tests/features.spec.ts",
+        "tests/file-encoding.spec.ts",
         "tests/fixtures/pdf.md",
         "tests/fixtures/workspace-tree/docs/note.md",
         "tests/fixtures/workspace-tree/program.bin",
@@ -506,6 +527,7 @@
         "docs/design/file-encoding-review.html",
         "docs/editor-v1.png",
         "docs/editor.png",
+        "docs/file-encoding.md",
         "docs/images.md",
         "docs/mac-signing.md",
         "docs/mini-mark-editor.png",
@@ -516,6 +538,7 @@
         "docs/release-rev-v1.0.2.md",
         "docs/release-rev-v1.0.3.md",
         "docs/release-rev-v1.0.4.md",
+        "docs/release-rev-v1.0.5.md",
         "docs/release-v1.0.0.md",
         "docs/release-v1.0.1.md",
         "docs/release-v1.0.2.md",

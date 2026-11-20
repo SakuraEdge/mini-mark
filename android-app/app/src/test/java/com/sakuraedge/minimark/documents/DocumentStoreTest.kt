@@ -102,6 +102,31 @@ class DocumentStoreTest {
         assertEquals("unsaved", store.active!!.value.text)
     }
 
+    @Test fun safEncodingRecoveryProtectsBothTheFileAndPendingChanges() {
+        val original = byteArrayOf(0xd6.toByte(), 0xd0.toByte(), 0xce.toByte(), 0xc4.toByte(), 13, 10)
+        provider.file.writeBytes(original); store.open(uri) {}; await { !store.busy }
+        val doc = store.active!!
+        fun request(action: String, name: String, revision: Long = doc.revision) = kotlinx.coroutines.runBlocking {
+            store.encodingAction(doc.id, revision, doc.value.text, action, name)
+        }
+        assertTrue(doc.needsEncoding)
+        store.save(doc.id); assertArrayEquals(original, provider.file.readBytes())
+        assertEquals("中文\n", request("previewRead", "gbk")); assertTrue(doc.needsEncoding)
+        request("switch", "gbk"); assertFalse(doc.needsEncoding); assertFalse(doc.dirty)
+        assertTrue(runCatching { request("convert", "utf-16be", doc.revision + 1) }.isFailure)
+        store.webEdit(doc.id, "中文😀", 1)
+        assertTrue(runCatching { request("switch", "windows-1252") }.isFailure)
+        assertTrue(runCatching { request("convert", "gbk") }.isFailure)
+        store.save(doc.id); await { !store.busy }; assertFalse(doc.writeFailed); assertArrayEquals(original, provider.file.readBytes())
+        request("convert", "utf-16be"); assertEquals("utf-16be", doc.pendingEncoding)
+        store.flushDrafts(); await { runCatching { decodeSession(File(application.filesDir, "documents.json").readText()).documents.single().pendingEncoding == "utf-16be" }.getOrDefault(false) }
+        provider.file.writeText("external"); assertTrue(runCatching { request("convert", "utf-8") }.isFailure)
+        store.save(doc.id); await { !store.busy }; assertEquals("external", provider.file.readText()); assertEquals("utf-16be", doc.pendingEncoding)
+        provider.file.writeBytes(original); store.save(doc.id); await { !store.busy }
+        assertNull(doc.pendingEncoding); assertFalse(doc.dirty); assertEquals("utf-16be", doc.encoding)
+        assertEquals("中文😀", decodeDocument(provider.file.readBytes(), null).body)
+    }
+
     @Test fun externalChangeBlocksOverwriteAndKeepsLocalText() {
         openDocument("original")
         val document = store.active!!

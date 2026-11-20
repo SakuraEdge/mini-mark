@@ -28,7 +28,6 @@ final class FolderWorkspace {
     private let stateFile: URL
     private(set) var root: WorkspaceFolderRoot?
     static let pageSize = 500
-    private let maximumBytes = 20 * 1024 * 1024
     init(stateFile: URL) { self.stateFile = stateFile }
 
     func select(_ path: String) throws -> [String: Any] {
@@ -62,13 +61,29 @@ final class FolderWorkspace {
     func list(rootId: String, path: String, offset: Int) throws -> [String: Any] {
         try listing(root: current(rootId), path: path, offset: offset)
     }
-    func read(rootId: String, path: String) throws -> Document {
+    func read(rootId: String, path: String, offerChoice: Bool = false) throws -> Document {
         let root = try current(rootId), segments = try Self.relativeSegments(path, allowRoot: false)
         guard Self.supported(path) else { throw Store.failure("该文件类型不支持编辑。") }
         let rootFd = try openRoot(root)
         defer { Darwin.close(rootFd) }
-        let fileFd = try descend(rootFd, segments: segments, directory: false)
+        let fileFd = try Self.descend(rootFd, segments: segments, directory: false)
         defer { Darwin.close(fileFd) }
+        let (data, after) = try Self.readFile(fileFd)
+        let validated = try openRoot(root)
+        defer { Darwin.close(validated) }
+        let check = try Self.descend(validated, segments: segments, directory: false)
+        defer { Darwin.close(check) }
+        var currentFile = stat()
+        guard fstat(check, &currentFile) == 0, currentFile.st_dev == after.st_dev, currentFile.st_ino == after.st_ino else {
+            throw Store.failure("文件位置在读取时发生变化，请刷新工作区。")
+        }
+        let absolute = URL(fileURLWithPath: root.path).appendingPathComponent(path).path
+        var doc = try FileEncoding.decode(data, path: absolute, offerChoice: offerChoice)
+        doc.folderSource = true
+        return doc
+    }
+    private static func readFile(_ fileFd: Int32) throws -> (Data, stat) {
+        let maximumBytes = FileEncoding.maximum
         var before = stat()
         guard fstat(fileFd, &before) == 0, Self.isRegular(before),
               before.st_size >= 0, before.st_size <= off_t(maximumBytes) else { throw Store.failure("只能打开不超过 20 MB 的普通文本文档。") }
@@ -84,22 +99,15 @@ final class FolderWorkspace {
         guard fstat(fileFd, &after) == 0, before.st_dev == after.st_dev, before.st_ino == after.st_ino,
               before.st_size == after.st_size, before.st_mtimespec.tv_sec == after.st_mtimespec.tv_sec,
               before.st_mtimespec.tv_nsec == after.st_mtimespec.tv_nsec else { throw Store.failure("文件在读取时发生变化，请重试。") }
-        let validated = try openRoot(root)
-        defer { Darwin.close(validated) }
-        let check = try descend(validated, segments: segments, directory: false)
-        defer { Darwin.close(check) }
-        var currentFile = stat()
-        guard fstat(check, &currentFile) == 0, currentFile.st_dev == after.st_dev, currentFile.st_ino == after.st_ino else {
-            throw Store.failure("文件位置在读取时发生变化，请刷新工作区。")
-        }
-        let bom = data.starts(with: [0xef, 0xbb, 0xbf])
-        guard let raw = String(data: bom ? data.dropFirst(3) : data, encoding: .utf8), !raw.contains("\0") else {
-            throw Store.failure("文件不是 UTF-8 文本文档。")
-        }
-        let absolute = URL(fileURLWithPath: root.path).appendingPathComponent(path).path
-        let text = Store.normalize(raw)
-        return Document(untitledName: segments.last!, path: absolute, text: text, baseline: text,
-                        fingerprint: Store.hash(data), bom: bom, newline: raw.contains("\r\n") ? "\r\n" : "\n", autoName: false)
+        return (data, after)
+    }
+    static func reread(_ path: String) throws -> Data {
+        let root = Darwin.open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        guard root >= 0, path.hasPrefix("/") else { throw Store.failure("文件路径无效。") }
+        defer { Darwin.close(root) }
+        let file = try Self.descend(root, segments: path.split(separator: "/").map(String.init), directory: false)
+        defer { Darwin.close(file) }
+        return try readFile(file).0
     }
     private func current(_ rootId: String) throws -> WorkspaceFolderRoot {
         guard let root = root, !rootId.isEmpty, root.id == rootId else { throw Store.failure("工作区已经改变，请重新选择文件夹。") }
@@ -128,9 +136,9 @@ final class FolderWorkspace {
         let descriptor = Darwin.open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC)
         guard descriptor >= 0 else { throw Store.failure("无法读取文件夹。") }
         defer { Darwin.close(descriptor) }
-        return try descend(descriptor, segments: path.split(separator: "/").map(String.init), directory: true)
+        return try Self.descend(descriptor, segments: path.split(separator: "/").map(String.init), directory: true)
     }
-    private func descend(_ base: Int32, segments: [String], directory: Bool) throws -> Int32 {
+    private static func descend(_ base: Int32, segments: [String], directory: Bool) throws -> Int32 {
         var current = dup(base)
         guard current >= 0 else { throw Store.failure("无法读取工作区。") }
         for (index, segment) in segments.enumerated() {
@@ -147,7 +155,7 @@ final class FolderWorkspace {
         guard offset >= 0 else { throw Store.failure("目录分页参数无效。") }
         let rootFd = try openRoot(root)
         defer { Darwin.close(rootFd) }
-        let fd = try descend(rootFd, segments: segments, directory: true)
+        let fd = try Self.descend(rootFd, segments: segments, directory: true)
         defer { Darwin.close(fd) }
         let copy = dup(fd)
         guard copy >= 0 else { throw Store.failure("无法读取目录。") }
@@ -177,7 +185,7 @@ final class FolderWorkspace {
         }
         let validated = try openRoot(root)
         defer { Darwin.close(validated) }
-        let check = try descend(validated, segments: segments, directory: true)
+        let check = try Self.descend(validated, segments: segments, directory: true)
         defer { Darwin.close(check) }
         var original = stat(), latest = stat()
         guard fstat(fd, &original) == 0, fstat(check, &latest) == 0, original.st_dev == latest.st_dev, original.st_ino == latest.st_ino else {

@@ -87,7 +87,7 @@ extension AppDelegate {
             }
             self.folderQueue.async {
                 let result = Result { () -> (Document, String?) in
-                    let document = try self.folders.read(rootId: rootId, path: path)
+                    let document = try self.folders.read(rootId: rootId, path: path, offerChoice: true)
                     let existing = existingPaths.first { Store.samePath($0.path, document.path!) }?.id
                     return (document, existing)
                 }

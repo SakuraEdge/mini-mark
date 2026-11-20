@@ -16,6 +16,16 @@ func runStoreTests() throws {
     guard read.text == doc.text, read.bom, read.newline == "\r\n", !Store.conflict(doc) else { throw Store.failure("UTF-8 round trip failed") }
     try Data("外部修改".utf8).write(to: URL(fileURLWithPath: path))
     guard Store.conflict(doc) else { throw Store.failure("Conflict missed") }
+    let fixture = Data([0xd6, 0xd0, 0xce, 0xc4, 13, 10])
+    let legacy = try FileEncoding.decode(fixture, path: path, requested: "gbk")
+    guard try FileEncoding.decode(fixture, path: path, offerChoice: true).needsEncoding == true,
+          legacy.text == "中文\n", legacy.newline == "\r\n",
+          try FileEncoding.encode(legacy.text, as: "gbk", bom: false, newline: legacy.newline) == fixture else { throw Store.failure("GBK recovery failed") }
+    for (name, sample) in [("gb18030", "𠀀"), ("utf-16le", "𠀀"), ("utf-16be", "中文"), ("windows-1252", "café €")] {
+        let encoded = try FileEncoding.encode(sample, as: name, bom: true, newline: "\n")
+        guard try FileEncoding.decode(encoded, path: path, requested: name).text == sample else { throw Store.failure("Encoding round trip failed: " + name) }
+    }
+    guard (try? FileEncoding.encode("中文", as: "windows-1252", bom: false, newline: "\n")) == nil else { throw Store.failure("Lossy encoding accepted") }
     let second = Document(untitledName: "第二份.md", text: "草稿B", baseline: "")
     let session = Session(documents: [doc, second], activeId: second.id)
     let file = folder.appendingPathComponent("session.json"); try Store.saveSession(session, file)

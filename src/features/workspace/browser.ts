@@ -65,7 +65,5 @@ export async function readBrowserWorkspaceFile(rootId: string, path: string) {
   if (file.size > 20 * 1024 * 1024) throw new Error('文件超过 20 MB。');
   const bytes = await file.arrayBuffer();
   if (!root || root.id !== rootId) throw new Error('工作区已关闭或切换。');
-  const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  if (text.includes('\0')) throw new Error('文件不是 UTF-8 文本文档。');
-  return { name: file.name, text };
+  return { name: file.name, bytes: new Uint8Array(bytes) };
 }

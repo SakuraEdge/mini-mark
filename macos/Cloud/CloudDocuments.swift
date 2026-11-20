@@ -49,6 +49,7 @@ extension AppDelegate {
                 return
             }
             let snapshot = self.session.documents[index]
+            if type == "cloudBind" && (snapshot.needsEncoding == true || snapshot.pendingEncoding != nil) { done(.failure(Store.failure("请先选择编码并保存本地文件。"))); return }
             if type == "cloudBind" && snapshot.cloud != nil { done(.failure(Store.failure("当前文档已经是云文档。"))); return }
             var fields: [String: Any] = ["owner": owner, "path": path]
             if type == "cloudBind" { fields["text"] = snapshot.text }
@@ -164,7 +165,7 @@ extension AppDelegate {
             for decision in decisions where decision.answer == .alertThirdButtonReturn {
                 guard let index = self.session.documents.firstIndex(where: { $0.id == decision.id }) else { continue }
                 if self.session.documents[index].path == nil && self.session.documents[index].cloud == nil { self.remove(decision.id) }
-                else { self.session.documents[index].text = self.session.documents[index].savedText }
+                else { self.session.documents[index].text = self.session.documents[index].savedText; self.session.documents[index].pendingEncoding = nil }
             }
             self.persist(); self.closingRequest = nil; self.confirmedClose = true
             completion(.success(())); NSApp.terminate(nil)

@@ -1,3 +1,5 @@
+import { initializeEncoding } from '../features/encoding/panel';
+import type { EncodingMetadata } from '../features/encoding/model';
 import { createIcons, X } from 'lucide';
 import { mountApp, icon } from '../ui/layout';
 import { undo, redo, isolateHistory } from '@codemirror/commands';
@@ -35,6 +37,7 @@ let language: DocumentLanguage = 'markdown';
 let baseline = '';
 let fileOnDisk = false;
 let autoName = false;
+let encodingInfo: EncodingMetadata = {};
 let cloudBinding: CloudBinding | null = null;
 let cloudOperation: { resolve(): void; reject(error: Error): void } | undefined;
 let loading = false;
@@ -96,6 +99,10 @@ const view = createEditor(document.querySelector('#editor')!, (update) => {
     }
   }
 });
+const encodingPanel = initializeEncoding(() => ({ ...snapshotCurrent(), ...encodingInfo, dirty: view.state.doc.toString() !== baseline || Boolean(encodingInfo.pendingEncoding), cloud: !!cloudBinding }), () => {
+  // Flush a real edit that is still in the debounce window before requesting a preview.
+  if (revision > (documents.get(activeId)?.document.revision ?? 0)) { clearTimeout(persistTimer); send('edit', snapshotCurrent()); }
+}, showToast);
 const imageActions = initializeImages({
   view, notice: showToast,
   snapshot: () => ({ documentId: activeId, revision, editable: !transitionPending && mode !== 'read' && language === 'markdown' }),
@@ -157,7 +164,7 @@ function cloudDocumentAction(type: string, payload: Record<string, unknown> = {}
 }
 
 function updateSaved(text = view.state.doc.toString()) {
-  const dirty = text !== baseline;
+  const dirty = text !== baseline || !!encodingInfo.pendingEncoding;
   document.querySelector('#save-state')!.textContent = cloudBinding ? dirty ? '未同步' : '已同步' : dirty ? '未保存' : fileOnDisk ? '已保存' : '草稿';
   document.querySelector('#storage-mode')!.textContent = cloudBinding ? '云文档' : isDesktop ? '本地文档' : '浏览器预览';
   document.querySelector('#sidebar-dirty')!.classList.toggle('visible', dirty);
@@ -174,7 +181,7 @@ function snapshotCurrent() {
 }
 function setTransitionPending(pending: boolean, keepEditable = false) {
   transitionPending = pending;
-  setEditorEditable(view, !pending || keepEditable);
+  setEditorEditable(view, (!pending || keepEditable) && !encodingInfo.needsEncoding);
   app.classList.toggle('transition-pending', pending);
   mobileShell?.refresh();
 }
@@ -182,7 +189,7 @@ function cacheCurrent() {
   if (!activeId) return;
   const previous = documents.get(activeId);
   documents.set(activeId, {
-    document: { id: activeId, name, text: view.state.doc.toString(), baseline, revision, path: previous?.document.path, cloud: cloudBinding, autoName },
+    document: { ...encodingInfo, id: activeId, name, text: view.state.doc.toString(), baseline, revision, path: previous?.document.path, cloud: cloudBinding, autoName },
     state: view.state,
     mode,
     language,
@@ -504,6 +511,7 @@ mobileShell = initializeAndroidShell({
 
 let updateScheduled = false;
 connect((message) => {
+  if (message.type === 'encodingResponse') { encodingPanel.handle(message); return; }
   if (message.type === 'cloudConflict') { mobileShell?.conflict(message); return; }
   if (workspaceActions.handleMessage(message)) return;
   if (cloudActions.handleMessage(message)) return;
@@ -532,6 +540,7 @@ connect((message) => {
     name = autoName ? headingDocumentName(current.text) ?? doc.name : doc.name;
     fileOnDisk = Boolean(doc.path);
     cloudBinding = doc.cloud ?? null;
+    encodingInfo = { encoding: doc.encoding, pendingEncoding: doc.pendingEncoding, needsEncoding: doc.needsEncoding, canReinterpret: doc.canReinterpret };
     baseline = doc.baseline;
     revision = current.revision;
     loading = true;
@@ -578,8 +587,10 @@ connect((message) => {
     if (message.recovered) showToast('已恢复上次打开的文档和未保存草稿');
     setTransitionPending(false);
     mobileShell?.receiveWorkspace();
+    encodingPanel.update();
+    if (doc.needsEncoding && (switchingDocument || !cached || !cached.document.needsEncoding)) encodingPanel.open();
     if (switchingDocument) animateDocumentSwitch();
-    if (mode !== 'read' && !isAndroid) view.focus();
+    if (mode !== 'read' && !isAndroid && !document.querySelector('dialog[open]')) view.focus();
     if (localIsNewer) send('edit', snapshotCurrent());
     void document.fonts.ready.then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
       window.__MOYE_READY__ = performance.now();
@@ -589,11 +600,13 @@ connect((message) => {
   } else if (message.type === 'saved') {
     workspaceActions.refreshAfterSave();
     const cached = documents.get(message.documentId);
-    if (cached) Object.assign(cached.document, { name: message.name, path: message.path, cloud: message.cloud, baseline: message.text, autoName: false });
+    const savedEncoding = message.encoding ? { encoding: message.encoding, pendingEncoding: message.pendingEncoding, needsEncoding: message.needsEncoding, canReinterpret: message.canReinterpret } : {};
+    if (cached) Object.assign(cached.document, { ...savedEncoding, name: message.name, path: message.path, cloud: message.cloud, baseline: message.text, autoName: false });
     const tab = tabs.find(tab => tab.id === message.documentId);
     if (tab) Object.assign(tab, { name: message.name, path: message.path, cloud: message.cloud, autoName: false, dirty: cached ? cached.document.text !== message.text : false });
     if (message.documentId === activeId) {
       name = message.name; baseline = message.text; fileOnDisk = Boolean(message.path); cloudBinding = message.cloud ?? null; autoName = false;
+      encodingInfo = { ...encodingInfo, ...savedEncoding }; encodingPanel.update();
       setImageDocument(activeId + ':' + (message.path ?? ''));
       const nextLanguage = documentLanguage(name);
       if (nextLanguage !== language) {

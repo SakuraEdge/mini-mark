@@ -50,6 +50,8 @@ internal class AndroidBridge(
                 val text = failure.message ?: "操作失败，请重试。"
                 val request = body.optString("requestId")
                 when (body.optString("type")) {
+                    "encodingRequest" -> send("encodingResponse", JSONObject().put("requestId", request).put("documentId", body.optString("documentId"))
+                        .put("error", if (failure is java.nio.charset.CharacterCodingException) "所选编码无法完整读取或表示正文。" else text))
                     "cloudRequest" -> send("cloudResponse", JSONObject().put("requestId", request).put("error", text))
                     "folderRequest" -> send("folderResponse", JSONObject().put("requestId", request).put("error", text))
                     "importImages" -> send("imagesImported", JSONObject().put("requestId", request).put("error", text))
@@ -69,6 +71,14 @@ internal class AndroidBridge(
             return
         }
         if (type == "rendered") return
+        if (type == "encodingRequest") {
+            check(!state.documentBusy && state.pendingPicker == null) { "请等待当前文件操作完成。" }
+            val id = body.getString("documentId"); val action = body.getString("action")
+            val preview = store.encodingAction(id, body.getLong("revision"), body.getString("text"), action, body.getString("encoding"))
+            if (action == "switch" || action == "convert") publish()
+            send("encodingResponse", JSONObject().put("requestId", body.getString("requestId")).put("documentId", id).put("preview", preview))
+            return
+        }
         if (body.has("text") && body.has("revision") && body.has("documentId")) {
             store.webEdit(body.getString("documentId"), body.getString("text"), body.getLong("revision"), body.optString("autoTitle").ifBlank { null })
         }
@@ -220,6 +230,7 @@ internal class AndroidBridge(
         updateResources()
     }
     private suspend fun saveCloud(doc: LocalDocument, owner: String = doc.cloud!!.owner, path: String = doc.cloud!!.path) {
+        check(!doc.needsEncoding && doc.pendingEncoding == null) { "请先选择编码并保存本地文件。" }
         val embedded = if (doc.cloud == null) embedAssets(doc) else false
         val text = doc.value.text
         val binding = doc.cloud?.takeIf { it.owner.equals(owner, true) && it.path == path }
@@ -312,9 +323,12 @@ internal class AndroidBridge(
         } catch (_: Exception) { result.put("error", "暂时无法检测 Android 版本，请联网后重试。") }
         send("updateResult", result)
     }
+    private fun JSONObject.withEncoding(doc: LocalDocument) = put("encoding", if (doc.cloud == null) doc.encoding else "utf-8")
+        .put("pendingEncoding", doc.pendingEncoding ?: JSONObject.NULL).put("needsEncoding", doc.needsEncoding)
+        .put("canReinterpret", doc.uri != null && doc.cloud == null)
     private fun jsonDocument(doc: LocalDocument) = JSONObject().put("id", doc.id).put("name", doc.name).put("text", doc.value.text)
         .put("baseline", doc.cloud?.baseline ?: doc.savedBody ?: "").put("revision", doc.revision).put("path", doc.uri)
-        .put("cloud", doc.cloud?.json()).put("autoName", doc.autoName)
+        .put("cloud", doc.cloud?.json()).put("autoName", doc.autoName).withEncoding(doc)
     fun publish() {
         val doc = store.active ?: return
         val tabs = JSONArray()
@@ -324,6 +338,6 @@ internal class AndroidBridge(
         send("workspace", JSONObject().put("tabs", tabs).put("document", jsonDocument(doc)))
     }
     private fun saved(doc: LocalDocument) { send("saved", JSONObject().put("documentId", doc.id).put("name", doc.name).put("path", doc.uri)
-        .put("text", doc.cloud?.baseline ?: doc.savedBody ?: "").put("cloud", doc.cloud?.json()).put("autoName", false)) }
+        .put("text", doc.cloud?.baseline ?: doc.savedBody ?: "").put("cloud", doc.cloud?.json()).put("autoName", false).withEncoding(doc)) }
     private fun updateResources() { resources.documents = store.documents.map { DocumentAccess(it.id, it.uri, it.parentUri) } }
 }

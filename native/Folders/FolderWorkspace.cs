@@ -79,13 +79,13 @@ public sealed class FolderWorkspace(string dataRoot) {
         return new FolderListing(root, relative, page, (long)offset + page.Length < ordered.Length ? offset + page.Length : null);
     }
 
-    public LoadedDocument Read(string rootId, string path) {
+    public LoadedDocument Read(string rootId, string path, bool offerChoice = false) {
         var root = Require(rootId);
         var relative = ValidateRelative(path, false);
         if (!IsSupported(relative)) throw new IOException("工作区仅支持打开 Markdown、YAML、HTML 和 TXT 文档。");
         var absolute = Resolve(root, relative);
         using var access = FolderAccess.Directory(System.IO.Path.GetDirectoryName(absolute)!);
-        var loaded = DocumentStore.Decode(absolute, access.ReadFile(absolute));
+        var loaded = DocumentStore.Decode(absolute, access.ReadFile(absolute), offerChoice: offerChoice);
         EnsureCurrent(rootId);
         return loaded;
     }

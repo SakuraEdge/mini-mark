@@ -6,7 +6,7 @@
 
 Markdown、YAML、HTML 编辑器，支持 Windows、macOS 和 Android。
 
-[![Release](https://img.shields.io/badge/release-Rev%20v1.0.4-286bd6)](https://github.com/SakuraEdge/mini-mark/releases/latest)
+[![Release](https://img.shields.io/badge/release-Rev%20v1.0.5-286bd6)](https://github.com/SakuraEdge/mini-mark/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-526a85)](LICENSE)
 
 [下载正式版](https://github.com/SakuraEdge/mini-mark/releases/latest) · [版本记录](https://github.com/SakuraEdge/mini-mark/releases) · [反馈问题](https://github.com/SakuraEdge/mini-mark/issues)
@@ -38,6 +38,10 @@ Markdown、YAML、HTML 编辑器，支持 Windows、macOS 和 Android。
 左侧可切换“单文档”或“工作区文档”。点击“打开文件夹”后，工作区显示目录中的文件和子文件夹。Markdown、YAML、HTML、TXT 文件可直接打开，不覆盖已有标签中的修改。
 
 目录按需展开，文件较多时分批显示。可刷新目录或关闭工作区；关闭工作区不会关闭已打开的文档。不支持编辑的文件和链接仅显示，不自动运行。桌面版会记住选择的文件夹；浏览器预览重新打开后需再次选择。
+
+## 文件编码
+
+点击状态栏的编码名称。打开旧文件时，用「切换为…」从原始字节试读。选择「转换为…」可指定下次保存的编码。支持 UTF-8、UTF-8 BOM、UTF-16 LE/BE、GBK、GB18030 和 Windows-1252；云文档使用 UTF-8。
 
 ## 云文档
 
@@ -90,7 +94,7 @@ Windows 安装时可以选择桌面和开始菜单快捷方式，以及 Markdown
 
 macOS 将 `Mini Mark.app` 拖入 Applications。当前包使用 **ad-hoc 签名，未使用 Apple Developer ID，也未公证**。免费个人开发证书不等同于公开发行签名。Windows 包同样未使用商业代码签名。请从本仓库下载并核对校验和，无需关闭系统安全保护。
 
-Android 采用文档、工作区、云文档、设置四个入口，共享桌面端的即时编辑、源码、阅读、分屏、公式、图片、主题与插件能力。系统文件选择器负责打开、保存和文件夹授权，PDF 通过系统打印中的“另存为 PDF”导出。GitHub 云文档包含登录、MiniMarkDisk 目录、保存、重命名、删除与冲突处理。单个本地文件上限为 20 MB，云文档上限为 5 MB。将 APK 传到手机点击安装，并按系统提示允许当前文件管理器安装应用。v1.0.4 沿用此前本地预览 APK 的签名，支持覆盖升级并保留草稿。真实账号全流程、手机输入法和自动更新的验收范围见开发说明。[Android 开发说明](docs/android-development.md)
+Android 采用文档、工作区、云文档、设置四个入口，共享桌面端的即时编辑、源码、阅读、分屏、公式、图片、主题与插件能力。系统文件选择器负责打开、保存和文件夹授权，PDF 通过系统打印中的“另存为 PDF”导出。GitHub 云文档包含登录、MiniMarkDisk 目录、保存、重命名、删除与冲突处理。单个本地文件上限为 20 MB，云文档上限为 5 MB。将 APK 传到手机点击安装，并按系统提示允许当前文件管理器安装应用。v1.0.5 沿用此前本地预览 APK 的签名，支持覆盖升级并保留草稿。真实账号全流程、手机输入法和自动更新的验收范围见开发说明。[Android 开发说明](docs/android-development.md)
 
 ## 快捷键
 

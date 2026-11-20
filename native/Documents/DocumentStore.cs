@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace Moye;
 
-public sealed record LoadedDocument(string Path, string Text, string Fingerprint, bool Bom, string Newline);
+public sealed record LoadedDocument(string Path, string Text, string Fingerprint, bool Bom, string Newline, string EncodingName = "utf-8", bool NeedsEncoding = false);
 public sealed record Draft(string? Path, string Text, string Baseline, string? Fingerprint, bool Bom, string Newline);
 
 public static class DocumentStore {
@@ -13,34 +13,25 @@ public static class DocumentStore {
 
     public static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
 
-    public static LoadedDocument Read(string path) {
-        var info = new FileInfo(path);
-        if (info.Length > MaxFileBytes) throw new IOException("文件超过 20 MB，请使用适合大文件的文本工具。");
-        var bytes = File.ReadAllBytes(path);
-        return Decode(path, bytes);
+    public static LoadedDocument Read(string path, string? encoding = null, bool offerChoice = false) {
+        using var access = FolderAccess.Directory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        return Decode(path, access.ReadFile(path), encoding, offerChoice);
     }
 
-    public static LoadedDocument Decode(string path, byte[] bytes) {
-        if (bytes.LongLength > MaxFileBytes) throw new IOException("文件超过 20 MB，请使用适合大文件的文本工具。");
-        var bom = bytes.AsSpan().StartsWith(new byte[] { 0xef, 0xbb, 0xbf });
-        var raw = new UTF8Encoding(false, true).GetString(bytes, bom ? 3 : 0, bytes.Length - (bom ? 3 : 0));
-        if (raw.Contains('\0')) throw new IOException("此文件不是 UTF-8 文本文档。");
-        var newline = raw.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
-        return new LoadedDocument(System.IO.Path.GetFullPath(path), Normalize(raw), Hash(bytes), bom, newline);
-    }
+    public static LoadedDocument Decode(string path, byte[] bytes, string? encoding = null, bool offerChoice = false) =>
+        FileEncoding.Decode(path, bytes, encoding, offerChoice);
 
     public static string Normalize(string text) => text.Replace("\r\n", "\n").Replace('\r', '\n');
 
     public static bool HasConflict(string path, string? fingerprint) {
         if (fingerprint is null) return File.Exists(path);
-        return !File.Exists(path) || Hash(File.ReadAllBytes(path)) != fingerprint;
+        if (!File.Exists(path)) return true;
+        using var access = FolderAccess.Directory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        return Hash(access.ReadFile(path)) != fingerprint;
     }
 
-    public static string Write(string path, string text, bool bom, string newline) {
-        var normalized = Normalize(text);
-        if (newline == "\r\n") normalized = normalized.Replace("\n", "\r\n");
-        var encoding = new UTF8Encoding(bom);
-        var bytes = encoding.GetPreamble().Concat(encoding.GetBytes(normalized)).ToArray();
+    public static string Write(string path, string text, bool bom, string newline, string? encoding = null) {
+        var bytes = FileEncoding.Encode(text, encoding ?? (bom ? "utf-8-bom" : "utf-8"), bom, newline);
         AtomicWrite(path, bytes);
         return Hash(bytes);
     }

@@ -6,6 +6,25 @@ Directory.CreateDirectory(folder);
 var count = 0;
 void Check(bool valid, string message) { if (!valid) throw new Exception(message); count++; }
 try {
+    var legacyPath = Path.Combine(folder, "gbk.txt");
+    byte[] gbk = [0xd6, 0xd0, 0xce, 0xc4, 13, 10];
+    File.WriteAllBytes(legacyPath, gbk);
+    var encodedWorkspace = new DocumentWorkspace();
+    var old = encodedWorkspace.Open(legacyPath);
+    Check(old.NeedsEncoding && !old.Update("oops", 1), "Undecoded document was editable");
+    old.Load(DocumentStore.Read(legacyPath, "gbk"));
+    Check(old.Text == "中文\n" && old.Newline == "\r\n" && !old.Dirty, "GBK read lost text or newline");
+    old.PendingEncoding = "utf-16be";
+    var encSession = Path.Combine(folder, "enc-session.json");
+    encodedWorkspace.SaveSession(encSession);
+    old = DocumentWorkspace.Restore(encSession, "").Active;
+    Check(old.Dirty && old.OutputBom && old.OutputEncoding == "utf-16be" && old.CurrentEncoding == "gbk", "Pending conversion lost on restore");
+    foreach (var (encoding, text) in new[] { ("gb18030", "𠀀"), ("windows-1252", "café €"), ("utf-8-bom", "中文"), ("utf-16le", "𠀀"), ("utf-16be", "正文") }) {
+        var bytes = FileEncoding.Encode(text, encoding, true, "\n");
+        Check(FileEncoding.Decode(legacyPath, bytes, encoding).Text == text, $"{encoding} round trip failed");
+    }
+    try { DocumentStore.Write(legacyPath, "中文", false, "\n", "windows-1252"); throw new Exception("Lossy conversion accepted"); } catch (IOException) { count++; }
+    Check(File.ReadAllBytes(legacyPath).SequenceEqual(gbk), "Failed conversion damaged original bytes");
     var previewFolder = Path.Combine(folder, "html");
     Directory.CreateDirectory(previewFolder);
     File.WriteAllText(Path.Combine(previewFolder, "index.html"), "<h1>HTML</h1>");

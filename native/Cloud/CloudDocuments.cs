@@ -41,6 +41,7 @@ public sealed partial class MainWindow {
         Publish(); Persist();
     }
     private async Task BindCloud(OpenDocument document, string owner, string path, long queuedDeletionRevision) {
+        if (document.NeedsEncoding || document.PendingEncoding is not null) throw new IOException("请先选择文件编码并保存本地文档。");
         if (queuedDeletionRevision != cloudDeletionRevision) throw new IOException("云端目录已变化，请重新选择保存位置。");
         CloudPaths.Validate(path);
         if (workspace.Documents.Any(item => item.Id != document.Id && item.Cloud?.Owner.Equals(owner, StringComparison.OrdinalIgnoreCase) == true && item.Cloud.Path == path))

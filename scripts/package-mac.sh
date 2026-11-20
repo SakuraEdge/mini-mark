@@ -18,7 +18,8 @@ sdk=$(xcrun --sdk macosx --show-sdk-path)
 sources=()
 while IFS= read -r source; do sources+=("$source"); done < <(find macos -name '*.swift' -type f | sort)
 for arch in arm64 x86_64; do
-  swiftc -O -swift-version 5 -target "$arch-apple-macos13.0" -sdk "$sdk" \
+  xcrun clang -O2 -target "$arch-apple-macos13.0" -isysroot "$sdk" -c macos/Documents/StrictTranscode.c -o "release/mac-build/codec-$arch.o"
+  swiftc -import-objc-header macos/Documents/StrictTranscode.h -liconv "release/mac-build/codec-$arch.o" -O -swift-version 5 -target "$arch-apple-macos13.0" -sdk "$sdk" \
     -framework AppKit -framework WebKit -framework CryptoKit -framework PDFKit -framework Security \
     "${sources[@]}" -o "release/mac-build/MiniMark-$arch"
 done

@@ -1,3 +1,6 @@
+import { browserEncoding, downloadBrowserDocument, openBrowserBytes } from '../features/encoding/browser';
+import { forgetOriginal } from '../features/encoding/originals';
+import { byteLimit, type EncodingMetadata } from '../features/encoding/model';
 import './android';
 import { sample } from '../documents/sample';
 import { BrowserWorkspace, type DocumentData, type TabData } from '../documents/workspace';
@@ -8,7 +11,8 @@ export type { DocumentData, TabData } from '../documents/workspace';
 
 export type HostMessage =
   | { type: 'workspace'; tabs: TabData[]; document: DocumentData; recovered?: boolean }
-  | { type: 'saved'; documentId: string; name: string; path?: string; text: string; cloud?: CloudBinding | null; autoName?: boolean }
+  | { type: 'encodingResponse'; requestId: string; documentId: string; preview?: string; error?: string }
+  | ({ type: 'saved'; documentId: string; name: string; path?: string; text: string; cloud?: CloudBinding | null; autoName?: boolean } & EncodingMetadata)
   | { type: 'cloudResponse'; requestId: string; data?: unknown; error?: string }
   | { type: 'folderResponse'; requestId: string; data?: unknown; error?: string }
   | { type: 'cloudConflict'; documentId: string; owner: string; path: string }
@@ -36,14 +40,14 @@ function publish(recovered = false) {
   persist();
   onMessage({ type: 'workspace', tabs: workspace.tabs, document: { ...workspace.active }, recovered });
 }
-function download(name: string, content: string, mime: string) {
+function download(name: string, content: BlobPart, mime: string) {
   const url = URL.createObjectURL(new Blob([content], { type: mime }));
   const a = document.createElement('a'); a.href = url; a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function documentFileName(value: string, sourceName: string) {
   const name = value.trim();
-  if (/\.(?:md|markdown|mdown|yaml|yml|html|htm)$/i.test(name)) return name;
+  if (/\.(?:md|markdown|mdown|txt|yaml|yml|html|htm)$/i.test(name)) return name;
   const yaml = documentLanguage(sourceName) === 'yaml';
   const extension = /\.htm$/i.test(sourceName) ? '.htm' : documentLanguage(sourceName) === 'html' ? '.html' : /\.yml$/i.test(sourceName) ? '.yml' : yaml ? '.yaml' : '.md';
   return `${name || '未命名'}${extension}`;
@@ -65,11 +69,17 @@ export function connect(callback: typeof onMessage) {
     } catch { /* Preserve an unreadable legacy entry for manual recovery. */ }
     if (!workspace.documents.length) workspace.add(sample, '随手记.md', sample);
   }
-  publish(workspace.documents.some(document => document.text !== document.baseline));
+  publish(workspace.documents.some(document => Boolean(document.pendingEncoding) || document.text !== document.baseline));
 }
 
 export function send(type: string, payload: Record<string, unknown> = {}) {
   if (native) { native.postMessage({ type, ...payload }); return; }
+  if (type === 'encodingRequest') {
+    const ids = { requestId: String(payload.requestId), documentId: String(payload.documentId) };
+    void browserEncoding(workspace, payload, publish).then(preview => onMessage({ type: 'encodingResponse', ...ids, preview }),
+      error => onMessage({ type: 'encodingResponse', ...ids, error: error.message }));
+    return;
+  }
   if (type === 'folderRequest') {
     void browserFolderRequest(String(payload.action), payload).then(data => onMessage({ type: 'folderResponse', requestId: String(payload.requestId), data }),
       error => onMessage({ type: 'folderResponse', requestId: String(payload.requestId), error: error instanceof Error ? error.message : '工作区读取失败。' }));
@@ -93,11 +103,11 @@ export function send(type: string, payload: Record<string, unknown> = {}) {
   const doc = workspace.documents.find(item => item.id === id);
   if (type === 'edit') { persist(); return; }
   if (type === 'openWorkspaceFile') {
-    void readBrowserWorkspaceFile(String(payload.rootId), String(payload.path)).then(file => {
+    void readBrowserWorkspaceFile(String(payload.rootId), String(payload.path)).then(async file => {
       const path = `workspace:${String(payload.rootId)}/${String(payload.path)}`;
       const existing = workspace.documents.find(item => item.path === path);
       if (existing) workspace.activate(existing.id);
-      else { const opened = workspace.add(file.text, file.name, file.text); opened.path = path; }
+      else await openBrowserBytes(workspace, file.bytes, file.name, path);
       publish();
     }).catch(error => onMessage({ type: 'error', message: error instanceof Error ? error.message : '工作区文件打开失败。' }))
       .finally(() => onMessage({ type: 'operationComplete' }));
@@ -112,8 +122,8 @@ export function send(type: string, payload: Record<string, unknown> = {}) {
   }
   if (type === 'closeTab') {
     const target = workspace.documents.find(item => item.id === payload.targetId);
-    if (!target || target.text === target.baseline || confirm(`“${target.name}”尚未保存。确定关闭并丢弃修改吗？`)) {
-      workspace.remove(String(payload.targetId)); publish();
+    if (!target || !target.pendingEncoding && target.text === target.baseline || confirm(`“${target.name}”尚未保存。确定关闭并丢弃修改吗？`)) {
+      forgetOriginal(target?.originalKey); workspace.remove(String(payload.targetId)); publish();
     }
     onMessage({ type: 'operationComplete' });
   }
@@ -122,11 +132,11 @@ export function send(type: string, payload: Record<string, unknown> = {}) {
     fileInput.onchange = async () => {
       try {
         for (const file of Array.from(fileInput?.files ?? [])) {
-          const text = (await file.text()).replace(/\r\n/g, '\n');
-          workspace.add(text, file.name, text);
+          if (file.size > byteLimit) throw new Error('文件超过 20 MB。');
+          await openBrowserBytes(workspace, new Uint8Array(await file.arrayBuffer()), file.name);
         }
         publish();
-      } finally { if (fileInput) fileInput.value = ''; onMessage({ type: 'operationComplete' }); }
+      } catch (error) { publish(); onMessage({ type: 'error', message: error instanceof Error ? error.message : '无法读取文件。' }); } finally { if (fileInput) fileInput.value = ''; onMessage({ type: 'operationComplete' }); }
     };
     fileInput.oncancel = () => onMessage({ type: 'operationComplete' });
     fileInput.click();
@@ -135,10 +145,10 @@ export function send(type: string, payload: Record<string, unknown> = {}) {
     const name = type === 'saveAs' ? prompt(`${formatLabel(doc.name)} 文件名`, doc.name) : doc.name;
     if (name) {
       const fileName = documentFileName(name, doc.name);
-      const mime = documentLanguage(fileName) === 'html' ? 'text/html;charset=utf-8' : documentLanguage(fileName) === 'yaml' ? 'application/yaml;charset=utf-8' : 'text/markdown;charset=utf-8';
-      download(fileName, doc.text, mime);
-      doc.name = fileName; doc.autoName = false; publish();
-      onMessage({ type: 'notice', message: `已发起 ${formatLabel(fileName)} 下载；草稿仍保留。` });
+      void downloadBrowserDocument(workspace, id, fileName, bytes => download(fileName, bytes, 'application/octet-stream')).then(() => {
+        publish(); onMessage({ type: 'notice', message: '已发起下载，草稿已保留。' });
+      }).catch(error => onMessage({ type: 'error', message: error.message })).finally(() => onMessage({ type: 'operationComplete' }));
+      return;
     }
   }
   if (type === 'exportHtml') {
@@ -167,5 +177,5 @@ export function send(type: string, payload: Record<string, unknown> = {}) {
 }
 
 window.addEventListener('beforeunload', event => {
-  if (!native && workspace.documents.some(document => document.text !== document.baseline)) { event.preventDefault(); event.returnValue = ''; }
+  if (!native && workspace.documents.some(document => Boolean(document.pendingEncoding) || document.text !== document.baseline)) { event.preventDefault(); event.returnValue = ''; }
 });

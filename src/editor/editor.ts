@@ -481,7 +481,7 @@ export function setEditorFont(view: EditorView, size: number) {
 }
 
 export function setEditorEditable(view: EditorView, editable: boolean) {
-  view.dispatch({ effects: editableCompartment.reconfigure(EditorView.editable.of(editable)) });
+  view.dispatch({ effects: editableCompartment.reconfigure(editable ? EditorView.editable.of(true) : [EditorView.editable.of(false), EditorState.readOnly.of(true), EditorState.changeFilter.of(tr => !tr.docChanged)]) });
 }
 
 export function surround(view: EditorView, before: string, after = before) {

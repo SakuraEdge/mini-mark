@@ -21,10 +21,15 @@ internal data class DocumentSnapshot(
     val revision: Long = 0,
     val cloud: CloudBinding? = null,
     val parentUri: String? = null,
+    val encoding: String = if (bom) "utf-8-bom" else "utf-8",
+    val pendingEncoding: String? = null,
+    val needsEncoding: Boolean = false,
 ) {
+    val outputEncoding get() = pendingEncoding ?: encoding
+    val outputBom get() = outputEncoding == "utf-8-bom" || outputEncoding.startsWith("utf-16") && (pendingEncoding != null || bom)
     fun toDocument() = LocalDocument(
         id, name, normalizeLines(body), uri, savedBody?.let(::normalizeLines), diskHash,
-        crlf, bom, autoName && uri == null && cloud == null && isMarkdown(name), writeFailed, revision, cloud, parentUri,
+        crlf, bom, autoName && uri == null && cloud == null && isMarkdown(name), writeFailed, revision, cloud, parentUri, encoding, pendingEncoding, needsEncoding,
     )
 }
 
@@ -47,6 +52,8 @@ internal fun decodeSession(text: String): SessionSnapshot {
             row.optLong("revision", 0).coerceAtLeast(0), row.optJSONObject("cloud")?.let {
                 CloudBinding(it.getString("owner"), it.getString("path"), it.getString("sha"), normalizeLines(it.getString("baseline")))
             }, row.nullableString("parentUri"),
+            row.optString("encoding", if (row.optBoolean("bom")) "utf-8-bom" else "utf-8"),
+            row.nullableString("pendingEncoding"), row.optBoolean("needsEncoding"),
         )
     }
     require(records.map { it.id }.distinct().size == records.size) { "草稿编号重复。" }
@@ -59,6 +66,7 @@ internal fun encodeSession(snapshot: SessionSnapshot): String {
         array.put(JSONObject().put("id", doc.id).put("name", doc.name).put("body", doc.body)
             .put("uri", doc.uri).put("savedBody", doc.savedBody).put("diskHash", doc.diskHash)
             .put("crlf", doc.crlf).put("bom", doc.bom).put("autoName", doc.autoName)
+            .put("encoding", doc.encoding).put("pendingEncoding", doc.pendingEncoding).put("needsEncoding", doc.needsEncoding)
             .put("writeFailed", doc.writeFailed).put("revision", doc.revision)
             .put("cloud", doc.cloud?.json()).put("parentUri", doc.parentUri))
     }

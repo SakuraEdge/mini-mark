@@ -52,7 +52,7 @@ public sealed partial class MainWindow {
     }
 
     private async Task OpenWorkspaceFile(string rootId, string path) {
-        var loaded = await Task.Run(() => folders.Read(rootId, path));
+        var loaded = await Task.Run(() => folders.Read(rootId, path, offerChoice: true));
         folders.OpenInto(workspace, rootId, loaded);
         Publish(); Persist();
     }

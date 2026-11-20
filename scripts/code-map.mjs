@@ -10,6 +10,7 @@ const areas = [
   ['src/features/theme', '主题过渡'], ['src/features/images', '图片插入'],
   ['src/features/plugins', '自定义插件与隔离执行'],
   ['src/features/formulas', '可视化公式与 Office 复制'], ['src/features/html', 'HTML 编辑入口与隔离运行'],
+  ['src/features/encoding', '编码面板、原始文件缓存和字节编解码'],
   ['src/features/documents', '文档右键菜单与重命名'],
   ['src/features/workspace', '工作区目录树、分页和文件夹协议'],
   ['src/features/android', 'Android 移动导航、工具栏与审核设计实现'],
